@@ -82,7 +82,15 @@ export default function UsersPage() {
     [branches]
   );
 
+  const assignableBranches = useMemo(() => branches.filter((b) => b.isActive), [branches]);
+
   const activeUserCount = useMemo(() => users.filter((user) => user.isActive).length, [users]);
+  const inactiveUserCount = useMemo(() => users.filter((user) => !user.isActive).length, [users]);
+  const canManageUserLifecycle = currentUser?.role === 'admin';
+  const activeAdminCount = useMemo(
+    () => users.filter((user) => user.isActive && user.role === 'admin').length,
+    [users]
+  );
 
   const filteredUsers = useMemo(
     () => users.filter((user) => matchesStatusFilter(user.isActive, statusFilter)),
@@ -208,7 +216,7 @@ export default function UsersPage() {
         email: '',
         password: '',
         roleId: roles[0]?.id ?? '',
-        branchId: branches[0]?.id ?? '',
+        branchId: assignableBranches[0]?.id ?? '',
         isActive: true,
       });
       setErrorMessage(null);
@@ -223,6 +231,15 @@ export default function UsersPage() {
   };
 
   const handleDeactivate = async (user: UserRow) => {
+    if (user.id === currentUser?.id) {
+      setErrorMessage('No puedes desactivar tu propia cuenta mientras estás conectado.');
+      return;
+    }
+    if (user.role === 'admin' && user.isActive && activeAdminCount <= 1) {
+      setErrorMessage('Debe quedar al menos un administrador activo en el sistema.');
+      return;
+    }
+
     const previous = user;
     setUsers((current) =>
       current.map((row) => (row.id === user.id ? { ...row, isActive: false } : row))
@@ -233,7 +250,7 @@ export default function UsersPage() {
       setSuccessMessage(null);
       notifyUndoAction({
         title: 'Usuario desactivado',
-        message: `${user.email} — usa Deshacer si fue un error.`,
+        message: `${user.name} ya no podrá iniciar sesión. El historial de ventas y reportes se conserva. Filtra por Inactivos para restaurar.`,
         onUndo: async () => {
           await api.restoreUser(user.id);
           setUsers((current) =>
@@ -312,6 +329,16 @@ export default function UsersPage() {
             <div>
               <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Usuarios</p>
               <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de usuarios</h1>
+              <p className="mt-2 max-w-2xl text-slate-400">
+                Desactiva a quien ya no trabaja en la empresa con el botón Desactivar en cada fila.
+                No se borra el registro: ventas y reportes históricos conservan su nombre. Usa el filtro
+                Inactivos para ver o restaurar cuentas.
+              </p>
+              {!canManageUserLifecycle && (
+                <p className="mt-2 text-sm text-amber-300/90">
+                  Solo el administrador puede desactivar o restaurar usuarios.
+                </p>
+              )}
               {currentUser && (
                 <p className="mt-3 text-sm text-slate-500">
                   Sesión: {currentUser.name} ({roleLabels[currentUser.role] ?? currentUser.role})
@@ -337,7 +364,7 @@ export default function UsersPage() {
                   email: '',
                   password: '',
                   roleId: roles[0]?.id ?? '',
-                  branchId: branches[0]?.id ?? '',
+                  branchId: assignableBranches[0]?.id ?? '',
                   isActive: true,
                 });
                 setErrorMessage(null);
@@ -359,6 +386,9 @@ export default function UsersPage() {
                 </span>
                 <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
                   Activos: {activeUserCount}
+                </span>
+                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                  Inactivos: {inactiveUserCount}
                 </span>
               </div>
               <StatusFilterSelect
@@ -432,15 +462,22 @@ export default function UsersPage() {
                               });
                               setShowModal(true);
                             }}
-                            onRestore={() => handleRestore(user)}
-                            onDelete={() =>
-                              askConfirmation(
-                                'Desactivar usuario',
-                                'El usuario no podrá iniciar sesión. Podrás restaurarlo desde Inactivos o con Deshacer.',
-                                'Desactivar',
-                                'danger',
-                                () => handleDeactivate(user)
-                              )
+                            onRestore={
+                              canManageUserLifecycle ? () => handleRestore(user) : undefined
+                            }
+                            onDelete={
+                              canManageUserLifecycle &&
+                              user.id !== currentUser?.id &&
+                              !(user.role === 'admin' && user.isActive && activeAdminCount <= 1)
+                                ? () =>
+                                    askConfirmation(
+                                      'Desactivar usuario',
+                                      `¿Desactivar a "${user.name}"? No podrá iniciar sesión. Su historial en ventas y reportes se conserva. Puedes restaurarlo desde Inactivos.`,
+                                      'Desactivar',
+                                      'danger',
+                                      () => handleDeactivate(user)
+                                    )
+                                : undefined
                             }
                           />
                         </td>
@@ -510,7 +547,7 @@ export default function UsersPage() {
                   disabled={!!editingUser}
                   className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
                 >
-                  {branches.map((branch) => (
+                  {assignableBranches.map((branch) => (
                     <option key={branch.id} value={branch.id}>
                       {branch.name}
                     </option>

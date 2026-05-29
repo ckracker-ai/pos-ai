@@ -188,9 +188,33 @@ class AuthDelegate {
   }
 
 
-  async deactivate(userId: string): Promise<Result<{ deactivated: true }>> {
-    const user = await User.findByPk(userId);
+  async deactivate(userId: string, actorUserId?: string): Promise<Result<{ deactivated: true }>> {
+    if (actorUserId && actorUserId === userId) {
+      return fail('CANNOT_DEACTIVATE_SELF');
+    }
+
+    const user = await User.findByPk(userId, {
+      include: [{ model: Role, as: 'role', attributes: ['name'] }],
+    });
     if (!user) return fail('USER_NOT_FOUND');
+
+    if (!user.isActive) {
+      return ok({ deactivated: true });
+    }
+
+    const roleName = String((user as { role?: { name?: string } }).role?.name ?? '').toUpperCase();
+    if (roleName === 'ADMIN') {
+      const adminRole = await Role.findOne({ where: { name: 'ADMIN' } });
+      if (adminRole) {
+        const activeAdmins = await User.count({
+          where: { roleId: adminRole.id, isActive: true },
+        });
+        if (activeAdmins <= 1) {
+          return fail('CANNOT_DEACTIVATE_LAST_ADMIN');
+        }
+      }
+    }
+
     await user.update({ isActive: false });
     return ok({ deactivated: true });
   }

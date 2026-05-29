@@ -5,12 +5,11 @@ import { api } from '@/core/api/api-client';
 import {
   extractList,
   fetchProductsForBranch,
-  normalizeBranch,
   normalizeShrinkage,
   ShrinkageRecord,
   unwrapApiEnvelope,
 } from '@/core/api/normalizers';
-import { Branch, Product } from '@/core/interfaces';
+import { Product } from '@/core/interfaces';
 import { useBranchStore } from '@/store/branch';
 import { useAuthStore } from '@/store/auth';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
@@ -19,6 +18,11 @@ import { Navbar } from '@/components/organisms/Navbar';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { ConfirmActionModal } from '@/components/molecules/ConfirmActionModal';
 import { notifyApiError, notifySuccess } from '@/store/ui';
+import {
+  applyDigitsOnlyInput,
+  INVALID_NUMERIC_INPUT_MESSAGE,
+  parsePositiveInt,
+} from '@/core/utils/numeric-input';
 
 function shrinkageStatusLabel(status: string) {
   if (status === 'PENDING') return 'Pendiente';
@@ -29,11 +33,11 @@ function shrinkageStatusLabel(status: string) {
 
 export default function MermasPage() {
   const branchId = useBranchStore((s) => s.selectedBranchId);
+  const activeBranchName = useBranchStore((s) => s.activeBranchLabel);
   const user = useAuthStore((s) => s.user);
   const canApprove = user?.role === 'admin' || user?.role === 'auditor';
 
   const [mermas, setMermas] = useState<ShrinkageRecord[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -61,7 +65,8 @@ export default function MermasPage() {
     variant: 'primary',
     action: null,
   });
-  const [form, setForm] = useState({ reason: '', productId: '', quantity: 1 });
+  const [form, setForm] = useState({ reason: '', productId: '', quantity: '1' });
+  const [quantityError, setQuantityError] = useState<string | null>(null);
 
   const productNameById = useMemo(
     () => new Map(products.map((p) => [p.id, p.name])),
@@ -73,23 +78,27 @@ export default function MermasPage() {
     [products]
   );
 
-  const activeBranchName = branches.find((b) => b.id === branchId)?.name ?? String(branchId);
-
   const selectedProduct = products.find((p) => p.id === form.productId);
+  const parsedQuantity = parsePositiveInt(form.quantity);
+  const canRegister =
+    Boolean(form.reason.trim()) &&
+    Boolean(form.productId) &&
+    parsedQuantity !== null &&
+    productsInBranch.length > 0;
 
-  useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const response = await api.getBranches();
-        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['branches']);
-        setBranches(rows.map((row) => normalizeBranch(row)));
-      } catch {
-        // No bloquea: mostramos ID si no se puede cargar el nombre.
-      }
-    };
-
-    loadBranches();
-  }, []);
+  const validateQuantityField = (raw: string) => {
+    const { value, hadInvalid } = applyDigitsOnlyInput(raw);
+    if (hadInvalid) {
+      setQuantityError(INVALID_NUMERIC_INPUT_MESSAGE);
+      return value === '' ? '' : value;
+    }
+    if (!value || value === '0') {
+      setQuantityError('La cantidad debe ser un número mayor a 0.');
+      return value;
+    }
+    setQuantityError(null);
+    return value;
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -124,12 +133,19 @@ export default function MermasPage() {
   }, [branchId]);
 
   const handleSubmit = async () => {
-    if (!form.reason.trim() || !form.productId || form.quantity <= 0) return;
+    if (!form.reason.trim() || !form.productId) return;
 
-    if (selectedProduct && form.quantity > (selectedProduct.stock ?? 0)) {
+    const quantity = parsePositiveInt(form.quantity);
+    if (quantity === null) {
+      setQuantityError('La cantidad debe ser un número mayor a 0.');
+      return;
+    }
+
+    if (selectedProduct && quantity > (selectedProduct.stock ?? 0)) {
       setErrorMessage(
-        `La cantidad no puede superar el stock disponible (${selectedProduct.stock ?? 0}). La merma quedará pendiente; el administrador validará al aprobar.`
+        `La cantidad no puede superar el stock disponible (${selectedProduct.stock ?? 0}).`
       );
+      return;
     }
 
     setIsSubmitting(true);
@@ -139,11 +155,12 @@ export default function MermasPage() {
     try {
       await api.createShrinkage({
         productId: form.productId,
-        quantity: form.quantity,
+        quantity,
         reason: form.reason.trim(),
       });
       setShowModal(false);
-      setForm({ reason: '', productId: productsInBranch[0]?.id ?? '', quantity: 1 });
+      setForm({ reason: '', productId: productsInBranch[0]?.id ?? '', quantity: '1' });
+      setQuantityError(null);
       setSuccessMessage(
         'Merma registrada en estado pendiente. Un administrador debe aprobarla para descontar el inventario.'
       );
@@ -158,6 +175,12 @@ export default function MermasPage() {
   };
 
   const handleApprove = async (id: string) => {
+    const row = mermas.find((m) => m.id === id);
+    if (row && row.quantity <= 0) {
+      setErrorMessage('No se puede aprobar una merma con cantidad 0. Recházala para descartarla.');
+      return;
+    }
+
     try {
       await api.approveShrinkage(id);
       setSuccessMessage('Merma aprobada. El stock fue descontado de la sucursal.');
@@ -179,6 +202,26 @@ export default function MermasPage() {
       const { displayMessage } = notifyApiError('mermas.reject', error);
       setErrorMessage(displayMessage);
     }
+  };
+
+  const requestRegister = () => {
+    if (!canRegister || parsedQuantity === null) {
+      setQuantityError('La cantidad debe ser un número mayor a 0.');
+      return;
+    }
+    if (selectedProduct && parsedQuantity > (selectedProduct.stock ?? 0)) {
+      setErrorMessage(
+        `La cantidad no puede superar el stock disponible (${selectedProduct.stock ?? 0}).`
+      );
+      return;
+    }
+    askConfirmation(
+      'Registrar merma',
+      '¿Confirmas el registro de esta merma en estado pendiente?',
+      'Registrar',
+      'primary',
+      handleSubmit
+    );
   };
 
   const askConfirmation = (
@@ -227,6 +270,8 @@ export default function MermasPage() {
             <button
               onClick={() => {
                 setErrorMessage(null);
+                setQuantityError(null);
+                setForm((c) => ({ ...c, quantity: '1' }));
                 setShowModal(true);
               }}
               className="rounded-3xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400"
@@ -261,9 +306,11 @@ export default function MermasPage() {
                         {new Date(m.createdAt).toLocaleString('es-CO')}
                       </td>
                       <td className="px-6 py-5 text-white">
-                        {m.productName ?? productNameById.get(m.productId) ?? m.productId}
+                        {m.productName ?? productNameById.get(m.productId) ?? 'Producto desconocido'}
                       </td>
-                      <td className="px-6 py-5 text-slate-300">{m.quantity}</td>
+                      <td className="px-6 py-5 text-slate-300">
+                        {m.quantity > 0 ? m.quantity : <span className="text-rose-300">0 (inválida)</span>}
+                      </td>
                       <td className="px-6 py-5 text-slate-300">{m.reason}</td>
                       <td className="px-6 py-5">
                         <StatusBadge
@@ -278,6 +325,8 @@ export default function MermasPage() {
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
+                                disabled={m.quantity <= 0}
+                                title={m.quantity <= 0 ? 'Cantidad inválida: rechaza esta merma' : undefined}
                                 onClick={() =>
                                   askConfirmation(
                                     'Aprobar merma',
@@ -287,7 +336,7 @@ export default function MermasPage() {
                                     () => handleApprove(m.id)
                                   )
                                 }
-                                className="rounded-2xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                                className="rounded-2xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Aprobar
                               </button>
@@ -351,13 +400,23 @@ export default function MermasPage() {
               <label className="block text-sm text-slate-300">
                 Cantidad a dar de baja
                 <input
-                  type="number"
-                  min={1}
-                  max={selectedProduct?.stock ?? undefined}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={form.quantity}
-                  onChange={(e) => setForm((c) => ({ ...c, quantity: Number(e.target.value) }))}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  onChange={(e) => {
+                    const next = validateQuantityField(e.target.value);
+                    setForm((c) => ({ ...c, quantity: next === '' ? '' : next }));
+                  }}
+                  className={`mt-2 w-full rounded-3xl border bg-slate-900 px-4 py-3 text-white ${
+                    quantityError
+                      ? 'border-rose-500/60 focus:border-rose-400'
+                      : 'border-slate-800 focus:border-amber-400'
+                  } outline-none`}
                 />
+                {quantityError && (
+                  <p className="mt-2 text-xs text-rose-300">{quantityError}</p>
+                )}
                 {selectedProduct && (
                   <p className="mt-1 text-xs text-slate-500">
                     Disponible en sucursal: {selectedProduct.stock ?? 0}
@@ -376,16 +435,8 @@ export default function MermasPage() {
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  askConfirmation(
-                    'Registrar merma',
-                    '¿Confirmas el registro de esta merma en estado pendiente?',
-                    'Registrar',
-                    'primary',
-                    handleSubmit
-                  )
-                }
-                disabled={isSubmitting || productsInBranch.length === 0}
+                onClick={requestRegister}
+                disabled={isSubmitting || !canRegister}
                 className="rounded-3xl bg-amber-500 px-5 py-2 font-semibold text-slate-950 disabled:opacity-50"
               >
                 {isSubmitting ? 'Registrando…' : 'Registrar pendiente'}

@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
 import { api, getApiErrorMessage } from '@/core/api/api-client';
-import { fetchProductsForBranch, normalizeBranch, extractList, unwrapApiEnvelope } from '@/core/api/normalizers';
-import { Branch, Product } from '@/core/interfaces';
+import { fetchProductsForBranch } from '@/core/api/normalizers';
+import { Product } from '@/core/interfaces';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
 import { ProductQuickPicker } from '@/components/organisms/ProductQuickPicker';
+import { coercePositiveIntInput } from '@/core/utils/numeric-input';
 
 
 
@@ -37,8 +38,8 @@ interface ReceiptData {
 export default function PosPage() {
   const { user } = useAuthStore();
   const branchId = useBranchStore((state) => state.selectedBranchId);
+  const activeBranchName = useBranchStore((state) => state.activeBranchLabel);
   const [products, setProducts] = useState<Product[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<PosLineItem[]>([]);
@@ -51,20 +52,6 @@ export default function PosPage() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [pickerResetKey, setPickerResetKey] = useState(0);
-
-  useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const response = await api.getBranches();
-        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['branches']);
-        setBranches(rows.map((row) => normalizeBranch(row)));
-      } catch {
-        // Fallback: mostramos el ID si no se puede cargar la lista de sucursales.
-      }
-    };
-
-    loadBranches();
-  }, []);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -88,7 +75,6 @@ export default function PosPage() {
 
 
   const selectedProduct = products.find((product) => product.id === selectedProductId);
-  const activeBranchName = branches.find((b) => b.id === branchId)?.name ?? String(branchId);
   const availableProducts = useMemo(
     () => products.filter((p) => Number(p.stock ?? 0) > 0),
     [products]
@@ -264,10 +250,11 @@ export default function PosPage() {
                   <label className="space-y-2">
                     <span className="text-sm text-slate-400">Cantidad</span>
                     <input
-                      type="number"
-                      min={1}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={quantity}
-                      onChange={(event) => setQuantity(Number(event.target.value))}
+                      onChange={(event) => setQuantity(coercePositiveIntInput(event.target.value))}
                       className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-amber-400"
                     />
                   </label>

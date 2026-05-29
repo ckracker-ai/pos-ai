@@ -288,6 +288,8 @@ export const api = {
     getApiClient().patch(`/api/branch/${id}`, data, config),
   deleteBranch: (id: string, config?: AxiosRequestConfig) =>
     getApiClient().delete(`/api/branch/${id}`, config),
+  restoreBranch: (id: string, config?: AxiosRequestConfig) =>
+    getApiClient().post(`/api/branch/${id}/restore`, {}, config),
   branchAction: (data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().post('/api/branch/branchAction', data, config),
 
@@ -318,6 +320,8 @@ export const api = {
     getApiClient().get('/api/reports/sales', config),
   getReportsInventory: (config?: AxiosRequestConfig) =>
     getApiClient().get('/api/reports/inventory', config),
+  getReportsShrinkage: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/api/reports/shrinkage', config),
 
   // Bulk Import
   importProducts: (formData: FormData, config?: AxiosRequestConfig) =>

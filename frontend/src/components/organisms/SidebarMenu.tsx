@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import type { UserRole } from '@/core/interfaces';
+import { APP_VERSION_LABEL } from '@/core/constants/version';
 
 type NavItem = {
   label: string;
@@ -188,6 +189,11 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
           );
         })}
       </nav>
+
+      <div className="flex-shrink-0 border-t border-slate-800/80 p-4 sm:p-5">
+        <p className="text-[10px] uppercase tracking-widest text-slate-600">SVM ERP</p>
+        <p className="mt-1 text-xs text-slate-500">{APP_VERSION_LABEL}</p>
+      </div>
     </div>
   );
 }

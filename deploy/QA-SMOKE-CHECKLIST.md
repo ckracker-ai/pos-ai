@@ -1,4 +1,4 @@
-# Sprint 4 — QA smoke y checklist pre-GitHub
+# Sprint 4 / v1.2 — QA smoke y checklist pre-GitHub
 
 Checklist para validar el monorepo antes del primer push a GitHub (ramas `dev` / `prod`).
 
@@ -16,8 +16,8 @@ Esperar hasta que todos los servicios estén `healthy` (healthchecks en `docker-
 | Servicio   | Puerto (dev) | Healthcheck              |
 |-----------|--------------|--------------------------|
 | frontend  | 80           | HTTP 200 en `/`          |
-| api-bff   | 3000         | `GET /api/health`        |
-| api-core  | (interno)    | `GET /health`            |
+| api-bff   | 3000         | `GET /api/health` → `version: 1.2.0` |
+| api-core  | (interno)    | `GET /health` → `version: 1.2.0`     |
 | db-mysql  | (interno)    | `mysqladmin ping`        |
 
 ## 2. Smoke automatizado

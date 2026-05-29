@@ -70,6 +70,19 @@ router.get('/inventory', requireSeller, async (req: AuthenticatedRequest, res) =
   }
 });
 
+router.get('/shrinkage', requireSeller, async (req: AuthenticatedRequest, res) => {
+  try {
+    const branchId = resolveReportBranchId(req);
+    const status = String(req.query.status ?? 'ALL');
+    const limit = Math.min(500, Math.max(10, Number(req.query.limit ?? 300)));
+    const result = await reportsDelegate.getShrinkageReport(branchId, { status, limit });
+    if (result.success) return sendOk(res, result.value);
+    return sendFail(res, result.error, 500);
+  } catch {
+    return sendFail(res, 'ERROR_FETCHING_SHRINKAGE_REPORT', 500);
+  }
+});
+
 router.get('/dashboard', requireSeller, async (req: AuthenticatedRequest, res) => {
   const branchId = resolveReportBranchId(req);
   const days = Math.min(90, Math.max(7, Number(req.query.days ?? 30)));

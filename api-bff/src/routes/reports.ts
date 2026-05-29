@@ -60,6 +60,25 @@ const reportsRoutes = async (app: FastifyInstance) => {
       return sendFail(reply, err.response?.data?.error ?? 'Failed to load inventory report', err.response?.status ?? 500);
     }
   });
+
+  app.get('/shrinkage', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    const query = request.query as { status?: string; limit?: string };
+
+    try {
+      const data = await reportsCore.getShrinkageReport(ctx.token, ctx.internalKey, ctx.branchId, {
+        global: parseGlobal(request),
+        status: query.status ?? 'ALL',
+        limit: Number(query.limit ?? 300),
+      });
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { error?: string } } };
+      return sendFail(reply, err.response?.data?.error ?? 'Failed to load shrinkage report', err.response?.status ?? 500);
+    }
+  });
 };
 
 export default reportsRoutes;

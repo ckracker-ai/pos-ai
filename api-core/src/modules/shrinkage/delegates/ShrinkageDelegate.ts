@@ -125,6 +125,12 @@ class ShrinkageDelegate {
         return fail('SHRINKAGE_NOT_PENDING');
       }
 
+      const shrinkageQty = Number(shrinkage.quantity);
+      if (!Number.isFinite(shrinkageQty) || shrinkageQty <= 0) {
+        await transaction.rollback();
+        return fail('VALIDATION_ERROR: quantity must be greater than zero');
+      }
+
       const stock = await InventoryStock.findOne({
         where: { productId: shrinkage.productId, branchId },
         transaction,

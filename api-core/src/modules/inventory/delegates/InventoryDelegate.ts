@@ -94,6 +94,9 @@ class InventoryDelegate {
     const minStock = Number.isFinite(input.minStock) ? input.minStock : 0;
     const quantity = Number(input.quantity);
 
+    if (!Number.isFinite(minStock) || minStock < 0) {
+      return fail('VALIDATION_ERROR: minStock must be >= 0');
+    }
     if (!Number.isFinite(quantity) || quantity < 0) {
       return fail('VALIDATION_ERROR: quantity must be >= 0');
     }
@@ -141,6 +144,9 @@ class InventoryDelegate {
 
     const minStock = Number.isFinite(input.minStock) ? input.minStock : 0;
     const quantity = Number(input.quantity);
+    if (!Number.isFinite(minStock) || minStock < 0) {
+      return fail('VALIDATION_ERROR: minStock must be >= 0');
+    }
     if (!Number.isFinite(quantity) || quantity < 0) {
       return fail('VALIDATION_ERROR: quantity must be >= 0');
     }

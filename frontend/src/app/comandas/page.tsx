@@ -76,13 +76,6 @@ export default function ComandasPage() {
               <p className="mt-2 max-w-2xl text-slate-400">
                 Pedidos pendientes de preparación. Se actualiza automáticamente cada {POLL_MS / 1000}s.
               </p>
-              <p className="mt-3 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-4 py-2 text-sm text-sky-100">
-                <span className="text-sky-300/90">Sucursal asignada: </span>
-                <span className="font-semibold">{activeBranchName}</span>
-                {assignedBranchId && (
-                  <span className="mt-1 block text-xs text-sky-400/80 font-mono">{assignedBranchId}</span>
-                )}
-              </p>
               {branchLoadError && (
                 <p className="mt-2 text-xs text-amber-300">{branchLoadError}</p>
               )}
@@ -118,7 +111,7 @@ export default function ComandasPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs uppercase tracking-[0.25em] text-amber-400">Comanda</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">#{order.id.slice(0, 8)}</h2>
+                      <h2 className="mt-2 text-lg font-semibold text-white">{order.displayReference}</h2>
                       <p className="mt-1 text-xs text-slate-500">
                         {new Date(order.createdAt).toLocaleString('es-CO', {
                           dateStyle: 'short',
@@ -131,9 +124,9 @@ export default function ComandasPage() {
                     </span>
                   </div>
 
-                  {order.notes && (
+                  {order.customerNotes && (
                     <p className="mt-4 rounded-2xl bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
-                      {order.notes}
+                      {order.customerNotes}
                     </p>
                   )}
 

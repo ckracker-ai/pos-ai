@@ -154,6 +154,10 @@ export interface KitchenOrder {
   id: string;
   status: string;
   notes?: string;
+  /** Referencia legible para cocina (ej. Venta #EF-01). */
+  displayReference: string;
+  /** Notas del cliente/cajero sin la línea de referencia de venta. */
+  customerNotes?: string;
   createdAt: string;
   items: KitchenOrderLine[];
 }

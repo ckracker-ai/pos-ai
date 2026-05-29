@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { Navbar } from '@/components/organisms/Navbar';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { useAuthStore } from '@/store/auth';
+import { APP_VERSION_LABEL } from '@/core/constants/version';
 
 type ManualRole = 'admin' | 'auditor' | 'seller' | 'comanda' | 'all';
 
@@ -128,7 +129,7 @@ export default function ManualPage() {
           </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             Perfil activo: <span className="font-semibold">{roleLabel(user?.role)}</span>. Solo ves
-            secciones aplicables a tu rol.
+            secciones aplicables a tu rol. Versión instalada: {APP_VERSION_LABEL}.
           </p>
         </div>
 

@@ -79,11 +79,24 @@ router.post('/branchAction', requireSeller, async (req: AuthenticatedRequest, re
 // Update (partial)
 router.patch('/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const [updated] = await Branch.update(req.body, { where: { id: req.params.id } });
-    if (!updated) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
-
     const branch = await Branch.findByPk(req.params.id);
     if (!branch) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
+
+    const body = req.body as {
+      name?: string;
+      address?: string;
+      phone?: string;
+      isActive?: boolean;
+    };
+
+    const patch: Record<string, unknown> = {};
+    if (typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim();
+    if (body.address !== undefined) patch.address = body.address;
+    if (body.phone !== undefined) patch.phone = body.phone;
+    if (body.isActive !== undefined) patch.isActive = body.isActive;
+
+    await branch.update(patch);
+    await branch.reload();
 
     return sendOk(res, { branch });
   } catch {
@@ -91,12 +104,30 @@ router.patch('/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Delete
+router.post('/:id/restore', requireSeller, async (req: AuthenticatedRequest, res) => {
+  try {
+    const branch = await Branch.findByPk(req.params.id);
+    if (!branch) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
+
+    await branch.update({ isActive: true });
+    await branch.reload();
+
+    return sendOk(res, { branch });
+  } catch {
+    return sendFail(res, 'ERROR_RESTORING_BRANCH', 400);
+  }
+});
+
+// Desactivación lógica (soft delete) — conserva ventas e inventario histórico
 router.delete('/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const deleted = await Branch.destroy({ where: { id: req.params.id } });
-    if (!deleted) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
-    return sendOk(res, { deleted: true });
+    const branch = await Branch.findByPk(req.params.id);
+    if (!branch) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
+
+    await branch.update({ isActive: false });
+    await branch.reload();
+
+    return sendOk(res, { deactivated: true, branch });
   } catch {
     return sendFail(res, 'ERROR_DELETING_BRANCH', 400);
   }

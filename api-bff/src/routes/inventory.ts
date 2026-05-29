@@ -22,8 +22,8 @@ const addToBranchSchema = z.object({
 
 const stockUpsertSchema = z.object({
   productId: z.string().min(1),
-  quantity: z.coerce.number(),
-  minStock: z.coerce.number().optional(),
+  quantity: z.coerce.number().min(0),
+  minStock: z.coerce.number().min(0).optional(),
 });
 
 const inventoryRoutes = async (app: FastifyInstance) => {

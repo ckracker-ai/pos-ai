@@ -29,7 +29,12 @@ export class ApiCoreServiceBranch extends ApiCoreBaseService {
 
   async updateBranch(
     targetBranchId: string,
-    input: { name: string; address?: string },
+    input: {
+      name?: string;
+      address?: string;
+      phone?: string;
+      isActive?: boolean;
+    },
     token: string,
     internalKey?: string,
     branchId?: string
@@ -47,4 +52,14 @@ export class ApiCoreServiceBranch extends ApiCoreBaseService {
     return response.data;
   }
 
+  async restoreBranch(targetBranchId: string, token: string, internalKey?: string, branchId?: string) {
+    const response = await this.client.post(
+      `/branch/${targetBranchId}/restore`,
+      {},
+      {
+        headers: this.flexibleHeaders(token, internalKey, branchId),
+      }
+    );
+    return response.data;
+  }
 }

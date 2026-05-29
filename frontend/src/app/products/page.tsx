@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
 import { api, ApiError } from '@/core/api/api-client';
@@ -8,11 +8,10 @@ import {
   extractList,
   fetchProductsForBranch,
   normalizeCategory,
-  normalizeBranch,
   normalizeSupplier,
   unwrapApiEnvelope,
 } from '@/core/api/normalizers';
-import { Branch, Category, Product, Supplier } from '@/core/interfaces';
+import { Category, Product, Supplier } from '@/core/interfaces';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -21,6 +20,13 @@ import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TableActions } from '@/components/molecules/TableActions';
 import { ConfirmActionModal } from '@/components/molecules/ConfirmActionModal';
 import { notifyApiError, notifySuccess } from '@/store/ui';
+import {
+  applyDecimalInput,
+  applyDigitsOnlyInput,
+  INVALID_NUMERIC_INPUT_MESSAGE,
+  parseNonNegativeInt,
+  parsePositiveDecimal,
+} from '@/core/utils/numeric-input';
 
 
 
@@ -47,9 +53,9 @@ export default function ProductsPage() {
 
   const currentUser = useAuthStore((state) => state.user);
   const branchId = useBranchStore((state) => state.selectedBranchId);
+  const activeBranchName = useBranchStore((state) => state.activeBranchLabel);
 
 const [products, setProducts] = useState<Product[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
@@ -77,6 +83,8 @@ const [products, setProducts] = useState<Product[]>([]);
   // Edición rápida de inventario (cantidad) por sucursal activa
   const [quickStockDraft, setQuickStockDraft] = useState<Record<string, string>>({});
   const [quickMinStockDraft, setQuickMinStockDraft] = useState<Record<string, string>>({});
+  const [quickNumericWarning, setQuickNumericWarning] = useState<string | null>(null);
+  const [formNumericWarning, setFormNumericWarning] = useState<string | null>(null);
   const [quickSavingId, setQuickSavingId] = useState<string | null>(null);
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
   const [quickCategoryFilter, setQuickCategoryFilter] = useState('all');
@@ -121,8 +129,6 @@ const [products, setProducts] = useState<Product[]>([]);
     );
   }, [products, searchTerm, onlyAssignedToBranch]);
 
-  const branchNameById = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches]);
-  const activeBranchName = branchNameById.get(branchId) ?? String(branchId);
   const suggestedSku = useMemo(() => {
     const normalizedBranch = activeBranchName
       .normalize('NFD')
@@ -141,24 +147,37 @@ const [products, setProducts] = useState<Product[]>([]);
   }, [activeBranchName, products]);
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'stock' || field === 'minStock') {
+      const { value: next, hadInvalid } = applyDigitsOnlyInput(value);
+      setFormNumericWarning(hadInvalid ? INVALID_NUMERIC_INPUT_MESSAGE : null);
+      setForm((current) => ({ ...current, [field]: next }));
+      return;
+    }
+    if (field === 'price' || field === 'cost') {
+      const { value: next, hadInvalid } = applyDecimalInput(value);
+      setFormNumericWarning(hadInvalid ? INVALID_NUMERIC_INPUT_MESSAGE : null);
+      setForm((current) => ({ ...current, [field]: next }));
+      return;
+    }
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const response = await api.getBranches();
-        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['branches']);
-        setBranches(rows.map((row) => normalizeBranch(row)));
-      } catch {
-        // No bloquea el módulo de productos; los nombres se mostrarán como fallback.
-      }
-    };
-    loadBranches();
-  }, []);
+  const handleQuickDigitsChange = (
+    raw: string,
+    setter: Dispatch<SetStateAction<Record<string, string>>>,
+    productId: string
+  ) => {
+    const { value, hadInvalid } = applyDigitsOnlyInput(raw);
+    if (hadInvalid) {
+      setQuickNumericWarning(INVALID_NUMERIC_INPUT_MESSAGE);
+    } else {
+      setQuickNumericWarning(null);
+    }
+    setter((d) => ({ ...d, [productId]: value }));
+  };
 
-  // Carga de metadatos para el alta de productos (categorías / proveedores).
   useEffect(() => {
+    // Carga de metadatos para el alta de productos (categorías / proveedores).
     const loadCatalogMeta = async () => {
       try {
         const [categoriesRes, suppliersRes] = await Promise.all([api.getCategories(), api.getSuppliers()]);
@@ -238,6 +257,7 @@ const [products, setProducts] = useState<Product[]>([]);
     setEditingProduct(product);
     setSelectedProduct(product);
     setSuccessMessage(null);
+    setFormNumericWarning(null);
     setForm({
       name: product.name ?? '',
       sku: product.sku ?? '',
@@ -257,13 +277,13 @@ const [products, setProducts] = useState<Product[]>([]);
     if (!productId?.trim()) {
       throw new Error('No se pudo actualizar inventario: productId inválido.');
     }
-    const stockDeltaNum = Number(form.stock);
-    const minStockNum = Number(form.minStock);
+    const stockDeltaNum = parseNonNegativeInt(form.stock);
+    const minStockNum = parseNonNegativeInt(form.minStock);
 
-    if (!Number.isFinite(stockDeltaNum) || stockDeltaNum < 0) {
+    if (stockDeltaNum === null) {
       throw new Error('El ingreso de stock debe ser un número mayor o igual a 0.');
     }
-    if (!Number.isFinite(minStockNum) || minStockNum < 0) {
+    if (minStockNum === null) {
       throw new Error('El stock mínimo debe ser un número mayor o igual a 0.');
     }
 
@@ -320,15 +340,20 @@ const [products, setProducts] = useState<Product[]>([]);
     const sku = form.sku?.trim();
     const categoryId = form.categoryId?.trim();
     const supplierId = form.supplierId?.trim();
-    const priceNum = Number(form.price);
-    const stockNum = Number(form.stock);
+    const priceNum = parsePositiveDecimal(form.price);
+    const stockNum = parseNonNegativeInt(form.stock);
 
-    // `stock` puede ser 0, así que evitamos validaciones falsy.
     if (!name || !sku || !categoryId || !supplierId) return;
-    if (!Number.isFinite(priceNum) || priceNum <= 0) return;
-    if (!Number.isFinite(stockNum) || stockNum < 0) return;
+    if (priceNum === null) {
+      setErrorMessage('El precio debe ser un número mayor a 0 (sin símbolos como $).');
+      return;
+    }
+    if (stockNum === null) {
+      setErrorMessage('El stock inicial debe ser un número mayor o igual a 0.');
+      return;
+    }
 
-    const minStockNum = Number(form.minStock);
+    const minStockNum = parseNonNegativeInt(form.minStock);
 
     const payload = {
       name,
@@ -337,7 +362,7 @@ const [products, setProducts] = useState<Product[]>([]);
       supplierId,
       price: priceNum,
       initialStock: stockNum,
-      minStock: Number.isFinite(minStockNum) && minStockNum >= 0 ? minStockNum : 0,
+      minStock: minStockNum ?? 0,
     };
 
     setIsSaving(true);
@@ -416,14 +441,14 @@ const [products, setProducts] = useState<Product[]>([]);
     }
     const rawQty = quickStockDraft[product.id] ?? '0';
     const rawMin = quickMinStockDraft[product.id] ?? String(product.minStock ?? 0);
-    const quantityDelta = Number(rawQty);
-    const minStock = Number(rawMin);
+    const quantityDelta = parseNonNegativeInt(rawQty);
+    const minStock = parseNonNegativeInt(rawMin);
 
-    if (!Number.isFinite(quantityDelta) || quantityDelta < 0) {
+    if (quantityDelta === null) {
       setErrorMessage('El ingreso de stock debe ser un número mayor o igual a 0.');
       return;
     }
-    if (!Number.isFinite(minStock) || minStock < 0) {
+    if (minStock === null) {
       setErrorMessage('El stock mínimo debe ser un número mayor o igual a 0.');
       return;
     }
@@ -500,6 +525,7 @@ const [products, setProducts] = useState<Product[]>([]);
                   minStock: '0',
                 });
                 setSuccessMessage(null);
+                setFormNumericWarning(null);
                 setShowModal(true);
               }}
               disabled={isActionLocked}
@@ -622,6 +648,9 @@ const [products, setProducts] = useState<Product[]>([]);
                     <p className="mt-1 text-sm text-slate-400">
                       Registra ingresos de stock en la sucursal activa (se suman al stock actual).
                     </p>
+                    {quickNumericWarning && (
+                      <p className="mt-2 text-xs text-rose-300">{quickNumericWarning}</p>
+                    )}
                   </div>
                   <span className="rounded-full bg-slate-900 px-3 py-1 text-xs text-slate-400">
                     Sucursal: {activeBranchName}
@@ -677,29 +706,25 @@ const [products, setProducts] = useState<Product[]>([]);
                             <td className="px-4 py-3 text-slate-300">{p.minStock ?? 0}</td>
                             <td className="px-4 py-3">
                               <input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 className="w-28 rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-emerald-500"
                                 value={draft ?? '0'}
                                 onChange={(e) =>
-                                  setQuickStockDraft((d) => ({
-                                    ...d,
-                                    [p.id]: e.target.value,
-                                  }))
+                                  handleQuickDigitsChange(e.target.value, setQuickStockDraft, p.id)
                                 }
                               />
                             </td>
                             <td className="px-4 py-3">
                               <input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 className="w-24 rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-emerald-500"
                                 value={minDraft ?? String(p.minStock ?? 0)}
                                 onChange={(e) =>
-                                  setQuickMinStockDraft((d) => ({
-                                    ...d,
-                                    [p.id]: e.target.value,
-                                  }))
+                                  handleQuickDigitsChange(e.target.value, setQuickMinStockDraft, p.id)
                                 }
                               />
                             </td>
@@ -861,7 +886,8 @@ const [products, setProducts] = useState<Product[]>([]);
                   onChange={(event) => handleInputChange('price', event.target.value)}
                   className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
                   placeholder="Precio de venta"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                 />
               </label>
               <label className="block text-sm text-slate-300">
@@ -871,7 +897,8 @@ const [products, setProducts] = useState<Product[]>([]);
                   onChange={(event) => handleInputChange('cost', event.target.value)}
                   className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
                   placeholder="Costo"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                 />
               </label>
             </div>
@@ -886,6 +913,9 @@ const [products, setProducts] = useState<Product[]>([]);
                     : 'Este producto aún no está habilitado en la sucursal. Ingresa cantidad para crear el registro de inventario.'
                   : 'Al crear el producto se registrará el stock inicial en la sucursal activa.'}
               </p>
+              {formNumericWarning && (
+                <p className="mt-2 text-xs text-rose-300">{formNumericWarning}</p>
+              )}
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <label className="block text-sm text-slate-300">
@@ -895,8 +925,9 @@ const [products, setProducts] = useState<Product[]>([]);
                     onChange={(event) => handleInputChange('stock', event.target.value)}
                     className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-emerald-500"
                     placeholder="0"
-                    type="number"
-                    min={0}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                   />
                 </label>
                 <label className="block text-sm text-slate-300">
@@ -906,8 +937,9 @@ const [products, setProducts] = useState<Product[]>([]);
                     onChange={(event) => handleInputChange('minStock', event.target.value)}
                     className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-emerald-500"
                     placeholder="0"
-                    type="number"
-                    min={0}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                   />
                 </label>
               </div>
@@ -915,7 +947,6 @@ const [products, setProducts] = useState<Product[]>([]);
               {editingProduct && (
                 <p className="mt-3 text-xs text-slate-500">
                   Stock actual en sistema: {editingProduct.stock ?? 0} unidades
-                  {editingProduct.stockRecordId ? ` · registro ${editingProduct.stockRecordId.slice(0, 8)}…` : ''}
                 </p>
               )}
             </div>

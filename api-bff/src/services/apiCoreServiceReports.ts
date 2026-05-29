@@ -45,4 +45,21 @@ export class ApiCoreServiceReports extends ApiCoreBaseService {
     });
     return response.data;
   }
+
+  async getShrinkageReport(
+    token: string,
+    internalKey: string,
+    branchId: string,
+    options?: { global?: boolean; status?: string; limit?: number }
+  ) {
+    const response = await this.client.get('/reports/shrinkage', {
+      headers: this.authHeaders(token, internalKey, branchId),
+      params: {
+        global: options?.global ? 'true' : undefined,
+        status: options?.status ?? 'ALL',
+        limit: options?.limit ?? 300,
+      },
+    });
+    return response.data;
+  }
 }

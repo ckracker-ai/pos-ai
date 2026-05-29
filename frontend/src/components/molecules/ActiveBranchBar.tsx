@@ -2,11 +2,15 @@
 
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
+import { sanitizeBranchDisplayLabel } from '@/core/utils/branch-display';
 
 /** Indica qué sucursal filtra las peticiones API (header x-branch-id). */
 export function ActiveBranchBar() {
   const user = useAuthStore((s) => s.user);
-  const activeBranchName = useBranchStore((s) => s.activeBranchLabel);
+  const activeBranchName = sanitizeBranchDisplayLabel(
+    useBranchStore((s) => s.activeBranchLabel),
+    'Cargando…'
+  );
   const canSwitchBranch = ['admin', 'auditor'].includes(user?.role ?? '');
 
   return (
@@ -17,11 +21,6 @@ export function ActiveBranchBar() {
       <span className="font-semibold" title={activeBranchName}>
         {activeBranchName}
       </span>
-      {!canSwitchBranch && user?.branchId && (
-        <span className="ml-2 hidden font-mono text-xs text-sky-600/70 dark:text-sky-400/60 lg:inline">
-          ({user.branchId})
-        </span>
-      )}
       <span className="ml-2 hidden text-xs text-sky-700/70 dark:text-sky-400/70 sm:inline">
         (productos, stock, ventas y reportes usan esta sucursal)
       </span>

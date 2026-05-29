@@ -13,6 +13,7 @@ export type ApiErrorContext =
   | 'branches.list'
   | 'branches.save'
   | 'branches.delete'
+  | 'branches.restore'
   | 'categories.list'
   | 'categories.save'
   | 'categories.delete'
@@ -56,7 +57,8 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'suppliers.restore': 'No se pudo restaurar el proveedor',
   'branches.list': 'No se pudieron cargar las sucursales',
   'branches.save': 'No se pudo guardar la sucursal',
-  'branches.delete': 'No se pudo eliminar la sucursal',
+  'branches.delete': 'No se pudo desactivar la sucursal',
+  'branches.restore': 'No se pudo restaurar la sucursal',
   'categories.list': 'No se pudieron cargar las categorías',
   'categories.save': 'No se pudo guardar la categoría',
   'categories.delete': 'No se pudo eliminar la categoría',
@@ -85,6 +87,8 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   ACCOUNT_DISABLED: 'Tu cuenta está desactivada. Pide a un administrador que la reactive.',
   EMAIL_TAKEN: 'Ese correo ya está registrado. Usa otro correo o recupera el usuario existente.',
   USER_NOT_FOUND: 'No encontramos ese usuario.',
+  CANNOT_DEACTIVATE_SELF: 'No puedes desactivar tu propia cuenta mientras estás conectado.',
+  CANNOT_DEACTIVATE_LAST_ADMIN: 'Debe quedar al menos un administrador activo en el sistema.',
   ROLE_NOT_FOUND: 'El rol seleccionado no es válido.',
   UNAUTHORIZED: 'No autorizado. Verifica la clave interna del sistema o vuelve a iniciar sesión.',
   UNAUTHENTICATED: 'Tu sesión expiró. Vuelve a iniciar sesión.',

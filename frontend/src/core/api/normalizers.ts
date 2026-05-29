@@ -252,6 +252,43 @@ export function normalizeShrinkage(raw: Record<string, unknown>): ShrinkageRecor
   };
 }
 
+export function parseKitchenOrderReference(notes?: string, createdAt?: string): {
+  displayReference: string;
+  customerNotes?: string;
+} {
+  const rawNotes = notes?.trim();
+  if (rawNotes) {
+    const saleMatch = rawNotes.match(/Venta\s+#(\S+)(?:\s*\(([^)]+)\))?/i);
+    if (saleMatch) {
+      const payment = saleMatch[2]?.trim();
+      const displayReference = payment
+        ? `Venta #${saleMatch[1]} (${payment})`
+        : `Venta #${saleMatch[1]}`;
+      const customerNotes = rawNotes
+        .split(/\s*•\s*/)
+        .map((part) => part.trim())
+        .filter((part) => part && !/^Venta\s+#/i.test(part))
+        .join(' • ')
+        .trim();
+      return {
+        displayReference,
+        customerNotes: customerNotes || undefined,
+      };
+    }
+    return { displayReference: rawNotes, customerNotes: undefined };
+  }
+
+  if (createdAt) {
+    const when = new Date(createdAt).toLocaleString('es-CO', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+    return { displayReference: `Pedido ${when}` };
+  }
+
+  return { displayReference: 'Pedido' };
+}
+
 export function normalizeKitchenOrder(
   raw: Record<string, unknown>,
   productNames: Map<string, string>
@@ -274,11 +311,17 @@ export function normalizeKitchenOrder(
     };
   });
 
+  const notes = raw.notes ? String(raw.notes) : undefined;
+  const createdAt = String(raw.createdAt ?? new Date().toISOString());
+  const { displayReference, customerNotes } = parseKitchenOrderReference(notes, createdAt);
+
   return {
     id: String(raw.id ?? ''),
     status: String(raw.status ?? 'PENDING'),
-    notes: raw.notes ? String(raw.notes) : undefined,
-    createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    notes,
+    displayReference,
+    customerNotes,
+    createdAt,
     items,
   };
 }

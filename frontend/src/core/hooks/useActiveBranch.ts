@@ -11,6 +11,7 @@ import {
 import { Branch } from '@/core/interfaces';
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
+import { sanitizeBranchDisplayLabel } from '@/core/utils/branch-display';
 
 const ROLES_WITH_BRANCH_SWITCH = ['admin', 'auditor'];
 
@@ -54,14 +55,15 @@ export function useActiveBranch() {
           'branches',
         ]);
         const loaded = rows.map((row) => normalizeBranch(row));
+        const activeBranches = loaded.filter((b) => b.isActive);
         if (cancelled) return;
 
-        setBranches(loaded);
+        setBranches(activeBranches);
         setLoadError(null);
 
-        if (loaded.length > 0 && !loaded.some((b) => b.id === branchId)) {
+        if (activeBranches.length > 0 && !activeBranches.some((b) => b.id === branchId)) {
           const preferred =
-            loaded.find((b) => b.id === user?.branchId)?.id ?? loaded[0]?.id;
+            activeBranches.find((b) => b.id === user?.branchId)?.id ?? activeBranches[0]?.id;
           if (preferred) setBranchId(preferred);
         }
       } catch (error) {
@@ -81,7 +83,10 @@ export function useActiveBranch() {
     [branches, branchId]
   );
 
-  const activeBranchName = activeBranch?.name ?? (branchId ? `Sucursal ${branchId.slice(0, 8)}…` : '—');
+  const activeBranchName = sanitizeBranchDisplayLabel(
+    activeBranch?.name,
+    branchId ? 'Cargando…' : '—'
+  );
 
   useEffect(() => {
     setActiveBranchLabel(activeBranchName);

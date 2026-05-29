@@ -23,9 +23,10 @@ class AuthController {
   };
 
   deactivate = async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
-    const result = await authDelegate.deactivate(req.params.id);
+    const result = await authDelegate.deactivate(req.params.id, req.user!.userId);
     if (result.success) return sendOk(res, result.value);
-    return sendFail(res, result.error, 404);
+    const status = result.error.startsWith('CANNOT_') ? 409 : 404;
+    return sendFail(res, result.error, status);
   };
 
   restore = async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {

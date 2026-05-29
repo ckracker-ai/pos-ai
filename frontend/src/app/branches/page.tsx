@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/core/context/auth';
 import { api } from '@/core/api/api-client';
-import { extractList, normalizeBranch, unwrapApiEnvelope } from '@/core/api/normalizers';
+import { extractList, extractEntity, normalizeBranch, normalizeUser, unwrapApiEnvelope } from '@/core/api/normalizers';
 import { Branch } from '@/core/interfaces';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
@@ -14,15 +14,19 @@ import { SearchInput } from '@/components/molecules/SearchInput';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TableActions } from '@/components/molecules/TableActions';
 import { ConfirmActionModal } from '@/components/molecules/ConfirmActionModal';
-import { notifyApiError, notifySuccess } from '@/store/ui';
+import { StatusFilterSelect, StatusFilterValue } from '@/components/molecules/StatusFilterSelect';
+import { filterByStatusAndSearch } from '@/core/utils/soft-delete';
+import { notifyApiError, notifySuccess, notifyUndoAction } from '@/store/ui';
 
 export default function BranchesPage() {
   const currentUser = useAuthStore((state) => state.user);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [activeUsersByBranch, setActiveUsersByBranch] = useState<Map<string, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('active');
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
@@ -51,19 +55,19 @@ export default function BranchesPage() {
   });
   const isActionLocked = isConfirming || confirmModal.open;
 
-  const filteredBranches = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return branches;
-    }
+  const filteredBranches = useMemo(
+    () =>
+      filterByStatusAndSearch(branches, statusFilter, searchTerm, (branch, q) =>
+        [branch.name, branch.code, branch.city, branch.address, branch.phone]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      ),
+    [branches, statusFilter, searchTerm]
+  );
 
-    const normalized = searchTerm.toLowerCase();
-    return branches.filter((branch) =>
-      [branch.name, branch.code, branch.city, branch.address, branch.phone]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalized)
-    );
-  }, [branches, searchTerm]);
+  const activeCount = useMemo(() => branches.filter((b) => b.isActive).length, [branches]);
+  const inactiveCount = useMemo(() => branches.filter((b) => !b.isActive).length, [branches]);
 
   const handleInputChange = (field: string, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -74,9 +78,19 @@ export default function BranchesPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await api.getBranches();
-        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['branches']);
+        const [branchesRes, usersRes] = await Promise.all([api.getBranches(), api.getUsers()]);
+        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(branchesRes.data), ['branches']);
         setBranches(rows.map((row) => normalizeBranch(row)));
+
+        const userRows = extractList<Record<string, unknown>>(unwrapApiEnvelope(usersRes.data), ['users']);
+        const counts = new Map<string, number>();
+        for (const row of userRows) {
+          const user = normalizeUser(row);
+          if (user.isActive && user.branchId) {
+            counts.set(user.branchId, (counts.get(user.branchId) ?? 0) + 1);
+          }
+        }
+        setActiveUsersByBranch(counts);
       } catch (error) {
         const { displayMessage } = notifyApiError('branches.list', error, { toast: false });
         setErrorMessage(displayMessage);
@@ -118,17 +132,43 @@ export default function BranchesPage() {
     }
   };
 
-  const handleDeleteBranch = async (branchId: string) => {
+  const handleDeactivateBranch = async (branch: Branch) => {
+    const previous = branch;
+    setBranches((current) =>
+      current.map((b) => (b.id === branch.id ? { ...b, isActive: false } : b))
+    );
     try {
-      await api.deleteBranch(branchId);
-      setBranches((current) => current.filter((branch) => branch.id !== branchId));
+      await api.deleteBranch(branch.id);
       setErrorMessage(null);
-      setSuccessMessage('Sucursal eliminada correctamente');
-      notifySuccess('Sucursal eliminada correctamente');
+      setSuccessMessage(null);
+      notifyUndoAction({
+        title: 'Sucursal desactivada',
+        message: `"${branch.name}" ya no aparecerá en ventas. Las ventas históricas se conservan.`,
+        onUndo: async () => {
+          await api.restoreBranch(branch.id);
+          setBranches((current) =>
+            current.map((b) => (b.id === branch.id ? { ...b, isActive: true } : b))
+          );
+          notifySuccess('Sucursal restaurada');
+        },
+      });
     } catch (error) {
+      setBranches((current) => current.map((b) => (b.id === branch.id ? previous : b)));
       const { displayMessage } = notifyApiError('branches.delete', error);
       setErrorMessage(displayMessage);
-      setSuccessMessage(null);
+    }
+  };
+
+  const handleRestoreBranch = async (branch: Branch) => {
+    try {
+      const response = await api.restoreBranch(branch.id);
+      const row = extractEntity<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['branch']);
+      const restored = row ? normalizeBranch(row) : { ...branch, isActive: true };
+      setBranches((current) => current.map((b) => (b.id === branch.id ? restored : b)));
+      setErrorMessage(null);
+      notifySuccess('Sucursal restaurada');
+    } catch (error) {
+      notifyApiError('branches.restore', error);
     }
   };
 
@@ -164,7 +204,9 @@ export default function BranchesPage() {
               <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Sucursales</p>
               <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de sucursales</h1>
               <p className="mt-2 max-w-2xl text-slate-400">
-                Administra las sucursales y la información de cada punto de atención.
+                Administra sucursales fijas y puestos temporales (eventos). Usa Desactivar cuando una
+                sucursal cierra: deja de aparecer en ventas nuevas, pero ventas, inventario y reportes
+                históricos se conservan. Restaura desde el filtro Inactivos.
               </p>
               {currentUser && (
                 <p className="mt-3 text-sm text-slate-500">Sesión iniciada como: {currentUser.name}</p>
@@ -200,10 +242,14 @@ export default function BranchesPage() {
             <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
               <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Sucursales activas</h2>
-                  <p className="text-sm text-slate-400">Busca por nombre, código o ciudad.</p>
+                  <h2 className="text-xl font-semibold text-white">Sucursales</h2>
+                  <p className="text-sm text-slate-400">
+                    Busca por nombre, código o ciudad. Activas: {activeCount} · Inactivas: {inactiveCount}
+                  </p>
                 </div>
-                <div className="w-full md:w-80">
+                <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+                  <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+                  <div className="w-full md:w-80">
                   <SearchInput
                     placeholder="Buscar sucursal"
                     items={branches}
@@ -217,6 +263,7 @@ export default function BranchesPage() {
                       </div>
                     )}
                   />
+                  </div>
                 </div>
               </div>
 
@@ -263,6 +310,7 @@ export default function BranchesPage() {
                           <td className="px-6 py-5">
                             <TableActions
                               disabled={isActionLocked}
+                              isInactive={!branch.isActive}
                               onEdit={() => {
                                 setSelectedBranch(branch);
                                 setEditingBranch(branch);
@@ -277,15 +325,21 @@ export default function BranchesPage() {
                                 setSuccessMessage(null);
                                 setShowModal(true);
                               }}
-                              onDelete={() =>
+                              onDelete={() => {
+                                const assignedUsers = activeUsersByBranch.get(branch.id) ?? 0;
+                                const userNote =
+                                  assignedUsers > 0
+                                    ? ` Hay ${assignedUsers} usuario(s) activo(s) asignado(s); podrás reasignarlos desde Usuarios.`
+                                    : '';
                                 askConfirmation(
-                                  'Eliminar sucursal',
-                                  '¿Deseas eliminar esta sucursal? Esta acción no se puede deshacer.',
-                                  'Eliminar',
+                                  'Desactivar sucursal',
+                                  `¿Desactivar "${branch.name}"? No aparecerá en el selector de ventas. El historial de ventas e inventario se conserva.${userNote}`,
+                                  'Desactivar',
                                   'danger',
-                                  () => handleDeleteBranch(branch.id)
-                                )
-                              }
+                                  () => handleDeactivateBranch(branch)
+                                );
+                              }}
+                              onRestore={() => handleRestoreBranch(branch)}
                             />
                           </td>
                         </tr>
@@ -300,7 +354,8 @@ export default function BranchesPage() {
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
                 <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Notas</p>
                 <p className="mt-4 text-slate-400 text-sm leading-6">
-                  Estas sucursales pueden ser asignadas a usuarios y usadas en el flujo de ventas.
+                  Desactivar no elimina datos. Sirve para sucursales cerradas o puestos de evento que ya
+                  terminaron. Los registros inactivos quedan disponibles en reportes y auditoría.
                 </p>
               </div>
 

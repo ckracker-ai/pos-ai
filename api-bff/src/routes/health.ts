@@ -1,10 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import { sendOk } from '../utils/response.js';
+import { APP_NAME, APP_VERSION } from '../version.js';
 
 const healthRoutes = async (app: FastifyInstance) => {
   app.get('/', async (_request, reply) => {
-    // Mirror api-core health contract
-    return sendOk(reply, { status: 'ok', ts: new Date().toISOString() });
+    return sendOk(reply, {
+      status: 'ok',
+      service: APP_NAME,
+      version: APP_VERSION,
+      ts: new Date().toISOString(),
+    });
   });
 };
 

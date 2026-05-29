@@ -10,8 +10,10 @@ const createBranchSchema = z.object({
 });
 
 const updateBranchSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).optional(),
   address: z.string().optional(),
+  phone: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 const branchRoutes = async (app: FastifyInstance) => {
@@ -92,7 +94,21 @@ const branchRoutes = async (app: FastifyInstance) => {
       return sendOk(reply, data);
     } catch (e: any) {
       const statusCode = e?.response?.status ?? 400;
-      const error = e?.response?.data?.error ?? 'Failed to delete branch';
+      const error = e?.response?.data?.error ?? 'Failed to deactivate branch';
+      return sendFail(reply, error, statusCode);
+    }
+  });
+
+  app.post('/:id/restore', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { token, internalKey, branchId } = getCoreRequestContext(request);
+
+    try {
+      const data = await branchCore.restoreBranch(id, token, internalKey, branchId);
+      return sendOk(reply, data);
+    } catch (e: any) {
+      const statusCode = e?.response?.status ?? 400;
+      const error = e?.response?.data?.error ?? 'Failed to restore branch';
       return sendFail(reply, error, statusCode);
     }
   });

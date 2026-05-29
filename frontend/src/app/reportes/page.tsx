@@ -51,6 +51,31 @@ type InventoryRow = {
   price: number;
 };
 
+type ShrinkageReportSummary = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  pendingQuantity: number;
+  approvedQuantity: number;
+  rejectedQuantity: number;
+};
+
+type ShrinkageReportRow = {
+  id: string;
+  date: string;
+  branchName: string;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reportedByName: string;
+  reviewedByName: string | null;
+  rejectionNote: string | null;
+};
+
+type ShrinkageStatusFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
 function normalizeSaleReportRow(raw: Record<string, unknown>): SaleRow {
   const dateRaw = raw.date ?? raw.created_at ?? raw.createdAt;
   return {
@@ -87,13 +112,50 @@ function stockBadgeClass(quantity: number, minStock: number) {
   return 'bg-slate-800 text-slate-300 border-slate-700';
 }
 
+function shrinkageStatusLabel(status: string) {
+  if (status === 'PENDING') return 'Pendiente';
+  if (status === 'APPROVED') return 'Aprobada';
+  if (status === 'REJECTED') return 'Rechazada';
+  return status;
+}
+
+function shrinkageStatusClass(status: string) {
+  if (status === 'APPROVED') return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+  if (status === 'REJECTED') return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+  return 'bg-amber-500/15 text-amber-200 border-amber-500/30';
+}
+
+function normalizeShrinkageReportRow(raw: Record<string, unknown>): ShrinkageReportRow {
+  const dateRaw = raw.date ?? raw.created_at ?? raw.createdAt;
+  return {
+    id: String(raw.id ?? ''),
+    date: String(dateRaw ?? new Date().toISOString()),
+    branchName: String(raw.branchName ?? raw.branch_name ?? '—'),
+    productName: String(raw.productName ?? raw.product_name ?? 'Producto'),
+    productSku: String(raw.productSku ?? raw.product_sku ?? raw.sku ?? ''),
+    quantity: Number(raw.quantity ?? 0),
+    reason: String(raw.reason ?? ''),
+    status: String(raw.status ?? 'PENDING').toUpperCase() as ShrinkageReportRow['status'],
+    reportedByName: String(raw.reportedByName ?? raw.reported_by_name ?? '—'),
+    reviewedByName:
+      raw.reviewedByName != null || raw.reviewed_by_name != null
+        ? String(raw.reviewedByName ?? raw.reviewed_by_name)
+        : null,
+    rejectionNote:
+      raw.rejectionNote != null || raw.rejection_note != null
+        ? String(raw.rejectionNote ?? raw.rejection_note)
+        : null,
+  };
+}
+
 export default function ReportesPage() {
   const user = useAuthStore((s) => s.user);
   const { branchId, activeBranchName } = useActiveBranch();
   const canGlobal = user?.role === 'admin' || user?.role === 'auditor';
 
   const [globalView, setGlobalView] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ventas' | 'inventario'>('ventas');
+  const [activeTab, setActiveTab] = useState<'ventas' | 'inventario' | 'mermas'>('ventas');
+  const [shrinkageStatusFilter, setShrinkageStatusFilter] = useState<ShrinkageStatusFilter>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -102,20 +164,34 @@ export default function ReportesPage() {
   const [lowStock, setLowStock] = useState<LowStockAlert[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
+  const [shrinkageSummary, setShrinkageSummary] = useState<ShrinkageReportSummary | null>(null);
+  const [shrinkages, setShrinkages] = useState<ShrinkageReportRow[]>([]);
 
   const reportParams = useMemo(
     () => ({ params: { global: globalView && canGlobal ? 'true' : undefined, days: 30 } }),
     [globalView, canGlobal]
   );
 
+  const shrinkageReportParams = useMemo(
+    () => ({
+      params: {
+        global: globalView && canGlobal ? 'true' : undefined,
+        status: shrinkageStatusFilter,
+        limit: 300,
+      },
+    }),
+    [globalView, canGlobal, shrinkageStatusFilter]
+  );
+
   const loadReports = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [dashboardRes, salesRes, inventoryRes] = await Promise.all([
+      const [dashboardRes, salesRes, inventoryRes, shrinkageRes] = await Promise.all([
         api.getReportsDashboard(reportParams),
         api.getReportsSales({ params: { ...reportParams.params, limit: 300 } }),
         api.getReportsInventory(reportParams),
+        api.getReportsShrinkage(shrinkageReportParams),
       ]);
 
       const dashboard = unwrapApiEnvelope(dashboardRes.data) as {
@@ -143,12 +219,24 @@ export default function ReportesPage() {
           .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object')
           .map((row) => normalizeInventoryReportRow(row))
       );
+
+      const shrinkageData = unwrapApiEnvelope(shrinkageRes.data) as {
+        summary?: ShrinkageReportSummary;
+        shrinkages?: unknown[];
+      };
+      setShrinkageSummary(shrinkageData.summary ?? null);
+      const shrinkageRows = Array.isArray(shrinkageData.shrinkages) ? shrinkageData.shrinkages : [];
+      setShrinkages(
+        shrinkageRows
+          .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object')
+          .map((row) => normalizeShrinkageReportRow(row))
+      );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
-  }, [reportParams]);
+  }, [reportParams, shrinkageReportParams]);
 
   useEffect(() => {
     setGlobalView(false);
@@ -175,6 +263,42 @@ export default function ReportesPage() {
       ['Producto', 'SKU', 'Sucursal', 'Stock', 'Stock mínimo', 'Precio'],
       inventory.map((row) => [row.productName, row.sku, row.branchName, row.quantity, row.minStock, row.price])
     );
+  };
+
+  const exportShrinkageExcel = () => {
+    exportRowsToExcel(
+      'reporte-mermas',
+      [
+        'Fecha',
+        'Sucursal',
+        'Producto',
+        'SKU',
+        'Cantidad',
+        'Motivo',
+        'Estado',
+        'Reportó',
+        'Revisó',
+        'Nota rechazo',
+      ],
+      shrinkages.map((row) => [
+        new Date(row.date).toLocaleString('es-CO'),
+        row.branchName,
+        row.productName,
+        row.productSku,
+        row.quantity,
+        row.reason,
+        shrinkageStatusLabel(row.status),
+        row.reportedByName,
+        row.reviewedByName ?? '',
+        row.rejectionNote ?? '',
+      ])
+    );
+  };
+
+  const handleExport = () => {
+    if (activeTab === 'ventas') exportSalesExcel();
+    else if (activeTab === 'inventario') exportInventoryExcel();
+    else exportShrinkageExcel();
   };
 
   return (
@@ -315,7 +439,7 @@ export default function ReportesPage() {
 
               <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setActiveTab('ventas')}
@@ -338,15 +462,81 @@ export default function ReportesPage() {
                     >
                       Inventario
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('mermas')}
+                      className={`rounded-2xl px-4 py-2 text-sm font-medium ${
+                        activeTab === 'mermas'
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-slate-950 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Mermas
+                    </button>
                   </div>
                   <button
                     type="button"
-                    onClick={activeTab === 'ventas' ? exportSalesExcel : exportInventoryExcel}
+                    onClick={handleExport}
                     className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
                   >
                     Exportar Excel
                   </button>
                 </div>
+
+                {activeTab === 'mermas' && shrinkageSummary && (
+                  <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {[
+                      {
+                        label: 'Pendientes',
+                        count: shrinkageSummary.pending,
+                        qty: shrinkageSummary.pendingQuantity,
+                        tone: 'text-amber-200',
+                      },
+                      {
+                        label: 'Aprobadas',
+                        count: shrinkageSummary.approved,
+                        qty: shrinkageSummary.approvedQuantity,
+                        tone: 'text-emerald-300',
+                      },
+                      {
+                        label: 'Rechazadas',
+                        count: shrinkageSummary.rejected,
+                        qty: shrinkageSummary.rejectedQuantity,
+                        tone: 'text-rose-300',
+                      },
+                    ].map((card) => (
+                      <div
+                        key={card.label}
+                        className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3"
+                      >
+                        <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
+                        <p className={`mt-1 text-2xl font-semibold ${card.tone}`}>{card.count}</p>
+                        <p className="text-xs text-slate-500">{card.qty} unidades</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeTab === 'mermas' && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <label className="text-sm text-slate-400">Filtrar estado</label>
+                    <select
+                      value={shrinkageStatusFilter}
+                      onChange={(e) =>
+                        setShrinkageStatusFilter(e.target.value as ShrinkageStatusFilter)
+                      }
+                      className="rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500"
+                    >
+                      <option value="ALL">Todas</option>
+                      <option value="PENDING">Pendientes</option>
+                      <option value="APPROVED">Aprobadas</option>
+                      <option value="REJECTED">Rechazadas</option>
+                    </select>
+                    <p className="text-xs text-slate-500">
+                      Las rechazadas muestran la nota del administrador (sin descuento de stock).
+                    </p>
+                  </div>
+                )}
 
                 <div className="mt-6 overflow-x-auto">
                   {activeTab === 'ventas' ? (
@@ -382,7 +572,7 @@ export default function ReportesPage() {
                         )}
                       </tbody>
                     </table>
-                  ) : (
+                  ) : activeTab === 'inventario' ? (
                     <table className="min-w-full text-left text-sm">
                       <thead className="bg-slate-950/80 text-slate-400">
                         <tr>
@@ -410,6 +600,62 @@ export default function ReportesPage() {
                               <td className="px-4 py-3 text-slate-300">{row.quantity}</td>
                               <td className="px-4 py-3 text-slate-300">{row.minStock}</td>
                               <td className="px-4 py-3 text-slate-300">{formatMoney(row.price)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="bg-slate-950/80 text-slate-400">
+                        <tr>
+                          <th className="px-4 py-3">Fecha</th>
+                          <th className="px-4 py-3">Sucursal</th>
+                          <th className="px-4 py-3">Producto</th>
+                          <th className="px-4 py-3">Cant.</th>
+                          <th className="px-4 py-3">Motivo</th>
+                          <th className="px-4 py-3">Estado</th>
+                          <th className="px-4 py-3">Reportó</th>
+                          <th className="px-4 py-3">Revisó</th>
+                          <th className="px-4 py-3">Nota rechazo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {shrinkages.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                              No hay mermas para mostrar.
+                            </td>
+                          </tr>
+                        ) : (
+                          shrinkages.map((row) => (
+                            <tr key={row.id} className="hover:bg-slate-950/60">
+                              <td className="px-4 py-3 text-slate-300">
+                                {new Date(row.date).toLocaleString('es-CO')}
+                              </td>
+                              <td className="px-4 py-3 text-white">{row.branchName}</td>
+                              <td className="px-4 py-3 text-white">
+                                <p>{row.productName}</p>
+                                <p className="text-xs text-slate-500">{row.productSku}</p>
+                              </td>
+                              <td className="px-4 py-3 text-slate-300">{row.quantity}</td>
+                              <td className="max-w-[180px] px-4 py-3 text-slate-300">{row.reason}</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${shrinkageStatusClass(row.status)}`}
+                                >
+                                  {shrinkageStatusLabel(row.status)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-slate-300">{row.reportedByName}</td>
+                              <td className="px-4 py-3 text-slate-300">{row.reviewedByName ?? '—'}</td>
+                              <td className="max-w-[220px] px-4 py-3 text-slate-300">
+                                {row.status === 'REJECTED' && row.rejectionNote ? (
+                                  <span className="text-rose-200">{row.rejectionNote}</span>
+                                ) : (
+                                  '—'
+                                )}
+                              </td>
                             </tr>
                           ))
                         )}
