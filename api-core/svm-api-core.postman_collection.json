@@ -1,0 +1,1320 @@
+{
+  "info": {
+    "name": "SVM API Core QA - Current Contract Tests",
+    "description": "Colección Postman para QA del api-core. (Incluye todos los endpoints esperados por el BFF para asegurar correspondencia 1:1 con api-core).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"QA User\",\n  \"email\": \"qa.user@example.com\",\n  \"password\": \"Str0ngPass!123\",\n  \"roleId\": \"{{roleIdSeller}}\",\n  \"branchId\": \"{{branchId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"qa.user@example.com\",\n  \"password\": \"Str0ngPass!123\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/users",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/users/:id",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /auth/users/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"QA User Updated\",\n  \"email\": \"qa.user.updated@example.com\",\n  \"roleId\": \"{{roleIdSeller}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /auth/users/:id",
+          "request": {
+            "method": "DELETE",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inventory (SELLER)",
+      "item": [
+        {
+          "name": "GET /inventory/branch/:branchId",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/branch/{{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "branch",
+                "{{branchId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /inventory/branch/:branchId/product/:productId",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/branch/{{branchId}}/product/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "branch",
+                "{{branchId}}",
+                "product",
+                "{{productId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /inventory/branch/:branchId/low-stock",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/branch/{{branchId}}/low-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "branch",
+                "{{branchId}}",
+                "low-stock"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /inventory/stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "stock"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 10\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /inventory/stock/adjust",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/stock/adjust",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "stock",
+                "adjust"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": -1\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catalog (SELLER)",
+      "item": [
+        {
+          "name": "GET /catalog/categories",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /catalog/categoriesAction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Categoria QA\",\n  \"description\": \"Categoria creada desde Postman\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /catalog/products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /catalog/products",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Producto QA\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"price\": 100\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /catalog/products/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Producto QA actualizado\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /catalog/suppliers",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/suppliers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "suppliers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /catalog/suppliers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/suppliers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "suppliers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Supplier QA\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /catalog/suppliers/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/suppliers/{{supplierId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "suppliers",
+                "{{supplierId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Supplier QA actualizado\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /catalog/suppliers/:id",
+          "request": {
+            "method": "DELETE",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/suppliers/{{supplierId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalog",
+                "suppliers",
+                "{{supplierId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Branch (SELLER)",
+      "item": [
+        {
+          "name": "GET /branch",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branch"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sucursal QA\",\n  \"address\": \"Direccion QA\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /branch/:id",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branch/{{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branch",
+                "{{branchId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /branch/branchAction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branch/branchAction",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branch",
+                "branchAction"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sucursal QA alias\",\n  \"address\": \"Direccion QA\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /branch/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branch/{{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branch",
+                "{{branchId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sucursal QA actualizada\",\n  \"address\": \"Direccion QA actualizada\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /branch/:id",
+          "request": {
+            "method": "DELETE",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branch/{{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branch",
+                "{{branchId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sales (SELLER)",
+      "item": [
+        {
+          "name": "GET /sales",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+            "raw": "{{baseUrl}}/sales/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "sales"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /sales",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+            "raw": "{{baseUrl}}/sales/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "sales"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"total\": 100.00,\n  \"discount\": 0.0,\n  \"status\": \"COMPLETED\",\n  \"notes\": \"QA sale\",\n  \"details\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1,\n      \"unitPrice\": 100.00,\n      \"subtotal\": 100.00\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Shrinkage / Mermas (SELLER)",
+      "item": [
+        {
+          "name": "GET /shrinkage",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shrinkage/shrinkage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shrinkage",
+                "shrinkage"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /shrinkage/shrinkage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shrinkage/shrinkage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shrinkage",
+                "shrinkage"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"{{shrinkageReason}}\",\n  \"details\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /shrinkage/shrinkage/status/:status",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shrinkage/shrinkage/status/{{shrinkageStatus}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shrinkage",
+                "shrinkage",
+                "status",
+                "{{shrinkageStatus}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /shrinkage/shrinkage/:id",
+          "request": {
+            "method": "GET",
+             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-key",
+                "value": "{{keyInternal}}"
+              },
+              {
+              
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shrinkage/shrinkage/{{shrinkageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shrinkage",
+                "shrinkage",
+                "{{shrinkageId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "roleIdSeller",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "branchId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "saleId",
+      "value": ""
+    },
+    {
+      "key": "shrinkageId",
+      "value": ""
+    },
+    {
+      "key": "shrinkageStatus",
+      "value": "PENDING"
+    },
+    {
+      "key": "shrinkageReason",
+      "value": "Vencimiento"
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "supplierId",
+      "value": ""
+    },
+    {
+      "key": "x-internal-key",
+      "value": "supersecretkey"
+    },
+    {
+      "key": "x-branch-id",
+      "value": "{{branchId}}"
+    }
+  ]
+}
+

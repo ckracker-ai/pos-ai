@@ -1,0 +1,18 @@
+# Frontend — solo HTTP (sin certificados aún o modo bootstrap)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${APP_DOMAIN};
+
+    include /etc/nginx/snippets/acme.conf;
+
+    location /api/ {
+        proxy_pass http://${BFF_UPSTREAM}/api/;
+        include /etc/nginx/snippets/proxy-headers.conf;
+    }
+
+    location / {
+        proxy_pass http://${FRONTEND_UPSTREAM};
+        include /etc/nginx/snippets/proxy-headers.conf;
+    }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "svm-core-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SVM Core API – Data persistence layer",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "db:sync": "ts-node src/db/sync.ts",
+    "docker:build": "docker build -t svm-core-api .",
+    "docker:run": "docker run --env-file .env -p 4000:4000 svm-core-api",
+    "compose:build": "docker compose build",
+    "compose:up": "docker compose up --build",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs --follow"
+  },
+  "dependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "argon2": "^0.31.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.9.7",
+    "sequelize": "^6.37.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.12.12",
+    "@types/uuid": "^9.0.8",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
+  }
+}

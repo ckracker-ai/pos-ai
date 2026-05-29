@@ -1,0 +1,34 @@
+# Frontend — HTTPS (certificados detectados en /etc/letsencrypt)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${APP_DOMAIN};
+
+    include /etc/nginx/snippets/acme.conf;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include /etc/nginx/snippets/ssl-params.conf;
+
+    # Misma API por mismo origen (evita CORS en el navegador)
+    location /api/ {
+        proxy_pass http://${BFF_UPSTREAM}/api/;
+        include /etc/nginx/snippets/proxy-headers.conf;
+    }
+
+    location / {
+        proxy_pass http://${FRONTEND_UPSTREAM};
+        include /etc/nginx/snippets/proxy-headers.conf;
+    }
+}

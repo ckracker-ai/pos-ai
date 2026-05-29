@@ -1,0 +1,13 @@
+# BFF / API pública — solo HTTP
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${API_DOMAIN};
+
+    include /etc/nginx/snippets/acme.conf;
+
+    location / {
+        proxy_pass http://${BFF_UPSTREAM};
+        include /etc/nginx/snippets/proxy-headers.conf;
+    }
+}

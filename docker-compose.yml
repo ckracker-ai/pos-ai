@@ -1,0 +1,142 @@
+services:
+  # ==========================================
+  # CAPA DE FRONTEND (Cliente Web/Móvil)
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
+        NEXT_PUBLIC_API_URL: ''
+        BFF_INTERNAL_URL: http://api-bff:3000
+    container_name: svm-frontend
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    environment:
+      BFF_INTERNAL_URL: http://api-bff:3000
+      AUTH_URL: http://api-bff:3000
+    networks:
+      - public_gateway
+    depends_on:
+      api-bff:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:80/']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # CAPA BFF (Backend For Frontend - Puerta de Entrada Pesada)
+  # ==========================================
+  api-bff:
+    build: ./api-bff
+    container_name: svm-api-bff
+    restart: unless-stopped
+    user: "1000:1000" # Usuario 'node' sin privilegios root
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - CORE_API_BASE_URL=http://api-core:4000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-svm_jwt_secret_key_2026}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-svm_jwt_refresh_secret_2026}
+    volumes:
+      - ./api-bff:/usr/src/app           # Sincroniza tu código local con el contenedor
+      - /usr/src/app/node_modules        # Protege las dependencias internas de Linux Alpine
+    networks:
+      - public_gateway
+      - internal_backend
+    depends_on:
+      api-core:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ==========================================
+  # CAPA CORE-API (Lógica de Negocio Centralizada)
+  # ==========================================
+  api-core:
+    build: ./api-core
+    container_name: svm-api-core
+    user: "1000:1000"
+    environment:
+      - NODE_ENV=production
+      - DB_SYNC_ALTER=false
+      - DB_SEED_ROLES=true
+      - PORT=4000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-svm_jwt_secret_key_2026}
+      - BOOTSTRAP_ADMIN_ENABLED=${BOOTSTRAP_ADMIN_ENABLED:-true}
+      - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-admin@empanadascostaazul.cl}
+      - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-@dmin123_}
+      - BOOTSTRAP_ADMIN_FULL_NAME=${BOOTSTRAP_ADMIN_FULL_NAME:-Administrador Costa Azul}
+      - BOOTSTRAP_ADMIN_BRANCH_NAME=${BOOTSTRAP_ADMIN_BRANCH_NAME:-Sucursal Central}
+      - BOOTSTRAP_ADMIN_RESET_PASSWORD=${BOOTSTRAP_ADMIN_RESET_PASSWORD:-false}
+      - DB_HOST=db-mysql
+      - DB_PORT=3306
+      - DB_NAME=erp_core_db
+      - DB_USER=usr_erp
+      - DB_PASSWORD=Usr@12345
+    volumes:
+      - ./api-core:/usr/src/app          # Sincroniza tu lógica de negocio en tiempo real
+      - /usr/src/app/node_modules        # Protege las dependencias internas de Linux Alpine
+    networks:
+      - internal_backend
+    deploy:
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      db-mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==========================================
+  # CAPA DE BASE DE DATOS
+  # ==========================================
+  db-mysql:
+    image: mysql:8.0
+    container_name: erp_db_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db}
+      MYSQL_USER: ${MYSQL_USER:-usr_erp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}
+    volumes:
+      - datos_mysql:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d
+    networks:
+      - internal_backend
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+# ==========================================
+# CONFIGURACIÓN DE REDES Y VOLÚMENES
+# ==========================================
+networks:
+  public_gateway:
+    driver: bridge
+  internal_backend:
+    internal: true
+
+volumes:
+  datos_mysql:
+    driver: local

@@ -1,0 +1,53 @@
+# Dependencies
+**/node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+**/.next/
+**/out/
+**/dist/
+**/build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env*.example
+!.env.docker.example
+!.env.prod.example
+
+# Logs & debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+**/coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+
+# SSL / certs (Let's Encrypt local)
+nginx/certs/live/
+nginx/certs/archive/
+nginx/certs/accounts/
+nginx/certs/renewal/
+!nginx/certs/.gitignore
+
+# Docker local overrides (optional)
+docker-compose.override.yml
+
+# MySQL data (if ever bind-mounted locally)
+mysql-data/
