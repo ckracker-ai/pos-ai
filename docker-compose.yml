@@ -1,27 +1,27 @@
 services:
   # ==========================================
-  # CAPA DE FRONTEND (Cliente Web/Móvil)
+  # POS-AI v1.4 — Frontend
   # ==========================================
-  frontend:
+  pos-frontend:
     build:
-      context: ./frontend
+      context: ./pos-frontend
       args:
         NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ''
-        BFF_INTERNAL_URL: http://api-bff:3000
-        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.3.0}
-    container_name: svm-frontend
+        BFF_INTERNAL_URL: http://pos-api-bff:3000
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.4.0}
+    container_name: pos-ai-frontend
     restart: unless-stopped
     ports:
       - '80:80'
     environment:
-      BFF_INTERNAL_URL: http://api-bff:3000
-      AUTH_URL: http://api-bff:3000
-      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.3.0}
+      BFF_INTERNAL_URL: http://pos-api-bff:3000
+      AUTH_URL: http://pos-api-bff:3000
+      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.4.0}
     networks:
       - public_gateway
     depends_on:
-      api-bff:
+      pos-api-bff:
         condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:80/']
@@ -31,31 +31,31 @@ services:
       start_period: 40s
 
   # ==========================================
-  # CAPA BFF (Backend For Frontend - Puerta de Entrada Pesada)
+  # POS-AI v1.4 — BFF
   # ==========================================
-  api-bff:
-    build: ./api-bff
-    container_name: svm-api-bff
+  pos-api-bff:
+    build: ./pos-api-bff
+    container_name: pos-ai-api-bff
     restart: unless-stopped
-    user: "1000:1000" # Usuario 'node' sin privilegios root
+    user: "1000:1000"
     ports:
       - '3000:3000'
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - CORE_API_BASE_URL=http://api-core:4000
+      - CORE_API_BASE_URL=http://pos-api-core:4000
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
-      - JWT_SECRET=${JWT_SECRET:-svm_jwt_secret_key_2026}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-svm_jwt_refresh_secret_2026}
-      - APP_VERSION=${APP_VERSION:-1.3.0}
+      - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-pos_ai_jwt_refresh_secret_2026}
+      - APP_VERSION=${APP_VERSION:-1.4.0}
     volumes:
-      - ./api-bff:/usr/src/app           # Sincroniza tu código local con el contenedor
-      - /usr/src/app/node_modules        # Protege las dependencias internas de Linux Alpine
+      - ./pos-api-bff:/usr/src/app
+      - /usr/src/app/node_modules
     networks:
       - public_gateway
       - internal_backend
     depends_on:
-      api-core:
+      pos-api-core:
         condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
@@ -65,11 +65,11 @@ services:
       start_period: 20s
 
   # ==========================================
-  # CAPA CORE-API (Lógica de Negocio Centralizada)
+  # POS-AI v1.4 — Core API (multi-tenant)
   # ==========================================
-  api-core:
-    build: ./api-core
-    container_name: svm-api-core
+  pos-api-core:
+    build: ./pos-api-core
+    container_name: pos-ai-api-core
     user: "1000:1000"
     environment:
       - NODE_ENV=production
@@ -77,22 +77,22 @@ services:
       - DB_SEED_ROLES=true
       - PORT=4000
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
-      - JWT_SECRET=${JWT_SECRET:-svm_jwt_secret_key_2026}
+      - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
       - BOOTSTRAP_ADMIN_ENABLED=${BOOTSTRAP_ADMIN_ENABLED:-true}
       - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-admin@empanadascostaazul.cl}
       - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-@dmin123_}
       - BOOTSTRAP_ADMIN_FULL_NAME=${BOOTSTRAP_ADMIN_FULL_NAME:-Administrador Costa Azul}
       - BOOTSTRAP_ADMIN_BRANCH_NAME=${BOOTSTRAP_ADMIN_BRANCH_NAME:-Sucursal Central}
       - BOOTSTRAP_ADMIN_RESET_PASSWORD=${BOOTSTRAP_ADMIN_RESET_PASSWORD:-false}
-      - APP_VERSION=${APP_VERSION:-1.3.0}
+      - APP_VERSION=${APP_VERSION:-1.4.0}
       - DB_HOST=db-mysql
       - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-erp_core_db}
+      - DB_NAME=${DB_NAME:-erp_core_db_v13}
       - DB_USER=${DB_USER:-usr_erp}
       - DB_PASSWORD=${DB_PASSWORD:-Usr@12345}
     volumes:
-      - ./api-core:/usr/src/app          # Sincroniza tu lógica de negocio en tiempo real
-      - /usr/src/app/node_modules        # Protege las dependencias internas de Linux Alpine
+      - ./pos-api-core:/usr/src/app
+      - /usr/src/app/node_modules
     networks:
       - internal_backend
     deploy:
@@ -109,15 +109,15 @@ services:
       start_period: 30s
 
   # ==========================================
-  # CAPA DE BASE DE DATOS
+  # Base de datos (schema v1.3 / producto v1.4)
   # ==========================================
   db-mysql:
     image: mysql:8.0
-    container_name: erp_db_mysql
+    container_name: pos-ai-db-mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db_v13}
       MYSQL_USER: ${MYSQL_USER:-usr_erp}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}
     volumes:
@@ -132,9 +132,6 @@ services:
       retries: 10
       start_period: 30s
 
-# ==========================================
-# CONFIGURACIÓN DE REDES Y VOLÚMENES
-# ==========================================
 networks:
   public_gateway:
     driver: bridge

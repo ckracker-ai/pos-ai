@@ -1,6 +1,6 @@
 {
-  "name": "svm-frontend",
-  "version": "1.3.0",
+  "name": "pos-frontend",
+  "version": "1.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 80",

@@ -1,20 +1,16 @@
 # Overlay de producción / VPS — NO reemplaza docker-compose.yml
 #
-# Desarrollo (sin cambios):
-#   docker compose up -d
+# Desarrollo:
+#   docker compose up -d --build
 #
-# Producción con Nginx (HTTP hasta tener certs; HTTPS automático al detectarlos):
+# Producción con Nginx:
 #   cp .env.prod.example .env.prod
-#   # Editar dominios y secretos
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
-#
-# Emitir certificados Let's Encrypt (DNS del VPS apuntando ya configurado):
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod --profile certbot run --rm certbot
 
 services:
   nginx:
     image: nginx:1.27-alpine
-    container_name: svm-nginx
+    container_name: pos-ai-nginx
     restart: unless-stopped
     ports:
       - '${NGINX_HTTP_PORT:-80}:80'
@@ -22,8 +18,8 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-app.localhost}
       API_DOMAIN: ${API_DOMAIN:-api.localhost}
-      FRONTEND_UPSTREAM: frontend:80
-      BFF_UPSTREAM: api-bff:3000
+      FRONTEND_UPSTREAM: pos-frontend:80
+      BFF_UPSTREAM: pos-api-bff:3000
       SSL_MODE: ${SSL_MODE:-auto}
     volumes:
       - ./nginx/conf.d/00-http.conf:/etc/nginx/conf.d/00-http.conf:ro
@@ -36,8 +32,8 @@ services:
     networks:
       - public_gateway
     depends_on:
-      - frontend
-      - api-bff
+      - pos-frontend
+      - pos-api-bff
     healthcheck:
       test: ['CMD', 'nginx', '-t']
       interval: 30s
@@ -45,25 +41,25 @@ services:
       retries: 3
       start_period: 10s
 
-  frontend:
+  pos-frontend:
     ports: !reset
     environment:
-      BFF_INTERNAL_URL: http://api-bff:3000
-      AUTH_URL: http://api-bff:3000
+      BFF_INTERNAL_URL: http://pos-api-bff:3000
+      AUTH_URL: http://pos-api-bff:3000
     build:
-      context: ./frontend
+      context: ./pos-frontend
       args:
         NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        BFF_INTERNAL_URL: http://api-bff:3000
+        BFF_INTERNAL_URL: http://pos-api-bff:3000
 
-  api-bff:
+  pos-api-bff:
     ports: !reset
     environment:
       NODE_ENV: production
     volumes: !reset
 
-  api-core:
+  pos-api-core:
     volumes: !reset
 
   certbot:
@@ -78,6 +74,6 @@ services:
   db-mysql:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db_v13}
       MYSQL_USER: ${MYSQL_USER:-usr_erp}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}

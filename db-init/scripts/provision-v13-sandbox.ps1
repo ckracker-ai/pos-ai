@@ -12,4 +12,4 @@ Write-Host ">> Provisionando sandbox v1.3 en contenedor: $Container"
 Get-Content $SqlFile -Raw | docker exec -i $Container mysql -uroot -p"$RootPassword"
 
 Write-Host ">> Listo. Sandbox v1.3 multi-tenant en erp_core_db_v13"
-Write-Host ">> Apunta api-core: DB_NAME=erp_core_db_v13"
+Write-Host ">> Apunta pos-api-core: DB_NAME=erp_core_db_v13"

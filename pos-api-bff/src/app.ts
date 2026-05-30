@@ -42,7 +42,7 @@ const createApp = () => {
 
   app.get('/', async () => ({
     status: 'ok',
-    service: 'svm-api-bff',
+    service: 'pos-api-bff',
   }));
 
   return app;

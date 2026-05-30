@@ -1,5 +1,5 @@
 /** Versión de producto SVM ERP (semver). */
-export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '1.3.0';
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '1.4.0';
 
 /** Etiqueta corta para UI, ej. v1.2 */
 export function formatAppVersionLabel(version = APP_VERSION): string {

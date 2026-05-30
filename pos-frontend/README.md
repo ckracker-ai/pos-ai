@@ -1,4 +1,6 @@
-# SVM Frontend - Sistema de Ventas Multisucursal
+# POS-AI Frontend (v1.4)
+
+Cliente web Next.js del ERP SaaS multi-tenant POS-AI.
 
 Plataforma frontend moderna y responsive para gestión de ventas multisucursal con dashboards especializados por rol.
 

@@ -1,8 +1,8 @@
 {
-  "name": "svm-core-api",
-  "version": "1.3.0",
+  "name": "pos-api-core",
+  "version": "1.4.0",
   "private": true,
-  "description": "SVM Core API – Data persistence layer",
+  "description": "POS-AI Core API – multi-tenant data layer",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -10,8 +10,8 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "db:sync": "ts-node src/db/sync.ts",
-    "docker:build": "docker build -t svm-core-api .",
-    "docker:run": "docker run --env-file .env -p 4000:4000 svm-core-api",
+    "docker:build": "docker build -t pos-api-core .",
+    "docker:run": "docker run --env-file .env -p 4000:4000 pos-api-core",
     "compose:build": "docker compose build",
     "compose:up": "docker compose up --build",
     "compose:down": "docker compose down",

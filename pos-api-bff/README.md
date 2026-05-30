@@ -1,6 +1,6 @@
-# SVM API BFF
+# POS-AI API BFF (v1.4)
 
-Backend-for-frontend diseñado para orquestar el tráfico entre el frontend y el Core API de SVM.
+Backend-for-frontend que orquesta el tráfico entre `pos-frontend` y `pos-api-core`.
 
 ## Objetivos
 

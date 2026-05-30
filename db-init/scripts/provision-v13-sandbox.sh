@@ -11,4 +11,4 @@ echo ">> Provisionando sandbox v1.3 en contenedor: ${CONTAINER}"
 docker exec -i "${CONTAINER}" mysql -uroot -p"${ROOT_PASSWORD}" \
   < "${SCRIPT_DIR}/provision-v13-sandbox.sql"
 
-echo ">> Listo. Apunta api-core a DB_NAME=erp_core_db_v13"
+echo ">> Listo. Apunta pos-api-core a DB_NAME=erp_core_db_v13"

@@ -1,6 +1,6 @@
-# SVM Core API
+# POS-AI Core API (v1.4)
 
-Core API for the SVM system. This repository contains the backend service for authentication, inventory, sales, and related domain logic.
+Core API multi-tenant para POS-AI. Autenticación, inventario, ventas, empresas y lógica de dominio.
 
 ## Commands
 

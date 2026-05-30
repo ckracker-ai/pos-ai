@@ -1,9 +1,19 @@
 # Changelog
 
-## [1.3.0] — en desarrollo
+## [1.4.0] — en desarrollo
 
-### Próximo módulo
-- (pendiente — trabajar en rama `release/1.3`)
+### Multi-tenant (empresa en todo el stack)
+- Renombrado monorepo: `pos-api-core`, `pos-api-bff`, `pos-frontend`
+- Core: modelo `Empresa`, `empresa_id`, CRUD `/empresas`, tenant scope
+- BD sandbox `erp_core_db_v13` (schema v1.3, producto v1.4)
+- Docker: servicios `pos-*`, contenedores `pos-ai-*`
+
+### Próximo (v1.5)
+- Asistente teléfono / WhatsApp (`pos-api-assistant`)
+
+## [1.3.0] — absorbido en v1.4
+
+- Trabajo multi-tenant inicial (rama `POS-AI`, pre-renombre)
 
 ## [1.2.0] — 2026-05-29
 
