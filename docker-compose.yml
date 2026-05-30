@@ -1,6 +1,8 @@
+name: pos-ai
+
 services:
   # ==========================================
-  # POS-AI v1.4 — Frontend
+  # POS-AI v1.4 — Frontend (host :8010)
   # ==========================================
   pos-frontend:
     build:
@@ -8,15 +10,15 @@ services:
       args:
         NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ''
-        BFF_INTERNAL_URL: http://pos-api-bff:3000
+        BFF_INTERNAL_URL: http://pos-api-bff:2020
         NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.4.0}
     container_name: pos-ai-frontend
     restart: unless-stopped
     ports:
-      - '80:80'
+      - '8010:80'
     environment:
-      BFF_INTERNAL_URL: http://pos-api-bff:3000
-      AUTH_URL: http://pos-api-bff:3000
+      BFF_INTERNAL_URL: http://pos-api-bff:2020
+      AUTH_URL: http://pos-api-bff:2020
       NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.4.0}
     networks:
       - public_gateway
@@ -31,7 +33,7 @@ services:
       start_period: 40s
 
   # ==========================================
-  # POS-AI v1.4 — BFF
+  # POS-AI v1.4 — BFF (host :2020, prefijo /pos/proxy)
   # ==========================================
   pos-api-bff:
     build: ./pos-api-bff
@@ -39,11 +41,12 @@ services:
     restart: unless-stopped
     user: "1000:1000"
     ports:
-      - '3000:3000'
+      - '2020:2020'
     environment:
       - NODE_ENV=development
-      - PORT=3000
-      - CORE_API_BASE_URL=http://pos-api-core:4000
+      - PORT=2020
+      - API_PREFIX=/pos/proxy
+      - CORE_API_BASE_URL=http://pos-api-core:1010
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
       - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-pos_ai_jwt_refresh_secret_2026}
@@ -58,24 +61,27 @@ services:
       pos-api-core:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2020/pos/proxy/health']
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
 
   # ==========================================
-  # POS-AI v1.4 — Core API (multi-tenant)
+  # POS-AI v1.4 — Core API (multi-tenant, puerto 1010)
   # ==========================================
   pos-api-core:
     build: ./pos-api-core
     container_name: pos-ai-api-core
     user: "1000:1000"
+    ports:
+      - '1010:1010'
     environment:
       - NODE_ENV=production
       - DB_SYNC_ALTER=false
       - DB_SEED_ROLES=true
-      - PORT=4000
+      - PORT=1010
+      - CORE_PORT=1010
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
       - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
       - BOOTSTRAP_ADMIN_ENABLED=${BOOTSTRAP_ADMIN_ENABLED:-true}
@@ -85,43 +91,47 @@ services:
       - BOOTSTRAP_ADMIN_BRANCH_NAME=${BOOTSTRAP_ADMIN_BRANCH_NAME:-Sucursal Central}
       - BOOTSTRAP_ADMIN_RESET_PASSWORD=${BOOTSTRAP_ADMIN_RESET_PASSWORD:-false}
       - APP_VERSION=${APP_VERSION:-1.4.0}
-      - DB_HOST=db-mysql
+      - DB_HOST=pos-ai-db-mysql
       - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-erp_core_db_v13}
-      - DB_USER=${DB_USER:-usr_erp}
+      - DB_NAME=${DB_NAME:-pos-ai-db}
+      - DB_USER=${DB_USER:-usr_pos_ai}
       - DB_PASSWORD=${DB_PASSWORD:-Usr@12345}
     volumes:
       - ./pos-api-core:/usr/src/app
       - /usr/src/app/node_modules
     networks:
       - internal_backend
+      - public_gateway
     deploy:
       restart_policy:
         condition: on-failure
     depends_on:
-      db-mysql:
+      pos-ai-db-mysql:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:1010/health']
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 30s
 
   # ==========================================
-  # Base de datos (schema v1.3 / producto v1.4)
+  # MySQL — pos-ai-db (3306 interno; host 3308 por defecto)
   # ==========================================
-  db-mysql:
+  pos-ai-db-mysql:
     image: mysql:8.0
     container_name: pos-ai-db-mysql
     restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - '${MYSQL_HOST_PORT:-3308}:3306'
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db_v13}
-      MYSQL_USER: ${MYSQL_USER:-usr_erp}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-pos-ai-db}
+      MYSQL_USER: ${MYSQL_USER:-usr_pos_ai}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}
     volumes:
-      - datos_mysql:/var/lib/mysql
+      - pos_ai_mysql_data:/var/lib/mysql
       - ./db-init:/docker-entrypoint-initdb.d
     networks:
       - internal_backend
@@ -139,5 +149,5 @@ networks:
     internal: true
 
 volumes:
-  datos_mysql:
+  pos_ai_mysql_data:
     driver: local

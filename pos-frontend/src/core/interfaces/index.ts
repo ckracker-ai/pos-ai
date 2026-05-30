@@ -143,6 +143,33 @@ export interface RoleOption {
   name: string;
 }
 
+export type EmpresaEstado = 'ACTIVO' | 'SUSPENDIDO' | 'PENDIENTE_ONBOARDING';
+
+export interface Empresa {
+  id: string;
+  rutEmpresa: string;
+  razonSocial: string;
+  nombreFantasia: string | null;
+  giroSii: string | null;
+  direccionComercial: string | null;
+  correoFacturacion: string | null;
+  urlLogo: string | null;
+  slug: string;
+  estado: EmpresaEstado;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateEmpresaInput {
+  razonSocial?: string;
+  nombreFantasia?: string | null;
+  giroSii?: string | null;
+  direccionComercial?: string | null;
+  correoFacturacion?: string | null;
+  urlLogo?: string | null;
+  slug?: string;
+}
+
 export interface KitchenOrderLine {
   id: string;
   productId: string;

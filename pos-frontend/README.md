@@ -52,7 +52,8 @@ npm install
 npm run dev
 ```
 
-La aplicación estará disponible en `http://localhost:3000`
+- Local con BFF: http://localhost:3000 (o el puerto que asigne Next)
+- **Recomendado**: `docker compose up` → http://localhost:**8010**
 
 ## Build para Producción
 
@@ -63,12 +64,21 @@ npm start
 
 ## Configuración de Variables de Entorno
 
-Edita `.env.local`:
+Ver `AUTH_SYSTEM.md` y `.env.local.example` si existe.
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_DEFAULT_BRANCH_ID=1
+# Desarrollo directo al BFF
+NEXT_PUBLIC_API_URL=http://localhost:2020
+NEXT_PUBLIC_INTERNAL_KEY=supersecretkey
 ```
+
+## Rutas de mantenedores (v1.4)
+
+| Ruta | Roles | Notas |
+|------|-------|-------|
+| `/empresas` | admin, auditor | Perfil tenant; solo admin edita |
+| `/branches` | admin, auditor | admin gestiona |
+| `/users` | admin, auditor | admin gestiona |
 
 ## Tipo de Comprobación
 

@@ -1,5 +1,6 @@
--- Sandbox v1.3 multi-tenant (schema completo v1.3).
--- api-core apunta aquí con DB_NAME=erp_core_db_v13 (docker-compose.v13.yml).
+-- POS-AI — schema multi-tenant + seed para Docker (MySQL 8.0)
+-- Base de datos: pos-ai-db (MYSQL_DATABASE en docker-compose).
+-- Requiere volumen vacío en el primer arranque del contenedor.
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -12,7 +13,9 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-USE `erp_core_db_v13`;
+USE `pos-ai-db`;
+
+ALTER DATABASE `pos-ai-db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 SOURCE /docker-entrypoint-initdb.d/schema/v1.3-core.sql;
 SOURCE /docker-entrypoint-initdb.d/schema/v1.3-seed.sql;

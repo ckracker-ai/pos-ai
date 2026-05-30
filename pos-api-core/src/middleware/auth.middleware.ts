@@ -3,9 +3,9 @@ import * as jwt from 'jsonwebtoken';
 
 import User from '../modules/auth/models/User.model';
 import Role from '../modules/auth/models/Role.model';
-import Empresa from '../modules/tenant/models/Empresa.model';
 import { readModelString } from '../utils/modelAttributes';
 import { branchBelongsToEmpresa } from '../utils/tenantScope';
+import { assertEmpresaAllowsOperation } from '../utils/empresaAccess';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -77,9 +77,10 @@ export const authenticateToken = (
       return;
     }
 
-    const empresa = await Empresa.findByPk(empresaIdFromUser, { attributes: ['id', 'estado'] });
-    if (!empresa || readModelString(empresa, 'estado') === 'SUSPENDIDO') {
-      res.status(403).json({ success: false, data: null, error: 'EMPRESA_SUSPENDED', code: 403 });
+    const tenantOk = await assertEmpresaAllowsOperation(empresaIdFromUser);
+    if (!tenantOk.success) {
+      const code = tenantOk.error === 'EMPRESA_NOT_FOUND' ? 404 : 403;
+      res.status(code).json({ success: false, data: null, error: tenantOk.error, code });
       return;
     }
 

@@ -3,10 +3,14 @@ import { UniqueConstraintError } from 'sequelize';
 import sequelize from '../../../config/database';
 import Empresa, { EmpresaEstado } from '../models/Empresa.model';
 import Branch from '../../branch/models/Branch.model';
+import Role from '../../auth/models/Role.model';
+import User from '../../auth/models/User.model';
 import { parseRut } from '../../../utils/rutChile';
 import { slugify, uniqueSlug } from '../../../utils/slug';
 import { readModelString } from '../../../utils/modelAttributes';
+import { isValidEmail } from '../../../utils/empresaAccess';
 import { Result, ok, fail } from '../../../types/result';
+import * as argon2 from 'argon2';
 
 export interface EmpresaRecord {
   id: string;
@@ -36,9 +40,14 @@ export interface CreateEmpresaInput {
   slug?: string;
   estado?: EmpresaEstado;
   branchName?: string;
+  /** Si se envían, crea admin inicial y deja empresa en ACTIVO. */
+  adminEmail?: string;
+  adminPassword?: string;
+  adminFullName?: string;
 }
 
-export interface UpdateEmpresaInput {
+/** Campos editables por ADMIN del tenant (sin lifecycle). */
+export interface UpdateEmpresaTenantInput {
   razonSocial?: string;
   nombreFantasia?: string | null;
   giroSii?: string | null;
@@ -46,8 +55,19 @@ export interface UpdateEmpresaInput {
   correoFacturacion?: string | null;
   urlLogo?: string | null;
   slug?: string;
+}
+
+/** Solo plataforma / onboarding interno (x-internal-key). */
+export interface UpdateEmpresaPlatformInput extends UpdateEmpresaTenantInput {
   estado?: EmpresaEstado;
 }
+
+const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
+  type: argon2.argon2id,
+  memoryCost: 65536,
+  timeCost: 3,
+  parallelism: 4,
+};
 
 class EmpresaDelegate {
   private toRecord(row: Empresa): EmpresaRecord {
@@ -90,12 +110,35 @@ class EmpresaDelegate {
     return ok([this.toRecord(row)]);
   }
 
-  async create(input: CreateEmpresaInput): Promise<Result<{ empresa: EmpresaRecord; branch?: Branch }>> {
+  async create(
+    input: CreateEmpresaInput
+  ): Promise<Result<{ empresa: EmpresaRecord; branch?: Branch; adminUserId?: string }>> {
     const rut = parseRut(input.rut);
     if (!rut) return fail('VALIDATION_ERROR: invalid RUT');
 
     const razonSocial = input.razonSocial?.trim();
     if (!razonSocial) return fail('VALIDATION_ERROR: razonSocial is required');
+
+    const correo = input.correoFacturacion?.trim();
+    if (correo && !isValidEmail(correo)) {
+      return fail('VALIDATION_ERROR: invalid correoFacturacion');
+    }
+
+    const adminEmail = input.adminEmail?.trim().toLowerCase();
+    const adminPassword = input.adminPassword?.trim();
+    const adminFullName = input.adminFullName?.trim() || 'Administrador';
+    const wantsAdmin = Boolean(adminEmail || adminPassword);
+    if (wantsAdmin) {
+      if (!adminEmail || !adminPassword) {
+        return fail('VALIDATION_ERROR: adminEmail and adminPassword are required together');
+      }
+      if (adminPassword.length < 8) {
+        return fail('VALIDATION_ERROR: adminPassword must be at least 8 characters');
+      }
+      if (!isValidEmail(adminEmail)) {
+        return fail('VALIDATION_ERROR: invalid adminEmail');
+      }
+    }
 
     const nombreFantasia = input.nombreFantasia?.trim() || null;
     const slugBase = input.slug?.trim() || nombreFantasia || razonSocial;
@@ -106,6 +149,10 @@ class EmpresaDelegate {
       where: { rutNumero: rut.rutNumero, rutDv: rut.rutDv },
     });
     if (existingRut) return fail('RUT_ALREADY_REGISTERED');
+
+    const initialEstado: EmpresaEstado = wantsAdmin
+      ? 'ACTIVO'
+      : (input.estado ?? 'PENDIENTE_ONBOARDING');
 
     const transaction = await sequelize.transaction();
     try {
@@ -124,13 +171,15 @@ class EmpresaDelegate {
           nombreFantasia,
           giroSii: input.giroSii?.trim() || null,
           direccionComercial: input.direccionComercial?.trim() || null,
-          correoFacturacion: input.correoFacturacion?.trim() || null,
+          correoFacturacion: correo || null,
           urlLogo: input.urlLogo?.trim() || null,
           slug,
-          estado: input.estado ?? 'PENDIENTE_ONBOARDING',
+          estado: initialEstado,
         },
         { transaction }
       );
+
+      const empresaId = String(empresa.getDataValue('id') ?? empresa.id);
 
       let branch: Branch | undefined;
       const branchName = input.branchName?.trim() || 'Sucursal Central';
@@ -138,7 +187,7 @@ class EmpresaDelegate {
         branch = await Branch.create(
           {
             id: uuidv4(),
-            empresaId: String(empresa.getDataValue('id') ?? empresa.id),
+            empresaId,
             name: branchName,
             address: input.direccionComercial?.trim() || 'Por definir',
             isActive: true,
@@ -147,8 +196,43 @@ class EmpresaDelegate {
         );
       }
 
+      let adminUserId: string | undefined;
+      if (wantsAdmin && branch) {
+        const adminRole = await Role.findOne({ where: { name: 'ADMIN' }, transaction });
+        if (!adminRole) {
+          await transaction.rollback();
+          return fail('ROLE_NOT_FOUND: ADMIN role missing');
+        }
+
+        const taken = await User.findOne({
+          where: { email: adminEmail!, empresaId },
+          transaction,
+        });
+        if (taken) {
+          await transaction.rollback();
+          return fail('EMAIL_TAKEN: admin email already registered in this empresa');
+        }
+
+        const passwordHash = await argon2.hash(adminPassword!, ARGON2_OPTIONS);
+        const branchId = String(branch.getDataValue('id') ?? branch.id);
+        adminUserId = uuidv4();
+        await User.create(
+          {
+            id: adminUserId,
+            fullName: adminFullName,
+            email: adminEmail!,
+            password: passwordHash,
+            roleId: String(adminRole.getDataValue('id') ?? adminRole.id),
+            empresaId,
+            branchId,
+            isActive: true,
+          },
+          { transaction }
+        );
+      }
+
       await transaction.commit();
-      return ok({ empresa: this.toRecord(empresa), branch });
+      return ok({ empresa: this.toRecord(empresa), branch, adminUserId });
     } catch (error) {
       await transaction.rollback();
       if (error instanceof UniqueConstraintError) {
@@ -158,16 +242,11 @@ class EmpresaDelegate {
     }
   }
 
-  async update(
-    id: string,
-    scopedEmpresaId: string,
-    input: UpdateEmpresaInput
+  private async applyPatch(
+    row: Empresa,
+    input: UpdateEmpresaTenantInput | UpdateEmpresaPlatformInput,
+    allowEstado: boolean
   ): Promise<Result<EmpresaRecord>> {
-    if (id !== scopedEmpresaId) return fail('EMPRESA_ACCESS_DENIED');
-
-    const row = await Empresa.findByPk(id);
-    if (!row) return fail('EMPRESA_NOT_FOUND');
-
     const patch: Record<string, unknown> = {};
 
     if (input.razonSocial !== undefined) {
@@ -181,16 +260,23 @@ class EmpresaDelegate {
       patch.direccionComercial = input.direccionComercial?.trim() || null;
     }
     if (input.correoFacturacion !== undefined) {
-      patch.correoFacturacion = input.correoFacturacion?.trim() || null;
+      const correo = input.correoFacturacion?.trim() || null;
+      if (correo && !isValidEmail(correo)) {
+        return fail('VALIDATION_ERROR: invalid correoFacturacion');
+      }
+      patch.correoFacturacion = correo;
     }
     if (input.urlLogo !== undefined) patch.urlLogo = input.urlLogo?.trim() || null;
-    if (input.estado !== undefined) patch.estado = input.estado;
+
+    if (allowEstado && 'estado' in input && input.estado !== undefined) {
+      patch.estado = input.estado;
+    }
 
     if (input.slug !== undefined) {
       const slug = slugify(input.slug);
       if (!slug) return fail('VALIDATION_ERROR: invalid slug');
       const taken = await Empresa.findOne({ where: { slug } });
-      if (taken && String(taken.id) !== id) return fail('SLUG_ALREADY_TAKEN');
+      if (taken && String(taken.id) !== String(row.id)) return fail('SLUG_ALREADY_TAKEN');
       patch.slug = slug;
     }
 
@@ -210,12 +296,39 @@ class EmpresaDelegate {
     }
   }
 
-  async deactivate(id: string, scopedEmpresaId: string): Promise<Result<EmpresaRecord>> {
-    return this.update(id, scopedEmpresaId, { estado: 'SUSPENDIDO' });
+  async updateForTenant(
+    id: string,
+    scopedEmpresaId: string,
+    input: UpdateEmpresaTenantInput
+  ): Promise<Result<EmpresaRecord>> {
+    if (id !== scopedEmpresaId) return fail('EMPRESA_ACCESS_DENIED');
+
+    const row = await Empresa.findByPk(id);
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+
+    return this.applyPatch(row, input, false);
   }
 
-  async restore(id: string, scopedEmpresaId: string): Promise<Result<EmpresaRecord>> {
-    return this.update(id, scopedEmpresaId, { estado: 'ACTIVO' });
+  async updatePlatform(id: string, input: UpdateEmpresaPlatformInput): Promise<Result<EmpresaRecord>> {
+    const row = await Empresa.findByPk(id);
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+    return this.applyPatch(row, input, true);
+  }
+
+  async suspendPlatform(id: string): Promise<Result<EmpresaRecord>> {
+    const row = await Empresa.findByPk(id);
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+    await row.update({ estado: 'SUSPENDIDO' });
+    await row.reload();
+    return ok(this.toRecord(row));
+  }
+
+  async activatePlatform(id: string): Promise<Result<EmpresaRecord>> {
+    const row = await Empresa.findByPk(id);
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+    await row.update({ estado: 'ACTIVO' });
+    await row.reload();
+    return ok(this.toRecord(row));
   }
 }
 

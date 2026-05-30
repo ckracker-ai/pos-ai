@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { LoginRequest, User, UserRole } from '@/core/interfaces';
 import { getFriendlyApiError } from '@/core/api/api-error-messages';
 import { getRoleProfile } from '@/core/config/role-access';
+import { posProxyPath } from '@/core/constants/api-path';
 import { useBranchStore } from '@/store/branch';
 
 interface RegisterRequest extends LoginRequest {
@@ -29,7 +30,7 @@ interface AuthStore {
 }
 
 const getBffBaseUrl = () =>
-  (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+  (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 const normalizeRoleName = (roleName?: string): UserRole => {
   if (!roleName) return 'user';
@@ -83,7 +84,7 @@ export const useAuthStore = create<AuthStore>()(
       login: async (credentials: LoginRequest) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch(`${getBffBaseUrl()}/api/auth/login`, {
+          const response = await fetch(`${getBffBaseUrl()}${posProxyPath('auth/login')}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -136,7 +137,7 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const branchId = payload.branchId || process.env.NEXT_PUBLIC_DEFAULT_BRANCH_ID || '1';
-          const response = await fetch(`${getBffBaseUrl()}/api/auth/register`, {
+          const response = await fetch(`${getBffBaseUrl()}${posProxyPath('auth/register')}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

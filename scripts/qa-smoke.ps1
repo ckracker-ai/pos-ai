@@ -1,9 +1,10 @@
-# Smoke tests Sprint 4 - ejecutar con el stack levantado (docker compose up -d)
-# Uso: .\scripts\qa-smoke.ps1 [-BaseUrl http://localhost:3000] [-FrontendUrl http://localhost]
+# Smoke tests POS-AI v1.4 — ejecutar con el stack levantado (docker compose up -d)
+# Uso: .\scripts\qa-smoke.ps1
 
 param(
-  [string]$BaseUrl = "http://localhost:3000",
-  [string]$FrontendUrl = "http://localhost",
+  [string]$BaseUrl = "http://localhost:2020",
+  [string]$ProxyPrefix = "/pos/proxy",
+  [string]$FrontendUrl = "http://localhost:8010",
   [string]$InternalKey = "supersecretkey",
   [string]$BranchId = "48d4ee18-5349-11f1-a915-00ff541b88ad",
   [string]$AdminEmail = "admin@empanadascostaazul.cl",
@@ -15,6 +16,7 @@ param(
 $ErrorActionPreference = "Stop"
 $passed = 0
 $failed = 0
+$ApiRoot = "$BaseUrl$ProxyPrefix"
 
 function Write-Pass([string]$Name) {
   Write-Host "[OK]   $Name" -ForegroundColor Green
@@ -40,7 +42,7 @@ function Invoke-Smoke {
 function Get-AuthSession {
   param([string]$Email, [string]$Password)
   $body = @{ email = $Email; password = $Password } | ConvertTo-Json
-  $resp = Invoke-RestMethod -Uri "$BaseUrl/api/auth/login" -Method Post -Body $body -ContentType "application/json" -Headers @{ "x-internal-key" = $InternalKey }
+  $resp = Invoke-RestMethod -Uri "$ApiRoot/auth/login" -Method Post -Body $body -ContentType "application/json" -Headers @{ "x-internal-key" = $InternalKey }
   if (-not $resp.success) { throw $resp.error }
   return @{
     Token = $resp.data.token
@@ -51,19 +53,19 @@ function Get-AuthSession {
 function Get-ApiHeaders {
   param([string]$Token, [string]$Branch = $BranchId)
   return @{
-    Authorization   = "Bearer $Token"
+    Authorization    = "Bearer $Token"
     "x-internal-key" = $InternalKey
     "x-branch-id"    = $Branch
   }
 }
 
 Write-Host ""
-Write-Host "=== SVM QA Smoke (Sprint 4) ===" -ForegroundColor Cyan
-Write-Host "BFF: $BaseUrl | Frontend: $FrontendUrl"
+Write-Host "=== POS-AI QA Smoke (v1.4) ===" -ForegroundColor Cyan
+Write-Host "BFF: $ApiRoot | Frontend: $FrontendUrl"
 Write-Host ""
 
-Invoke-Smoke "BFF health (/api/health)" {
-  $r = Invoke-RestMethod -Uri "$BaseUrl/api/health" -Method Get
+Invoke-Smoke "BFF health ($ProxyPrefix/health)" {
+  $r = Invoke-RestMethod -Uri "$ApiRoot/health" -Method Get
   if (-not $r.success -or $r.data.status -ne "ok") { throw "unexpected health payload" }
 }
 
@@ -76,25 +78,47 @@ $admin = $null
 Invoke-Smoke "Login ADMIN" {
   $script:admin = Get-AuthSession -Email $AdminEmail -Password $AdminPassword
   if (-not $admin.Token) { throw "missing token" }
+  if (-not $admin.User.empresaId) { throw "empresaId missing in user payload" }
 }
 
 $comanda = $null
-Invoke-Smoke "Login COMANDA" {
-  $script:comanda = Get-AuthSession -Email $ComandaEmail -Password $ComandaPassword
-  if (-not $comanda.User.branchId) { throw "branchId missing in user payload" }
+Write-Host "[..]   Login COMANDA (opcional)" -ForegroundColor DarkGray
+try {
+  $comanda = Get-AuthSession -Email $ComandaEmail -Password $ComandaPassword
+  if (-not $comanda.User.branchId) { throw "branchId missing" }
+  Write-Pass "Login COMANDA"
+} catch {
+  Write-Host "[WARN] COMANDA omitido - $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
 if ($admin) {
+  $adminBranch = if ($admin.User.branchId) { $admin.User.branchId } else { $BranchId }
+  $adminHeaders = Get-ApiHeaders -Token $admin.Token -Branch $adminBranch
+
+  Invoke-Smoke "ADMIN - GET /empresas/me (BFF)" {
+    $r = Invoke-RestMethod -Uri "$ApiRoot/empresas/me" -Method Get -Headers $adminHeaders
+    if (-not $r.success) { throw $r.error }
+    if (-not $r.data.empresa.id) { throw "empresa.id missing" }
+  }
+
   Invoke-Smoke "ADMIN - listar categorias" {
-    $h = Get-ApiHeaders -Token $admin.Token
-    $r = Invoke-RestMethod -Uri "$BaseUrl/api/catalog/categories" -Method Get -Headers $h
+    $r = Invoke-RestMethod -Uri "$ApiRoot/catalog/categories" -Method Get -Headers $adminHeaders
     if (-not $r.success) { throw $r.error }
   }
 
   Invoke-Smoke "ADMIN - listar usuarios" {
-    $h = Get-ApiHeaders -Token $admin.Token
-    $r = Invoke-RestMethod -Uri "$BaseUrl/api/auth/users" -Method Get -Headers $h
+    $r = Invoke-RestMethod -Uri "$ApiRoot/auth/users" -Method Get -Headers $adminHeaders
     if (-not $r.success) { throw $r.error }
+  }
+
+  Invoke-Smoke "ADMIN - PATCH /empresas/:id (reversible)" {
+    $empresaId = $admin.User.empresaId
+    $patchBody = @{ nombreFantasia = "QA Smoke $(Get-Date -Format 'HHmmss')" } | ConvertTo-Json
+    $patched = Invoke-RestMethod -Uri "$ApiRoot/empresas/$empresaId" -Method Patch -Body $patchBody -ContentType "application/json" -Headers $adminHeaders
+    if (-not $patched.success) { throw $patched.error }
+    $restoreBody = @{ nombreFantasia = "Costa Azul" } | ConvertTo-Json
+    $restored = Invoke-RestMethod -Uri "$ApiRoot/empresas/$empresaId" -Method Patch -Body $restoreBody -ContentType "application/json" -Headers $adminHeaders
+    if (-not $restored.success) { throw $restored.error }
   }
 }
 
@@ -102,17 +126,19 @@ if ($comanda) {
   Invoke-Smoke "COMANDA - listar ventas/comandas" {
     $branch = $comanda.User.branchId
     $h = Get-ApiHeaders -Token $comanda.Token -Branch $branch
-    $r = Invoke-RestMethod -Uri "$BaseUrl/api/sales/sales" -Method Get -Headers $h
+    $r = Invoke-RestMethod -Uri "$ApiRoot/sales/sales" -Method Get -Headers $h
     if (-not $r.success) { throw $r.error }
   }
 }
 
 if ($admin) {
+  $adminBranch = if ($admin.User.branchId) { $admin.User.branchId } else { $BranchId }
+  $h = Get-ApiHeaders -Token $admin.Token -Branch $adminBranch
+
   Invoke-Smoke "Soft delete + restore categoria (ciclo QA)" {
-    $h = Get-ApiHeaders -Token $admin.Token
     $suffix = Get-Date -Format "yyyyMMddHHmmss"
     $createBody = @{ name = "QA-Smoke-$suffix"; description = "auto" } | ConvertTo-Json
-    $created = Invoke-RestMethod -Uri "$BaseUrl/api/catalog/categories" -Method Post -Body $createBody -ContentType "application/json" -Headers $h
+    $created = Invoke-RestMethod -Uri "$ApiRoot/catalog/categories" -Method Post -Body $createBody -ContentType "application/json" -Headers $h
     if (-not $created.success) { throw $created.error }
     $cat = $created.data.category
     if (-not $cat.id) { $cat = $created.data }
@@ -120,10 +146,10 @@ if ($admin) {
     if (-not $id) { throw "category id missing" }
 
     $patchBody = @{ isActive = $false } | ConvertTo-Json
-    $deactivated = Invoke-RestMethod -Uri "$BaseUrl/api/catalog/categories/$id" -Method Patch -Body $patchBody -ContentType "application/json" -Headers $h
+    $deactivated = Invoke-RestMethod -Uri "$ApiRoot/catalog/categories/$id" -Method Patch -Body $patchBody -ContentType "application/json" -Headers $h
     if (-not $deactivated.success) { throw $deactivated.error }
 
-    $restored = Invoke-RestMethod -Uri "$BaseUrl/api/catalog/categories/$id/restore" -Method Post -Body "{}" -ContentType "application/json" -Headers $h
+    $restored = Invoke-RestMethod -Uri "$ApiRoot/catalog/categories/$id/restore" -Method Post -Body "{}" -ContentType "application/json" -Headers $h
     if (-not $restored.success) { throw $restored.error }
   }
 }

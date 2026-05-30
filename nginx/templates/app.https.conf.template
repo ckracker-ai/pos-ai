@@ -22,8 +22,8 @@ server {
     include /etc/nginx/snippets/ssl-params.conf;
 
     # Misma API por mismo origen (evita CORS en el navegador)
-    location /api/ {
-        proxy_pass http://${BFF_UPSTREAM}/api/;
+    location /pos/proxy/ {
+        proxy_pass http://${BFF_UPSTREAM}/pos/proxy/;
         include /etc/nginx/snippets/proxy-headers.conf;
     }
 

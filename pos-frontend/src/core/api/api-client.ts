@@ -51,7 +51,7 @@ const extractApiErrorText = (data: unknown): string | null => {
 const getFriendlyHttpMessage = (status?: number, networkCode?: string) => {
   if (!status) {
     if (networkCode === 'ECONNREFUSED' || networkCode === 'ERR_NETWORK') {
-      return 'No se pudo conectar con el servidor API. Inicia api-bff (puerto 3000) y api-core (puerto 4000), luego recarga la página.';
+      return 'No se pudo conectar con el servidor API. Inicia pos-api-bff (puerto 2020) y pos-api-core (puerto 1010), luego recarga la página.';
     }
     return 'No se pudo conectar con el servidor. Comprueba que api-bff esté en ejecución.';
   }
@@ -184,148 +184,154 @@ export function getApiClient(): AxiosInstance {
 // API Methods
 export const api = {
   health: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/health', config),
+    getApiClient().get('/pos/proxy/health', config),
 
   // Auth / Users
   login: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/auth/login', data, config),
+    getApiClient().post('/pos/proxy/auth/login', data, config),
   register: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/auth/register', data, config),
+    getApiClient().post('/pos/proxy/auth/register', data, config),
   getUsers: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/auth/users', config),
+    getApiClient().get('/pos/proxy/auth/users', config),
   getRoles: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/auth/roles', config),
+    getApiClient().get('/pos/proxy/auth/roles', config),
   getUser: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/auth/users/${id}`, config),
+    getApiClient().get(`/pos/proxy/auth/users/${id}`, config),
   updateUser: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().put(`/api/auth/users/${id}`, data, config),
+    getApiClient().put(`/pos/proxy/auth/users/${id}`, data, config),
   resetUserPassword: (id: string, password: string, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/auth/users/${id}/password`, { password }, config),
+    getApiClient().patch(`/pos/proxy/auth/users/${id}/password`, { password }, config),
   deleteUser: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/auth/users/${id}`, config),
+    getApiClient().delete(`/pos/proxy/auth/users/${id}`, config),
   restoreUser: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/auth/users/${id}/restore`, {}, config),
+    getApiClient().patch(`/pos/proxy/auth/users/${id}/restore`, {}, config),
 
   // Products
   getProducts: (config?: AxiosRequestConfig) => 
-    getApiClient().get('/api/catalog/products', config),
+    getApiClient().get('/pos/proxy/catalog/products', config),
   getProductsByBranch: (branchId: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/catalog/products/by-branch/${branchId}`, config),
+    getApiClient().get(`/pos/proxy/catalog/products/by-branch/${branchId}`, config),
   getProduct: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/catalog/products/${id}`, config),
+    getApiClient().get(`/pos/proxy/catalog/products/${id}`, config),
   createProduct: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/catalog/products', data, config),
+    getApiClient().post('/pos/proxy/catalog/products', data, config),
   updateProduct: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().put(`/api/catalog/products/${id}`, data, config),
+    getApiClient().put(`/pos/proxy/catalog/products/${id}`, data, config),
   deleteProduct: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/catalog/products/${id}`, config),
+    getApiClient().delete(`/pos/proxy/catalog/products/${id}`, config),
   searchProducts: (query: string, config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/catalog/products', { ...config, params: { q: query } }),
+    getApiClient().get('/pos/proxy/catalog/products', { ...config, params: { q: query } }),
   getCategories: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/catalog/categories', config),
+    getApiClient().get('/pos/proxy/catalog/categories', config),
   createCategory: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/catalog/categories', data, config),
+    getApiClient().post('/pos/proxy/catalog/categories', data, config),
   updateCategory: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/catalog/categories/${id}`, data, config),
+    getApiClient().patch(`/pos/proxy/catalog/categories/${id}`, data, config),
   deleteCategory: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/catalog/categories/${id}`, config),
+    getApiClient().delete(`/pos/proxy/catalog/categories/${id}`, config),
   restoreCategory: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().post(`/api/catalog/categories/${id}/restore`, {}, config),
+    getApiClient().post(`/pos/proxy/catalog/categories/${id}/restore`, {}, config),
   getSuppliers: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/catalog/suppliers', config),
+    getApiClient().get('/pos/proxy/catalog/suppliers', config),
   createSupplier: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/catalog/suppliers', data, config),
+    getApiClient().post('/pos/proxy/catalog/suppliers', data, config),
   updateSupplier: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/catalog/suppliers/${id}`, data, config),
+    getApiClient().patch(`/pos/proxy/catalog/suppliers/${id}`, data, config),
   deleteSupplier: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/catalog/suppliers/${id}`, config),
+    getApiClient().delete(`/pos/proxy/catalog/suppliers/${id}`, config),
   restoreSupplier: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().post(`/api/catalog/suppliers/${id}/restore`, {}, config),
+    getApiClient().post(`/pos/proxy/catalog/suppliers/${id}/restore`, {}, config),
 
   // Inventory
   getInventoryByBranch: (branchId: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/inventory/branch/${branchId}`, config),
+    getApiClient().get(`/pos/proxy/inventory/branch/${branchId}`, config),
   getInventoryProduct: (branchId: string, productId: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/inventory/branch/${branchId}/product/${productId}`, config),
+    getApiClient().get(`/pos/proxy/inventory/branch/${branchId}/product/${productId}`, config),
   getLowStock: (branchId: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/inventory/branch/${branchId}/low-stock`, config),
+    getApiClient().get(`/pos/proxy/inventory/branch/${branchId}/low-stock`, config),
   /** Establece la cantidad absoluta en inventory_stock (sucursal activa). */
   updateStock: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch('/api/inventory/stock', data, config),
+    getApiClient().patch('/pos/proxy/inventory/stock', data, config),
   /** @deprecated Use updateStock */
   createStock: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch('/api/inventory/stock', data, config),
+    getApiClient().patch('/pos/proxy/inventory/stock', data, config),
   /** Agrega un producto existente a la sucursal (solo crea fila de stock). */
   addProductToBranch: (branchId: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post(`/api/inventory/branch/${branchId}/stock`, data, config),
+    getApiClient().post(`/pos/proxy/inventory/branch/${branchId}/stock`, data, config),
   adjustStock: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch('/api/inventory/stock/adjust', data, config),
+    getApiClient().patch('/pos/proxy/inventory/stock/adjust', data, config),
 
   // Sales
   createSale: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/sales/sales', data, config),
+    getApiClient().post('/pos/proxy/sales/sales', data, config),
   getSale: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/sales/sales/${id}`, config),
+    getApiClient().get(`/pos/proxy/sales/sales/${id}`, config),
   getSales: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/sales/sales', config),
+    getApiClient().get('/pos/proxy/sales/sales', config),
   getSalesByUserAndBranch: (userId: string, branchId: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/sales/sales/user/${userId}/branch/${branchId}`, config),
+    getApiClient().get(`/pos/proxy/sales/sales/user/${userId}/branch/${branchId}`, config),
   updateSale: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/sales/sales/${id}`, data, config),
+    getApiClient().patch(`/pos/proxy/sales/sales/${id}`, data, config),
   deleteSale: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/sales/sales/${id}`, config),
+    getApiClient().delete(`/pos/proxy/sales/sales/${id}`, config),
   salesAction: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/sales/salesAction', data, config),
+    getApiClient().post('/pos/proxy/sales/salesAction', data, config),
 
   // Branches
   getBranches: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/branch', config),
+    getApiClient().get('/pos/proxy/branch', config),
   getBranch: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/branch/${id}`, config),
+    getApiClient().get(`/pos/proxy/branch/${id}`, config),
   createBranch: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/branch', data, config),
+    getApiClient().post('/pos/proxy/branch', data, config),
   updateBranch: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/branch/${id}`, data, config),
+    getApiClient().patch(`/pos/proxy/branch/${id}`, data, config),
   deleteBranch: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/branch/${id}`, config),
+    getApiClient().delete(`/pos/proxy/branch/${id}`, config),
   restoreBranch: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().post(`/api/branch/${id}/restore`, {}, config),
+    getApiClient().post(`/pos/proxy/branch/${id}/restore`, {}, config),
   branchAction: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/branch/branchAction', data, config),
+    getApiClient().post('/pos/proxy/branch/branchAction', data, config),
 
   // Shrinkage
   getShrinkage: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/shrinkage/shrinkage', config),
+    getApiClient().get('/pos/proxy/shrinkage/shrinkage', config),
   createShrinkage: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/shrinkage/shrinkage', data, config),
+    getApiClient().post('/pos/proxy/shrinkage/shrinkage', data, config),
   approveShrinkage: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().post(`/api/shrinkage/shrinkage/${id}/approve`, {}, config),
+    getApiClient().post(`/pos/proxy/shrinkage/shrinkage/${id}/approve`, {}, config),
   rejectShrinkage: (id: string, data?: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post(`/api/shrinkage/shrinkage/${id}/reject`, data ?? {}, config),
+    getApiClient().post(`/pos/proxy/shrinkage/shrinkage/${id}/reject`, data ?? {}, config),
   getShrinkageByStatus: (status: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/shrinkage/shrinkage/status/${status}`, config),
+    getApiClient().get(`/pos/proxy/shrinkage/shrinkage/status/${status}`, config),
   getShrinkageItem: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().get(`/api/shrinkage/shrinkage/${id}`, config),
+    getApiClient().get(`/pos/proxy/shrinkage/shrinkage/${id}`, config),
   updateShrinkage: (id: string, data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().patch(`/api/shrinkage/shrinkage/${id}`, data, config),
+    getApiClient().patch(`/pos/proxy/shrinkage/shrinkage/${id}`, data, config),
   deleteShrinkage: (id: string, config?: AxiosRequestConfig) =>
-    getApiClient().delete(`/api/shrinkage/shrinkage/${id}`, config),
+    getApiClient().delete(`/pos/proxy/shrinkage/shrinkage/${id}`, config),
   shrinkageAction: (data: unknown, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/shrinkage/shrinkageAction', data, config),
+    getApiClient().post('/pos/proxy/shrinkage/shrinkageAction', data, config),
 
   // Reports
   getReportsDashboard: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/reports/dashboard', config),
+    getApiClient().get('/pos/proxy/reports/dashboard', config),
   getReportsSales: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/reports/sales', config),
+    getApiClient().get('/pos/proxy/reports/sales', config),
   getReportsInventory: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/reports/inventory', config),
+    getApiClient().get('/pos/proxy/reports/inventory', config),
   getReportsShrinkage: (config?: AxiosRequestConfig) =>
-    getApiClient().get('/api/reports/shrinkage', config),
+    getApiClient().get('/pos/proxy/reports/shrinkage', config),
+
+  // Empresa (tenant profile)
+  getEmpresaMe: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/empresas/me', config),
+  updateEmpresa: (id: string, data: unknown, config?: AxiosRequestConfig) =>
+    getApiClient().patch(`/pos/proxy/empresas/${id}`, data, config),
 
   // Bulk Import
   importProducts: (formData: FormData, config?: AxiosRequestConfig) =>
-    getApiClient().post('/api/catalog/products/import', formData, {
+    getApiClient().post('/pos/proxy/catalog/products/import', formData, {
       ...config,
       headers: { 'Content-Type': 'multipart/form-data' },
     }),

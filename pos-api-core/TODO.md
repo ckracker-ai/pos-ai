@@ -1,6 +1,8 @@
-- [ ] Confirmar endpoints actuales en src/modules/*/routes/*.routes.ts
-- [ ] Actualizar colección Postman (svm-api-core.postman_collection.json) con las rutas reales
-- [ ] Asegurar compatibilidad: agregar aliases cuando existan (ej: /salesAction, /shrinkageAction, /categoriesAction)
-- [ ] Ejecutar búsqueda en la colección para verificar que no queden rutas obsoletas (ej: /sales/sales, /shrinkage/shrinkage)
-- [ ] Reemplazar el archivo collection-postman-api-core.json con la versión actualizada (si aplica)
+# TODO pos-api-core — v1.4 empresa
 
+- [x] CRUD tenant + rutas plataforma (`/platform`, `/suspend`, `/activate`)
+- [x] Login bloqueado si empresa no ACTIVO
+- [x] Onboarding con admin opcional en `POST /empresas`
+- [x] Postman carpeta Empresas + `QA-EMPRESAS-v1.4.md`
+- [x] BFF proxy `/empresas` tenant (GET me, GET /, GET :id, PATCH :id)
+- [x] Frontend `/empresas` mantenedor tenant (admin edita, auditor lectura)

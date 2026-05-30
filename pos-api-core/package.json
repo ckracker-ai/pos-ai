@@ -11,7 +11,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "db:sync": "ts-node src/db/sync.ts",
     "docker:build": "docker build -t pos-api-core .",
-    "docker:run": "docker run --env-file .env -p 4000:4000 pos-api-core",
+    "docker:run": "docker run --env-file .env -p 1010:1010 pos-api-core",
     "compose:build": "docker compose build",
     "compose:up": "docker compose up --build",
     "compose:down": "docker compose down",

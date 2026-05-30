@@ -38,7 +38,7 @@ const createApp = () => {
 
   app.setErrorHandler(errorHandler);
 
-  app.register(apiRoutes, { prefix: '/api' });
+  app.register(apiRoutes, { prefix: config.apiPrefix });
 
   app.get('/', async () => ({
     status: 'ok',

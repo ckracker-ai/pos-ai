@@ -1,38 +1,39 @@
 # POS-AI Core API (v1.4)
 
-Core API multi-tenant para POS-AI. Autenticación, inventario, ventas, empresas y lógica de dominio.
+Core API multi-tenant. Puerto por defecto **1010**, base de datos **pos-ai-db**.
 
-## Commands
+## Comandos
 
 - `npm install`
 - `npm run build`
 - `npm start`
 - `npm run dev`
-- `npm run db:sync`
 
-## Environment
+## Variables de entorno
 
-Copy `.env.example` to `.env` and update database credentials and `INTERNAL_API_KEY`.
+Copiar `.env.example` a `.env`:
 
-## Docker
+| Variable | Default |
+|----------|---------|
+| `PORT` / `CORE_PORT` | `1010` |
+| `DB_NAME` | `pos-ai-db` |
+| `DB_HOST` | `127.0.0.1` |
+| `DB_PORT` | `3308` (host; contenedor usa 3306) |
+| `INTERNAL_API_KEY` | (requerido) |
 
-Build and run the production image:
+## Docker (solo core)
 
-- `docker build -t svm-core-api .`
-- `docker run --env-file .env -p 4000:4000 svm-core-api`
+```powershell
+docker build -t pos-api-core .
+docker run --env-file .env -p 1010:1010 pos-api-core
+```
 
-Or start the stack with Docker Compose:
+## Postman
 
-- `docker compose up --build`
-- `docker compose down`
+Importar `pos-api-core.postman_collection.json` — carpeta **Empresas**.
 
-Use npm shortcuts:
+Checklist QA: `QA-EMPRESAS-v1.4.md`.
 
-- `npm run docker:build`
-- `npm run docker:run`
-- `npm run compose:build`
-- `npm run compose:up`
-- `npm run compose:down`
-- `npm run compose:logs`
+## Stack completo
 
-The compose setup uses `core_api` and `db`, with the API exposed only on `127.0.0.1:${CORE_PORT:-4000}`.
+Desde la raíz del monorepo: `docker compose up -d --build`

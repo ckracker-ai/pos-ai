@@ -14,6 +14,8 @@ export type ApiErrorContext =
   | 'branches.save'
   | 'branches.delete'
   | 'branches.restore'
+  | 'empresas.load'
+  | 'empresas.save'
   | 'categories.list'
   | 'categories.save'
   | 'categories.delete'
@@ -59,6 +61,8 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'branches.save': 'No se pudo guardar la sucursal',
   'branches.delete': 'No se pudo desactivar la sucursal',
   'branches.restore': 'No se pudo restaurar la sucursal',
+  'empresas.load': 'No se pudo cargar el perfil de la empresa',
+  'empresas.save': 'No se pudo guardar el perfil de la empresa',
   'categories.list': 'No se pudieron cargar las categorías',
   'categories.save': 'No se pudo guardar la categoría',
   'categories.delete': 'No se pudo eliminar la categoría',
@@ -98,6 +102,12 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   BRANCH_ID_INVALID: 'La sucursal activa no es válida. Selecciona una sucursal en la barra superior.',
   BRANCH_ACCESS_DENIED: 'No puedes operar en esta sucursal con tu usuario actual.',
   BRANCH_NOT_FOUND: 'No encontramos la sucursal indicada.',
+  EMPRESA_NOT_FOUND: 'No encontramos los datos de la empresa.',
+  EMPRESA_ACCESS_DENIED: 'No puedes acceder a los datos de otra empresa.',
+  EMPRESA_SUSPENDED: 'La empresa está suspendida. Contacta al soporte de la plataforma.',
+  EMPRESA_PENDING_ONBOARDING: 'La empresa aún no completó el onboarding.',
+  SLUG_ALREADY_TAKEN: 'Ese identificador (slug) ya está en uso. Elige otro.',
+  RUT_ALREADY_REGISTERED: 'Ese RUT ya está registrado en la plataforma.',
   PRODUCT_NOT_FOUND: 'No encontramos el producto.',
   PRODUCT_CREATE_FAILED: 'No se pudo crear el producto. Revisa SKU, categoría y proveedor.',
   SUPPLIER_NOT_FOUND: 'No encontramos el proveedor.',
@@ -197,7 +207,7 @@ const mapCodeToMessage = (rawText: string): { message: string; code?: string } =
   if (/Failed to fetch|Network Error|ECONNREFUSED|ERR_NETWORK/i.test(rawText)) {
     return {
       message:
-        'No se pudo conectar con el servidor. Verifica que api-bff (puerto 3000) y api-core estén activos.',
+        'No se pudo conectar con el servidor. Verifica que pos-api-bff (puerto 2020) y pos-api-core (1010) estén activos.',
       code: 'NETWORK',
     };
   }

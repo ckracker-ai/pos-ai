@@ -18,28 +18,60 @@ const mapErrorStatus = (error: string): number => {
   if (error.startsWith('RUT_') || error.startsWith('SLUG_') || error.startsWith('EMPRESA_DUPLICATE')) {
     return 409;
   }
+  if (error.startsWith('EMAIL_TAKEN') || error.startsWith('ROLE_NOT_FOUND')) return 409;
   return 400;
 };
 
-/** Onboarding: crea empresa (+ sucursal central opcional). Solo x-internal-key (sin JWT). */
+// ---------------------------------------------------------------------------
+// Plataforma / onboarding — solo x-internal-key (sin JWT)
+// ---------------------------------------------------------------------------
+
 router.post('/', async (req, res) => {
   const result = await empresaDelegate.create(req.body ?? {});
   if (result.success) {
-    return sendOk(res, { empresa: result.value.empresa, branch: result.value.branch ?? null }, 201);
+    return sendOk(
+      res,
+      {
+        empresa: result.value.empresa,
+        branch: result.value.branch ?? null,
+        adminUserId: result.value.adminUserId ?? null,
+      },
+      201
+    );
   }
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
+router.patch('/:id/platform', async (req, res) => {
+  const result = await empresaDelegate.updatePlatform(req.params.id, req.body ?? {});
+  if (result.success) return sendOk(res, { empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/:id/suspend', async (req, res) => {
+  const result = await empresaDelegate.suspendPlatform(req.params.id);
+  if (result.success) return sendOk(res, { suspended: true, empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/:id/activate', async (req, res) => {
+  const result = await empresaDelegate.activatePlatform(req.params.id);
+  if (result.success) return sendOk(res, { activated: true, empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+// ---------------------------------------------------------------------------
+// Tenant autenticado — perfil comercial (sin lifecycle)
+// ---------------------------------------------------------------------------
+
 router.use(authenticateToken);
 
-/** Perfil de la empresa del usuario autenticado. */
 router.get('/me', requireComanda, async (req: AuthenticatedRequest, res) => {
   const result = await empresaDelegate.findById(getEffectiveEmpresaId(req));
   if (result.success) return sendOk(res, { empresa: result.value });
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
-/** Lista tenant actual (1 registro). Extensible a super-admin. */
 router.get('/', requireComanda, async (req: AuthenticatedRequest, res) => {
   const result = await empresaDelegate.listForTenant(getEffectiveEmpresaId(req));
   if (result.success) return sendOk(res, { empresas: result.value });
@@ -53,25 +85,12 @@ router.get('/:id', requireComanda, async (req: AuthenticatedRequest, res) => {
 });
 
 router.patch('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const result = await empresaDelegate.update(
+  const result = await empresaDelegate.updateForTenant(
     req.params.id,
     getEffectiveEmpresaId(req),
     req.body ?? {}
   );
   if (result.success) return sendOk(res, { empresa: result.value });
-  return sendFail(res, result.error, mapErrorStatus(result.error));
-});
-
-router.post('/:id/restore', requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const result = await empresaDelegate.restore(req.params.id, getEffectiveEmpresaId(req));
-  if (result.success) return sendOk(res, { empresa: result.value });
-  return sendFail(res, result.error, mapErrorStatus(result.error));
-});
-
-/** Soft delete: estado SUSPENDIDO (no borra datos). */
-router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const result = await empresaDelegate.deactivate(req.params.id, getEffectiveEmpresaId(req));
-  if (result.success) return sendOk(res, { deactivated: true, empresa: result.value });
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 

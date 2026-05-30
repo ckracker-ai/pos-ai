@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
-const bffInternalUrl = (process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:3000').replace(
+const bffInternalUrl = (process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:2020').replace(
   /\/$/,
   ''
 );
 
+const proxyPrefix = '/pos/proxy';
+
 const nextConfig = {
-  // Habilita el empaquetado ultra-ligero y aislado para producción (Docker)
   output: 'standalone',
 
   reactStrictMode: true,
@@ -15,30 +16,27 @@ const nextConfig = {
     domains: ['localhost', 'api.example.com'],
   },
 
-  // En dev, el navegador llama al mismo origen (p. ej. :80) y Next reenvía /api/* al BFF.
-  // La ruta app/api/auth/login sigue resolviéndose en Next antes que el rewrite.
+  // Browser → mismo origen (:8010) → rewrite → BFF (:2020) /pos/proxy/*
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
-        destination: `${bffInternalUrl}/api/:path*`,
+        source: `${proxyPrefix}/:path*`,
+        destination: `${bffInternalUrl}${proxyPrefix}/:path*`,
       },
     ];
   },
 
   env: {
-    // Vacío = URLs relativas (/api/...) vía rewrite. Para llamar al BFF directo: http://localhost:3000
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? '',
   },
 
   async headers() {
     return [
       {
-        // Match all API routes
-        source: '/api/:path*',
+        source: `${proxyPrefix}/:path*`,
         headers: [
           { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Allow-Origin', value: 'http://localhost:3000' },
+          { key: 'Access-Control-Allow-Origin', value: 'http://localhost:8010' },
           { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT,OPTIONS' },
           {
             key: 'Access-Control-Allow-Headers',
@@ -52,4 +50,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

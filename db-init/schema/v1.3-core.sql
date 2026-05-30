@@ -1,5 +1,4 @@
--- ERP Core v1.3 — multi-tenant (shared DB + empresa_id).
--- Invocado desde 02-init-v13-sandbox.sql y provision-v13-sandbox.sql.
+-- ERP Core v1.4 — multi-tenant (pos-ai-db + empresa_id).
 
 DROP TABLE IF EXISTS `schema_migrations`;
 

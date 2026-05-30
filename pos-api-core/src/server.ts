@@ -82,9 +82,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(globalErrorHandler);
 
-  const PORT = Number(process.env.CORE_PORT ?? 4000);
+  const PORT = Number(process.env.PORT ?? process.env.CORE_PORT ?? 1010);
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀  SVM Core API v${APP_VERSION} listening on port ${PORT}`);
+    console.log(`🚀  ${APP_NAME} v${APP_VERSION} listening on port ${PORT}`);
   });
 }
 

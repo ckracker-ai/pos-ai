@@ -30,6 +30,8 @@ export type RoleProfile = {
   canManageUsers: boolean;
   /** Crear, editar, desactivar y restaurar sucursales */
   canManageBranches: boolean;
+  /** Editar perfil comercial de la empresa (tenant) */
+  canManageEmpresa: boolean;
 };
 
 const ALL_ROLES: readonly UserRole[] = ['admin', 'auditor', 'seller', 'comanda', 'user'];
@@ -46,6 +48,7 @@ const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
     canApproveShrinkages: true,
     canManageUsers: true,
     canManageBranches: true,
+    canManageEmpresa: true,
   },
   auditor: {
     role: 'auditor',
@@ -57,6 +60,7 @@ const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
     canApproveShrinkages: true,
     canManageUsers: false,
     canManageBranches: false,
+    canManageEmpresa: false,
   },
   seller: {
     role: 'seller',
@@ -68,6 +72,7 @@ const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
     canApproveShrinkages: false,
     canManageUsers: false,
     canManageBranches: false,
+    canManageEmpresa: false,
   },
   comanda: {
     role: 'comanda',
@@ -79,6 +84,7 @@ const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
     canApproveShrinkages: false,
     canManageUsers: false,
     canManageBranches: false,
+    canManageEmpresa: false,
   },
   user: {
     role: 'user',
@@ -89,6 +95,7 @@ const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
     canApproveShrinkages: false,
     canManageUsers: false,
     canManageBranches: false,
+    canManageEmpresa: false,
   },
 };
 
@@ -221,6 +228,17 @@ export const APP_MODULES: readonly AppModule[] = [
     showInNav: true,
     navSection: 'maintainers',
   },
+  {
+    key: 'empresas',
+    title: 'Empresa',
+    description: 'Datos comerciales y facturación del tenant',
+    icon: '🏢',
+    path: '/empresas',
+    allowed: ['admin', 'auditor'],
+    showOnDashboard: true,
+    showInNav: true,
+    navSection: 'maintainers',
+  },
 ] as const;
 
 const NAV_SECTION_LABELS: Record<NavSectionId, string> = {
@@ -252,6 +270,7 @@ export function getRoleProfile(role?: string): RoleProfile {
     canApproveShrinkages: false,
     canManageUsers: false,
     canManageBranches: false,
+    canManageEmpresa: false,
   };
 }
 

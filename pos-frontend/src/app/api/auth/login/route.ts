@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { POS_PROXY_PREFIX } from '@/core/constants/api-path';
 
 export async function POST(request: NextRequest) {
   const authUrl =
     process.env.AUTH_URL ||
     process.env.BFF_INTERNAL_URL ||
     process.env.NEXT_PUBLIC_AUTH_URL ||
-    'http://localhost:3000';
-  const loginUrl = authUrl.endsWith('/api/auth/login')
+    'http://localhost:2020';
+  const loginUrl = authUrl.includes(`${POS_PROXY_PREFIX}/auth/login`)
     ? authUrl
-    : `${authUrl.replace(/\/$/, '')}/api/auth/login`;
+    : `${authUrl.replace(/\/$/, '')}${POS_PROXY_PREFIX}/auth/login`;
   const branchId = process.env.NEXT_PUBLIC_DEFAULT_BRANCH_ID || '1';
 
   try {
@@ -49,4 +50,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

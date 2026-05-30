@@ -1,64 +1,64 @@
 # POS-AI — ERP SaaS multi-tenant
 
-Producto en desarrollo activo. Evolución SaaS del ERP SVM con multi-empresa en **core, BFF y frontend**.
+Producto v1.4: multi-empresa en core, BFF y frontend.
 
-## Roadmap de versiones
+## Roadmap
 
 | Versión | Alcance |
 |---------|---------|
-| **v1.4** (actual) | Multi-tenant: `empresa_id`, CRUD `/empresas`, BD `erp_core_db_v13` |
-| **v1.5** (próximo) | Asistente teléfono / WhatsApp (`pos-api-assistant`) |
-| **v1.6+** | Billing SaaS, onboarding self-service |
+| **v1.4** (actual) | Multi-tenant, BD `pos-ai-db`, core puerto **1010** |
+| **v1.5** | Asistente tel/WSP (`pos-api-assistant`) |
 
 ## Relación con SVM
 
-| | **SVM** | **POS-AI** (este repo) |
+| | **SVM** | **POS-AI** |
 |---|---|---|
 | Carpeta | `d:\Proyectos\svm\node` | `d:\Proyectos\POS-AI` |
-| Rama Git | `prod` | `POS-AI` |
-| Versión | v1.2.x (congelada) | v1.4.0+ |
-| BD | `erp_core_db` | `erp_core_db_v13` |
+| Versión | v1.2.x | v1.4.0+ |
+| BD | `erp_core_db` | `pos-ai-db` |
 
-## Estructura del monorepo
+## Estructura
 
 ```
 POS-AI/
-├── pos-frontend/     # UI Next.js
-├── pos-api-bff/      # Backend-for-frontend
-├── pos-api-core/     # Lógica de negocio + multi-tenant
-├── db-init/          # Schema y migraciones
-├── docker-compose.yml
-└── docker-compose.v13.yml   # sandbox con puertos alternativos
+├── pos-frontend/
+├── pos-api-bff/        # puerto 2020, prefijo /pos/proxy
+├── pos-api-core/       # puerto 1010
+├── db-init/init.sql    # → pos-ai-db
+└── docker-compose.yml  # proyecto Docker: pos-ai
 ```
 
-## Arranque rápido (v1.4)
+## Arranque
 
 ```powershell
 cd d:\Proyectos\POS-AI
 docker compose up -d --build
 ```
 
-- Frontend: http://localhost
-- BFF: http://localhost:3000/api/health
-- BD: `erp_core_db_v13` (ver `.env.v13.example`)
+| Servicio | Puerto host | Ruta API |
+|----------|-------------|----------|
+| pos-frontend | **8010** | — |
+| pos-api-bff | **2020** | `/pos/proxy/*` |
+| pos-api-core | 1010 | (interno) |
+| pos-ai-db-mysql | **3308** (host) | — |
 
-Sandbox con puertos alternativos (8080 / 3001 / 3307):
+> MySQL host: **3308** (SVM usa 3306). Override: `MYSQL_HOST_PORT=3309`.
+
+- UI: http://localhost:8010
+- BFF health: http://localhost:2020/pos/proxy/health
+- Core health: http://localhost:1010/health
+
+Sandbox (puertos alternativos): ver `.env.sandbox.example` + `docker-compose.sandbox.yml`.
+
+## QA smoke
 
 ```powershell
-docker compose -p pos-ai-sandbox -f docker-compose.yml -f docker-compose.v13.yml --env-file .env.v13.example up -d --build
+.\scripts\qa-smoke.ps1
 ```
 
-## API v1.4 (core)
-
-- Modelo `Empresa` y `empresa_id` en tablas operativas
-- JWT y middleware con contexto de tenant
-- CRUD `/empresas` en `pos-api-core`
-
-## Pendiente v1.4
-
-- BFF: proxy `/empresas` y header `x-empresa-id`
-- Frontend: contexto tenant, perfil empresa, onboarding
+Checklist manual: `deploy/QA-SMOKE-CHECKLIST.md` · Empresas Postman: `pos-api-core/QA-EMPRESAS-v1.4.md`
 
 ## Credenciales dev
 
 - Admin: `admin@empanadascostaazul.cl` / `@dmin123_`
+- MySQL user: `usr_pos_ai` / `Usr@12345`

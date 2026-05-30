@@ -1,12 +1,11 @@
-# Sistema de Autenticación - SVM Frontend
+# Sistema de Autenticación — POS-AI Frontend (v1.4)
 
 ## Descripción
-Sistema de autenticación completo implementado con:
-- **Store**: Zustand con persistencia en localStorage
-- **API**: Integración con endpoints `/api/auth/login`
-- **Protección de rutas**: RouteGuard automático
-- **Interceptores**: Token incluido en todas las requests
-- **Gestión de sesión**: Auto-logout en 401
+Sistema de autenticación con:
+- **Store**: Zustand + persistencia en localStorage
+- **API**: BFF en `/pos/proxy/auth/*` (Next reescribe al puerto 2020 en Docker)
+- **Protección de rutas**: RouteGuard + `role-access`
+- **Headers**: `Authorization`, `x-internal-key`, `x-branch-id` en cada request autenticada
 
 ## Estructura Creada
 
@@ -60,7 +59,7 @@ AuthResponse {
 
 1. **Usuario accede a la app** → RouteGuard verifica si hay token
 2. **Si no hay token** → Redirige a `/login`
-3. **Usuario ingresa credenciales** → Envía POST a `/api/auth/login`
+3. **Usuario ingresa credenciales** → POST `/pos/proxy/auth/login`
 4. **Backend retorna user + token** → Se guarda en Zustand + localStorage
 5. **Redirige a dashboard** → Rutas protegidas accesibles
 6. **API client incluye token** → En header `Authorization: Bearer <token>`
@@ -68,7 +67,7 @@ AuthResponse {
 
 ## API Esperada
 
-### POST `/api/auth/login`
+### POST `/pos/proxy/auth/login`
 **Request:**
 ```json
 {
@@ -103,18 +102,25 @@ AuthResponse {
 ## Variables de Entorno
 
 ```env
-# .env.local
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_DEFAULT_BRANCH_ID=1
-NODE_ENV=development
+# .env.local (desarrollo local contra BFF)
+NEXT_PUBLIC_API_URL=http://localhost:2020
+NEXT_PUBLIC_INTERNAL_KEY=supersecretkey
 ```
+
+En **Docker** (`docker compose`), `NEXT_PUBLIC_API_URL` va vacío: el frontend usa rewrites de Next hacia `pos-api-bff:2020` y expone la UI en **http://localhost:8010**.
 
 ## Rutas Protegidas
 
 - ✅ `/dashboard` - Requiere autenticación
 - ✅ `/` - Redirige a dashboard o login
 - ❌ `/login` - Pública, redirige a dashboard si está autenticado
-- ❌ `/api/auth/login` - Pública (manejada por backend)
+- ❌ `/login` — Pública
+- Rutas de módulos según rol (`/empresas` solo admin/auditor; edición solo admin)
+
+### Perfil empresa (tenant)
+
+- `GET /pos/proxy/empresas/me` — Perfil del tenant
+- `PATCH /pos/proxy/empresas/:id` — Actualizar datos comerciales (ADMIN)
 
 ## Uso en Componentes
 

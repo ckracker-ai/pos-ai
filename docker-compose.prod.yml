@@ -19,7 +19,7 @@ services:
       APP_DOMAIN: ${APP_DOMAIN:-app.localhost}
       API_DOMAIN: ${API_DOMAIN:-api.localhost}
       FRONTEND_UPSTREAM: pos-frontend:80
-      BFF_UPSTREAM: pos-api-bff:3000
+      BFF_UPSTREAM: pos-api-bff:2020
       SSL_MODE: ${SSL_MODE:-auto}
     volumes:
       - ./nginx/conf.d/00-http.conf:/etc/nginx/conf.d/00-http.conf:ro
@@ -44,14 +44,14 @@ services:
   pos-frontend:
     ports: !reset
     environment:
-      BFF_INTERNAL_URL: http://pos-api-bff:3000
-      AUTH_URL: http://pos-api-bff:3000
+      BFF_INTERNAL_URL: http://pos-api-bff:2020
+      AUTH_URL: http://pos-api-bff:2020
     build:
       context: ./pos-frontend
       args:
         NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        BFF_INTERNAL_URL: http://pos-api-bff:3000
+        BFF_INTERNAL_URL: http://pos-api-bff:2020
 
   pos-api-bff:
     ports: !reset
@@ -71,9 +71,9 @@ services:
     networks:
       - public_gateway
 
-  db-mysql:
+  pos-ai-db-mysql:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db_v13}
-      MYSQL_USER: ${MYSQL_USER:-usr_erp}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-pos-ai-db}
+      MYSQL_USER: ${MYSQL_USER:-usr_pos_ai}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}

@@ -1,4 +1,4 @@
-import { Branch, Category, KitchenOrder, Product, Supplier, User, UserRole } from '@/core/interfaces';
+import { Branch, Category, Empresa, EmpresaEstado, KitchenOrder, Product, Supplier, User, UserRole } from '@/core/interfaces';
 
 export function unwrapApiEnvelope(responseData: unknown): unknown {
   if (
@@ -158,6 +158,32 @@ export function normalizeBranch(raw: Record<string, unknown>): Branch {
     city: String(raw.city ?? ''),
     phone: String(raw.phone ?? ''),
     isActive: raw.isActive !== false,
+  };
+}
+
+const EMPRESA_ESTADOS: EmpresaEstado[] = ['ACTIVO', 'SUSPENDIDO', 'PENDIENTE_ONBOARDING'];
+
+export function normalizeEmpresa(raw: Record<string, unknown>): Empresa {
+  const estadoRaw = String(raw.estado ?? 'ACTIVO').toUpperCase();
+  const estado = EMPRESA_ESTADOS.includes(estadoRaw as EmpresaEstado)
+    ? (estadoRaw as EmpresaEstado)
+    : 'ACTIVO';
+
+  return {
+    id: String(raw.id ?? ''),
+    rutEmpresa: String(raw.rutEmpresa ?? raw.rut_empresa ?? ''),
+    razonSocial: String(raw.razonSocial ?? raw.razon_social ?? ''),
+    nombreFantasia: raw.nombreFantasia != null ? String(raw.nombreFantasia) : null,
+    giroSii: raw.giroSii != null ? String(raw.giroSii) : null,
+    direccionComercial:
+      raw.direccionComercial != null ? String(raw.direccionComercial) : null,
+    correoFacturacion:
+      raw.correoFacturacion != null ? String(raw.correoFacturacion) : null,
+    urlLogo: raw.urlLogo != null ? String(raw.urlLogo) : null,
+    slug: String(raw.slug ?? ''),
+    estado,
+    createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    updatedAt: String(raw.updatedAt ?? new Date().toISOString()),
   };
 }
 

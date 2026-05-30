@@ -14,6 +14,7 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=1010
 
 COPY package*.json ./
 RUN npm ci --omit=dev
@@ -22,6 +23,6 @@ COPY --from=build /app/dist ./dist
 
 USER node
 
-EXPOSE 4000
+EXPOSE 1010
 
 CMD ["node", "dist/server.js"]
