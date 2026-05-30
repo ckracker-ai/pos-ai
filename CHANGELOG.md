@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.0] — en desarrollo
+
+### Próximo módulo
+- (pendiente — trabajar en rama `release/1.3`)
+
 ## [1.2.0] — 2026-05-29
 
 ### Operaciones y mantenedores
