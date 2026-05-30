@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import type { UserRole } from '@/core/interfaces';
 import { APP_VERSION_LABEL } from '@/core/constants/version';
 import {
   getCatalogModulesForRole,
