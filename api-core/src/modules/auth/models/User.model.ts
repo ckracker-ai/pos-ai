@@ -3,6 +3,7 @@ import sequelize from '../../../config/database';
 
 class User extends Model {
   public id!: string;
+  public empresaId!: string;
   public fullName!: string;
   public email!: string;
   public password!: string;
@@ -28,7 +29,6 @@ User.init(
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: 'idx_user_email_unique',
       validate: {
         isEmail: true,
       },
@@ -40,6 +40,11 @@ User.init(
     roleId: {
       type: DataTypes.CHAR(36),
       allowNull: false,
+    },
+    empresaId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'empresa_id',
     },
     branchId: {
       type: DataTypes.CHAR(36),
@@ -54,6 +59,13 @@ User.init(
   {
     sequelize,
     tableName: 'users',
+    indexes: [
+      {
+        unique: true,
+        name: 'uq_users_empresa_email',
+        fields: ['empresa_id', 'email'],
+      },
+    ],
     defaultScope: {
       attributes: { exclude: ['password'] },
     },

@@ -6,6 +6,7 @@ import Product from '../models/Product.model';
 import Supplier from '../models/Supplier.model';
 import catalogProductDelegate from '../delegates/CatalogProductDelegate';
 import { getEffectiveBranchId } from '../../../utils/branchContext';
+import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 
 const router = Router();
 
@@ -13,9 +14,10 @@ const router = Router();
 router.use(authenticateToken);
 
 // Categories - Vendedor can create, view, update and delete
-router.get('/categories', requireSeller, async (_req: AuthenticatedRequest, res) => {
+router.get('/categories', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const categories = await Category.findAll();
+    const empresaId = getEffectiveEmpresaId(req);
+    const categories = await Category.findAll({ where: { empresaId } });
     return sendOk(res, { categories });
   } catch {
     return sendFail(res, 'ERROR_FETCHING_CATEGORIES', 500);
@@ -24,7 +26,8 @@ router.get('/categories', requireSeller, async (_req: AuthenticatedRequest, res)
 
 router.get('/categories/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const category = await Category.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
     if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
     return sendOk(res, { category });
   } catch {
@@ -51,7 +54,8 @@ router.post('/categoriesAction', requireSeller, async (req: AuthenticatedRequest
   if (!validation.valid) return sendFail(res, 'VALIDATION_ERROR: Category.name is required', 422);
 
   try {
-    const category = await Category.create(validation.payload);
+    const empresaId = getEffectiveEmpresaId(req);
+    const category = await Category.create({ ...validation.payload, empresaId });
     return sendOk(res, { category }, 201);
   } catch (err) {
     console.error('[Catalog] ERROR_CREATING_CATEGORY (/categoriesAction)', err);
@@ -64,7 +68,8 @@ router.post('/categoriesAction', requireSeller, async (req: AuthenticatedRequest
 // PATCH /categories/:id (update parcial)
 router.patch('/categories/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const category = await Category.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
     if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
 
     const body = (req.body ?? {}) as {
@@ -94,7 +99,8 @@ router.patch('/categories/:id', requireSeller, async (req: AuthenticatedRequest,
 
 router.post('/categories/:id/restore', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const category = await Category.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
     if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
 
     await category.update({ isActive: true });
@@ -110,7 +116,8 @@ router.post('/categories/:id/restore', requireSeller, async (req: AuthenticatedR
 // DELETE /categories/:id — desactivación lógica (soft delete)
 router.delete('/categories/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const category = await Category.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
     if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
 
     await category.update({ isActive: false });
@@ -130,7 +137,8 @@ router.post('/categories', requireSeller, async (req: AuthenticatedRequest, res)
   if (!validation.valid) return sendFail(res, 'VALIDATION_ERROR: Category.name is required', 422);
 
   try {
-    const category = await Category.create(validation.payload);
+    const empresaId = getEffectiveEmpresaId(req);
+    const category = await Category.create({ ...validation.payload, empresaId });
     return sendOk(res, { category }, 201);
   } catch (err) {
     console.error('[Catalog] ERROR_CREATING_CATEGORY (/categories)', err);
@@ -198,8 +206,9 @@ const parseCreateProductBody = (
 // List products with branch stock (JOIN inventory_stock for active branch)
 router.get('/products', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
+    const empresaId = getEffectiveEmpresaId(req);
     const branchId = getEffectiveBranchId(req);
-    const result = await catalogProductDelegate.listByBranch(branchId);
+    const result = await catalogProductDelegate.listByBranch(empresaId, branchId);
 
     if (!result.success) {
       const status = result.error === 'BRANCH_NOT_FOUND' ? 404 : 400;
@@ -220,7 +229,8 @@ router.get('/products/by-branch/:branchId', requireSeller, async (req: Authentic
   }
 
   try {
-    const result = await catalogProductDelegate.listByBranch(effective);
+    const empresaId = getEffectiveEmpresaId(req);
+    const result = await catalogProductDelegate.listByBranch(empresaId, effective);
     if (!result.success) {
       const status = result.error === 'BRANCH_NOT_FOUND' ? 404 : 400;
       return sendFail(res, result.error, status);
@@ -237,8 +247,13 @@ router.post('/products', requireSeller, async (req: AuthenticatedRequest, res) =
   if (!validation.valid) return sendFail(res, validation.error, 422);
 
   try {
+    const empresaId = getEffectiveEmpresaId(req);
     const branchId = getEffectiveBranchId(req);
-    const result = await catalogProductDelegate.createWithBranchStock(branchId, validation.payload);
+    const result = await catalogProductDelegate.createWithBranchStock(
+      empresaId,
+      branchId,
+      validation.payload
+    );
 
     if (!result.success) {
       const status = result.error === 'BRANCH_NOT_FOUND' ? 404 : 400;
@@ -269,7 +284,11 @@ router.post('/products', requireSeller, async (req: AuthenticatedRequest, res) =
 // Aliases to match requested singular paths
 router.get('/product/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-const product = await Product.findByPk(req.params.id, { include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }] });
+    const empresaId = getEffectiveEmpresaId(req);
+    const product = await Product.findOne({
+      where: { id: req.params.id, empresaId },
+      include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }],
+    });
     if (!product) return sendFail(res, 'PRODUCT_NOT_FOUND', 404);
     return sendOk(res, { product });
   } catch {
@@ -282,8 +301,13 @@ router.post('/product', requireSeller, async (req: AuthenticatedRequest, res) =>
   if (!validation.valid) return sendFail(res, validation.error, 422);
 
   try {
+    const empresaId = getEffectiveEmpresaId(req);
     const branchId = getEffectiveBranchId(req);
-    const result = await catalogProductDelegate.createWithBranchStock(branchId, validation.payload);
+    const result = await catalogProductDelegate.createWithBranchStock(
+      empresaId,
+      branchId,
+      validation.payload
+    );
 
     if (!result.success) {
       const status = result.error === 'BRANCH_NOT_FOUND' ? 404 : 400;
@@ -325,10 +349,14 @@ router.get('/product/:branchId', requireSeller, async (req: AuthenticatedRequest
 // Update
 router.put('/products/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const [updated] = await Product.update(req.body, { where: { id: req.params.id } });
+    const empresaId = getEffectiveEmpresaId(req);
+    const [updated] = await Product.update(req.body, { where: { id: req.params.id, empresaId } });
     if (!updated) return sendFail(res, 'PRODUCT_NOT_FOUND', 404);
 
-    const product = await Product.findByPk(req.params.id, { include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }] });
+    const product = await Product.findOne({
+      where: { id: req.params.id, empresaId },
+      include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }],
+    });
     return sendOk(res, { product });
   } catch {
     return sendFail(res, 'ERROR_UPDATING_PRODUCT', 400);
@@ -336,12 +364,15 @@ router.put('/products/:id', requireSeller, async (req: AuthenticatedRequest, res
 });
 
 router.patch('/product/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
-  // Partial update mapped to Sequelize update (same as PUT in this model context)
   try {
-    const [updated] = await Product.update(req.body, { where: { id: req.params.id } });
+    const empresaId = getEffectiveEmpresaId(req);
+    const [updated] = await Product.update(req.body, { where: { id: req.params.id, empresaId } });
     if (!updated) return sendFail(res, 'PRODUCT_NOT_FOUND', 404);
 
-    const product = await Product.findByPk(req.params.id, { include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }] });
+    const product = await Product.findOne({
+      where: { id: req.params.id, empresaId },
+      include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }],
+    });
     return sendOk(res, { product });
   } catch {
     return sendFail(res, 'ERROR_UPDATING_PRODUCT', 400);
@@ -351,7 +382,8 @@ router.patch('/product/:id', requireSeller, async (req: AuthenticatedRequest, re
 // Delete
 router.delete('/product/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const deleted = await Product.destroy({ where: { id: req.params.id } });
+    const empresaId = getEffectiveEmpresaId(req);
+    const deleted = await Product.destroy({ where: { id: req.params.id, empresaId } });
     if (!deleted) return sendFail(res, 'PRODUCT_NOT_FOUND', 404);
     return sendOk(res, { deleted: true });
   } catch {
@@ -361,9 +393,10 @@ router.delete('/product/:id', requireSeller, async (req: AuthenticatedRequest, r
 
 
 // Suppliers - Vendedor can manage
-router.get('/suppliers', requireSeller, async (_req: AuthenticatedRequest, res) => {
+router.get('/suppliers', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const suppliers = await Supplier.findAll();
+    const empresaId = getEffectiveEmpresaId(req);
+    const suppliers = await Supplier.findAll({ where: { empresaId } });
     return sendOk(res, { suppliers });
   } catch {
     return sendFail(res, 'ERROR_FETCHING_SUPPLIERS', 500);
@@ -372,7 +405,8 @@ router.get('/suppliers', requireSeller, async (_req: AuthenticatedRequest, res) 
 
 router.get('/suppliers/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const supplier = await Supplier.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const supplier = await Supplier.findOne({ where: { id: req.params.id, empresaId } });
     if (!supplier) return sendFail(res, 'SUPPLIER_NOT_FOUND', 404);
     return sendOk(res, { supplier });
   } catch {
@@ -395,7 +429,8 @@ router.post('/suppliers', requireSeller, async (req: AuthenticatedRequest, res) 
   if (!validation.valid) return sendFail(res, 'VALIDATION_ERROR: Supplier.name is required', 422);
 
   try {
-    const supplier = await Supplier.create(validation.payload);
+    const empresaId = getEffectiveEmpresaId(req);
+    const supplier = await Supplier.create({ ...validation.payload, empresaId });
     return sendOk(res, { supplier }, 201);
   } catch (err) {
     return sendFail(res, 'ERROR_CREATING_SUPPLIER', 400);
@@ -405,7 +440,8 @@ router.post('/suppliers', requireSeller, async (req: AuthenticatedRequest, res) 
 // PATCH /suppliers/:id (partial update)
 router.patch('/suppliers/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const supplier = await Supplier.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const supplier = await Supplier.findOne({ where: { id: req.params.id, empresaId } });
     if (!supplier) return sendFail(res, 'SUPPLIER_NOT_FOUND', 404);
 
     const body = (req.body ?? {}) as {
@@ -443,7 +479,8 @@ router.patch('/suppliers/:id', requireSeller, async (req: AuthenticatedRequest, 
 
 router.post('/suppliers/:id/restore', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const supplier = await Supplier.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const supplier = await Supplier.findOne({ where: { id: req.params.id, empresaId } });
     if (!supplier) return sendFail(res, 'SUPPLIER_NOT_FOUND', 404);
 
     await supplier.update({ isActive: true });
@@ -459,7 +496,8 @@ router.post('/suppliers/:id/restore', requireSeller, async (req: AuthenticatedRe
 // DELETE /suppliers/:id — desactivación lógica (soft delete)
 router.delete('/suppliers/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
-    const supplier = await Supplier.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const supplier = await Supplier.findOne({ where: { id: req.params.id, empresaId } });
     if (!supplier) return sendFail(res, 'SUPPLIER_NOT_FOUND', 404);
 
     await supplier.update({ isActive: false });

@@ -17,6 +17,7 @@ import salesRoutes from './modules/sales/routes/sales.routes';
 import shrinkageRoutes from './modules/shrinkage/routes/shrinkage.routes';
 import branchRoutes from './modules/branch/routes/branch.routes';
 import reportsRoutes from './modules/reports/routes/reports.routes';
+import empresaRoutes from './modules/tenant/routes/empresa.routes';
 import { APP_NAME, APP_VERSION } from './version';
 
 
@@ -76,6 +77,7 @@ async function bootstrap(): Promise<void> {
   app.use('/sales', salesRoutes);
   app.use('/shrinkage', shrinkageRoutes);
   app.use('/reports', reportsRoutes);
+  app.use('/empresas', empresaRoutes);
 
 
   app.use(globalErrorHandler);

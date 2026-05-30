@@ -96,8 +96,8 @@ function daysAgo(n: number): Date {
   return d;
 }
 
-function saleWhere(branchId: string | null) {
-  const base = { status: { [Op.ne]: 'CANCELLED' as const } };
+function saleWhere(empresaId: string, branchId: string | null) {
+  const base = { empresaId, status: { [Op.ne]: 'CANCELLED' as const } };
   return branchId ? { ...base, branchId } : base;
 }
 
@@ -111,8 +111,8 @@ function readRowValue(row: Record<string, unknown>, ...keys: string[]): unknown 
 }
 
 class ReportsDelegate {
-  async getSummary(branchId: string | null): Promise<Result<ReportsSummary>> {
-    const where = saleWhere(branchId);
+  async getSummary(empresaId: string, branchId: string | null): Promise<Result<ReportsSummary>> {
+    const where = saleWhere(empresaId, branchId);
     const today = startOfToday();
 
     const [totalRevenueRaw, todayRevenueRaw, totalSales, todaySales, activeBranches, registeredUsers] =
@@ -121,8 +121,8 @@ class ReportsDelegate {
         Sale.sum('total', { where: { ...where, createdAt: { [Op.gte]: today } } }),
         Sale.count({ where }),
         Sale.count({ where: { ...where, createdAt: { [Op.gte]: today } } }),
-        Branch.count({ where: { isActive: true } }),
-        User.count({ where: { isActive: true } }),
+        Branch.count({ where: { isActive: true, empresaId } }),
+        User.count({ where: { isActive: true, empresaId } }),
       ]);
 
     return ok({
@@ -138,12 +138,13 @@ class ReportsDelegate {
   }
 
   async getRevenueTrend(
+    empresaId: string,
     branchId: string | null,
     days = 30
   ): Promise<Result<RevenueTrendPoint[]>> {
     const from = daysAgo(days - 1);
     const where = {
-      ...saleWhere(branchId),
+      ...saleWhere(empresaId, branchId),
       createdAt: { [Op.gte]: from },
     };
 
@@ -180,11 +181,14 @@ class ReportsDelegate {
   }
 
   async getLowStockAlerts(
+    empresaId: string,
     branchId: string | null,
     limit = 20
   ): Promise<Result<LowStockAlert[]>> {
     try {
-      const branchClause = branchId ? 'WHERE s.branch_id = :branchId' : '';
+      const branchClause = branchId
+        ? 'WHERE s.empresa_id = :empresaId AND s.branch_id = :branchId'
+        : 'WHERE s.empresa_id = :empresaId';
       const rows = await sequelize.query<Record<string, unknown>>(
         `SELECT
            s.product_id,
@@ -194,12 +198,12 @@ class ReportsDelegate {
            p.name AS product_name,
            b.name AS branch_name
          FROM inventory_stock s
-         LEFT JOIN products p ON p.id = s.product_id
-         LEFT JOIN branches b ON b.id = s.branch_id
+         LEFT JOIN products p ON p.id = s.product_id AND p.empresa_id = :empresaId
+         LEFT JOIN branches b ON b.id = s.branch_id AND b.empresa_id = :empresaId
          ${branchClause}
          ORDER BY s.quantity ASC`,
         {
-          replacements: branchId ? { branchId } : {},
+          replacements: branchId ? { empresaId, branchId } : { empresaId },
           type: QueryTypes.SELECT,
         }
       );
@@ -229,7 +233,11 @@ class ReportsDelegate {
     }
   }
 
-  async getSalesTable(branchId: string | null, limit = 200): Promise<Result<SaleReportRow[]>> {
+  async getSalesTable(
+    empresaId: string,
+    branchId: string | null,
+    limit = 200
+  ): Promise<Result<SaleReportRow[]>> {
     try {
       const branchClause = branchId ? 'AND s.branch_id = :branchId' : '';
       const saleRows = await sequelize.query<Record<string, unknown>>(
@@ -243,13 +251,14 @@ class ReportsDelegate {
            s.created_at,
            b.name AS branch_name
          FROM sales s
-         LEFT JOIN branches b ON b.id = s.branch_id
-         WHERE s.status <> 'CANCELLED'
+         LEFT JOIN branches b ON b.id = s.branch_id AND b.empresa_id = :empresaId
+         WHERE s.empresa_id = :empresaId
+           AND s.status <> 'CANCELLED'
            ${branchClause}
          ORDER BY s.created_at DESC
          LIMIT :limit`,
         {
-          replacements: { branchId, limit },
+          replacements: { empresaId, branchId, limit },
           type: QueryTypes.SELECT,
         }
       );
@@ -288,9 +297,14 @@ class ReportsDelegate {
     }
   }
 
-  async getInventoryTable(branchId: string | null): Promise<Result<InventoryReportRow[]>> {
+  async getInventoryTable(
+    empresaId: string,
+    branchId: string | null
+  ): Promise<Result<InventoryReportRow[]>> {
     try {
-      const branchClause = branchId ? 'WHERE s.branch_id = :branchId' : '';
+      const branchClause = branchId
+        ? 'WHERE s.empresa_id = :empresaId AND s.branch_id = :branchId'
+        : 'WHERE s.empresa_id = :empresaId';
       const stockRows = await sequelize.query<Record<string, unknown>>(
         `SELECT
            s.product_id,
@@ -302,12 +316,12 @@ class ReportsDelegate {
            p.price AS product_price,
            b.name AS branch_name
          FROM inventory_stock s
-         LEFT JOIN products p ON p.id = s.product_id
-         LEFT JOIN branches b ON b.id = s.branch_id
+         LEFT JOIN products p ON p.id = s.product_id AND p.empresa_id = :empresaId
+         LEFT JOIN branches b ON b.id = s.branch_id AND b.empresa_id = :empresaId
          ${branchClause}
          ORDER BY s.quantity ASC`,
         {
-          replacements: branchId ? { branchId } : {},
+          replacements: branchId ? { empresaId, branchId } : { empresaId },
           type: QueryTypes.SELECT,
         }
       );
@@ -331,11 +345,14 @@ class ReportsDelegate {
   }
 
   async getShrinkageReport(
+    empresaId: string,
     branchId: string | null,
     options?: { status?: string; limit?: number }
   ): Promise<Result<ShrinkageReportPayload>> {
     try {
-      const branchClause = branchId ? 'WHERE sh.branch_id = :branchId' : '';
+      const branchClause = branchId
+        ? 'WHERE sh.empresa_id = :empresaId AND sh.branch_id = :branchId'
+        : 'WHERE sh.empresa_id = :empresaId';
       const branchAnd = branchId ? 'AND sh.branch_id = :branchId' : '';
 
       const summaryRows = await sequelize.query<Record<string, unknown>>(
@@ -344,7 +361,7 @@ class ReportsDelegate {
          ${branchClause}
          GROUP BY sh.status`,
         {
-          replacements: branchId ? { branchId } : {},
+          replacements: branchId ? { empresaId, branchId } : { empresaId },
           type: QueryTypes.SELECT,
         }
       );
@@ -402,13 +419,14 @@ class ReportsDelegate {
          LEFT JOIN branches b ON b.id = sh.branch_id
          LEFT JOIN users rep ON rep.id = sh.reported_by
          LEFT JOIN users rev ON rev.id = sh.approved_by
-         WHERE 1=1
+         WHERE sh.empresa_id = :empresaId
            ${branchAnd}
            ${statusClause}
          ORDER BY sh.created_at DESC
          LIMIT :limit`,
         {
           replacements: {
+            empresaId,
             ...(branchId ? { branchId } : {}),
             ...(statusClause ? { statusFilter } : {}),
             limit,

@@ -3,6 +3,7 @@ import sequelize from '../../../config/database';
 
 class Branch extends Model {
   public id!: string;
+  public empresaId!: string;
   public name!: string;
   public address?: string;
   public phone?: string;
@@ -18,6 +19,11 @@ Branch.init(
       defaultValue: DataTypes.UUIDV4,
       allowNull: false,
       primaryKey: true,
+    },
+    empresaId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'empresa_id',
     },
     name: {
       type: DataTypes.STRING(255),

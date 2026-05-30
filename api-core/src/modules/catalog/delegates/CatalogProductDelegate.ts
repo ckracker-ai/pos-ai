@@ -79,12 +79,12 @@ class CatalogProductDelegate {
     };
   }
 
-  async listByBranch(branchId: string): Promise<Result<ProductWithBranchStock[]>> {
-    const branch = await Branch.findByPk(branchId);
+  async listByBranch(empresaId: string, branchId: string): Promise<Result<ProductWithBranchStock[]>> {
+    const branch = await Branch.findOne({ where: { id: branchId, empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
 
-    // Consulta de stock separada: evita colisión de columnas `name` entre Product/Category/Supplier en el JOIN.
     const products = await Product.findAll({
+      where: { empresaId },
       include: [
         { model: Category, as: 'category', attributes: ['id', 'name'] },
         { model: Supplier, as: 'supplier', attributes: ['id', 'name'] },
@@ -98,10 +98,11 @@ class CatalogProductDelegate {
         ? await sequelize.query<Record<string, unknown>>(
             `SELECT id, product_id, quantity, min_stock
              FROM inventory_stock
-             WHERE branch_id = :branchId
+             WHERE empresa_id = :empresaId
+               AND branch_id = :branchId
                AND product_id IN (:productIds)`,
             {
-              replacements: { branchId, productIds },
+              replacements: { empresaId, branchId, productIds },
               type: QueryTypes.SELECT,
             }
           )
@@ -122,11 +123,18 @@ class CatalogProductDelegate {
   }
 
   async createWithBranchStock(
+    empresaId: string,
     branchId: string,
     input: CreateProductInput
   ): Promise<Result<{ product: Product; inventory: InventoryStock }>> {
-    const branch = await Branch.findByPk(branchId);
+    const branch = await Branch.findOne({ where: { id: branchId, empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
+
+    const category = await Category.findOne({ where: { id: input.categoryId, empresaId } });
+    if (!category) return fail('CATEGORY_NOT_FOUND');
+
+    const supplier = await Supplier.findOne({ where: { id: input.supplierId, empresaId } });
+    if (!supplier) return fail('SUPPLIER_NOT_FOUND');
 
     const initialStock = Number.isFinite(input.initialStock) ? Number(input.initialStock) : 0;
     const minStock = Number.isFinite(input.minStock) ? Number(input.minStock) : 0;
@@ -141,6 +149,7 @@ class CatalogProductDelegate {
       const product = await Product.create(
         {
           id: productId,
+          empresaId,
           name: input.name.trim(),
           sku: input.sku.trim(),
           categoryId: input.categoryId,
@@ -162,6 +171,7 @@ class CatalogProductDelegate {
       const inventory = await InventoryStock.create(
         {
           id: uuidv4(),
+          empresaId,
           productId: resolvedProductId,
           branchId,
           quantity: initialStock,

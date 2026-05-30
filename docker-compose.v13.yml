@@ -1,0 +1,47 @@
+# Overlay v1.3 — stack aislado en paralelo a v1.2 (mismo repo, otro proyecto Docker).
+#
+# Stack v1.2 estable (sin cambios):
+#   docker compose up -d
+#   → erp_core_db, puertos 80 / 3000
+#
+# Stack v1.3 sandbox (MySQL + apps propios):
+#   cp .env.v13.example .env.v13
+#   docker compose -p svm-v13 -f docker-compose.yml -f docker-compose.v13.yml --env-file .env.v13 up -d --build
+#   → erp_core_db_v13, puertos 8080 / 3001 / 3307
+#
+# Sandbox v1.3 en el MISMO MySQL de v1.2 (sin segundo stack):
+#   docker compose up -d
+#   .\db-init\scripts\provision-v13-sandbox.ps1
+#   # opcional: copiar datos reales para probar migración
+#   .\db-init\scripts\clone-v12-to-v13.ps1
+#   # en .env.docker: DB_NAME=erp_core_db_v13 y reiniciar api-core
+
+services:
+  frontend:
+    container_name: svm-v13-frontend
+    ports:
+      - '${FRONTEND_PORT:-8080}:80'
+
+  api-bff:
+    container_name: svm-v13-api-bff
+    ports:
+      - '${BFF_PORT:-3001}:3000'
+
+  api-core:
+    container_name: svm-v13-api-core
+    environment:
+      - DB_NAME=${DB_NAME:-erp_core_db_v13}
+
+  db-mysql:
+    container_name: svm-v13-db-mysql
+    ports:
+      - '${MYSQL_PORT:-3307}:3306'
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-erp_core_db_v13}
+    volumes:
+      - datos_mysql_v13:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d
+
+volumes:
+  datos_mysql_v13:
+    driver: local

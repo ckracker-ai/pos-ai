@@ -12,6 +12,8 @@ import sequelize from '../../../config/database';
 import Sale from '../models/Sale.model';
 import SaleDetail from '../models/SaleDetail.model';
 import Product from '../../catalog/models/Product.model';
+import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
+
 const router = Router();
 
 const saleDetailsInclude = [
@@ -154,7 +156,7 @@ router.use(authenticateToken);
 router.get('/sales', requireComanda, async (req: AuthenticatedRequest, res) => {
   try {
     const sales = await Sale.findAll({
-      where: { branchId: req.user!.branchId },
+      where: { empresaId: getEffectiveEmpresaId(req), branchId: req.user!.branchId },
       include: [
         {
           model: SaleDetail,
@@ -175,7 +177,11 @@ router.get('/sales', requireComanda, async (req: AuthenticatedRequest, res) => {
 router.get('/sales/:id', requireComanda, async (req: AuthenticatedRequest, res) => {
   try {
     const sale = await Sale.findOne({
-      where: { id: req.params.id, branchId: req.user!.branchId },
+      where: {
+        id: req.params.id,
+        empresaId: getEffectiveEmpresaId(req),
+        branchId: req.user!.branchId,
+      },
       include: [...saleDetailsInclude],
     });
 
@@ -199,7 +205,7 @@ router.get('/sales/user/:userId/branch/:branchId', requireComanda, async (req: A
     }
 
     const sales = await Sale.findAll({
-      where: { sellerId: userId, branchId },
+      where: { empresaId: getEffectiveEmpresaId(req), sellerId: userId, branchId },
       include: [...saleDetailsInclude],
       order: [['createdAt', 'DESC']],
     });
@@ -220,7 +226,7 @@ router.get('/sales/:id/user/:userId/branch/:branchId', requireComanda, async (re
     }
 
     const sale = await Sale.findOne({
-      where: { id, sellerId: userId, branchId },
+      where: { id, empresaId: getEffectiveEmpresaId(req), sellerId: userId, branchId },
       include: [...saleDetailsInclude],
     });
 
@@ -252,6 +258,7 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
     const saleId = uuidv4();
     const branchId = req.user!.branchId;
     const sellerId = req.user!.userId;
+    const empresaId = getEffectiveEmpresaId(req);
 
     await Sale.create(
       {
@@ -260,6 +267,7 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
         discount: Number(body.discount ?? 0),
         status: body.status ?? 'PENDING',
         notes: body.notes ?? null,
+        empresaId,
         branchId,
         sellerId,
       },
@@ -277,7 +285,10 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
         throw new Error('PRODUCT_NOT_FOUND:empty');
       }
 
-      const product = await Product.findByPk(productId, { transaction });
+      const product = await Product.findOne({
+        where: { id: productId, empresaId },
+        transaction,
+      });
       if (!product) {
         throw new Error(`PRODUCT_NOT_FOUND:${productId}`);
       }
@@ -304,7 +315,7 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
 
     try {
       const fullSale = await Sale.findOne({
-        where: { id: saleId, branchId },
+        where: { id: saleId, empresaId, branchId },
         include: [...saleDetailsInclude],
       });
       if (fullSale) {
@@ -339,13 +350,13 @@ router.patch('/sales/:id', requireComanda, async (req: AuthenticatedRequest, res
     const { id } = req.params;
 
     const [updated] = await Sale.update(req.body, {
-      where: { id, branchId: req.user!.branchId },
+      where: { id, empresaId: getEffectiveEmpresaId(req), branchId: req.user!.branchId },
     });
 
     if (!updated) return sendFail(res, 'SALE_NOT_FOUND', 404);
 
     const sale = await Sale.findOne({
-      where: { id, branchId: req.user!.branchId },
+      where: { id, empresaId: getEffectiveEmpresaId(req), branchId: req.user!.branchId },
       include: [...saleDetailsInclude],
     });
 
@@ -362,7 +373,11 @@ router.patch('/sales/:id', requireComanda, async (req: AuthenticatedRequest, res
 router.delete('/sales/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
     const deleted = await Sale.destroy({
-      where: { id: req.params.id, branchId: req.user!.branchId },
+      where: {
+        id: req.params.id,
+        empresaId: getEffectiveEmpresaId(req),
+        branchId: req.user!.branchId,
+      },
     });
 
     if (!deleted) return sendFail(res, 'SALE_NOT_FOUND', 404);

@@ -1,21 +1,5 @@
--- ERP Core — schema + seed para Docker (MySQL 8.0)
--- Se ejecuta en erp_core_db vía MYSQL_DATABASE en docker-compose.
--- Requiere volumen vacío en el primer arranque del contenedor.
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
--- ---------------------------------------------------------------------------
--- Tablas base (sin FK externas)
--- ---------------------------------------------------------------------------
+-- ERP Core v1.2 — tablas, FKs y triggers (sin USE ni seed).
+-- Invocado desde 01-init-v12.sql y 02-init-v13-sandbox.sql.
 
 DROP TABLE IF EXISTS `audit_logs`;
 CREATE TABLE `audit_logs` (
@@ -80,10 +64,6 @@ CREATE TABLE `roles` (
   UNIQUE KEY `uq_role_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------------
--- Catálogo e inventario
--- ---------------------------------------------------------------------------
-
 DROP TABLE IF EXISTS `products`;
 CREATE TABLE `products` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -121,10 +101,6 @@ CREATE TABLE `inventory_stock` (
   CONSTRAINT `fk_inventory_stock_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------------
--- Usuarios
--- ---------------------------------------------------------------------------
-
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -141,10 +117,6 @@ CREATE TABLE `users` (
   KEY `idx_users_role` (`role_id`),
   CONSTRAINT `fk_users_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
--- Ventas y mermas
--- ---------------------------------------------------------------------------
 
 DROP TABLE IF EXISTS `sale_details`;
 DROP TABLE IF EXISTS `sales`;
@@ -206,10 +178,6 @@ CREATE TABLE `shrinkages` (
   CONSTRAINT `fk_shrinkages_approved_by` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------------
--- Triggers (sin DEFINER para compatibilidad con usr_erp en Docker)
--- ---------------------------------------------------------------------------
-
 DELIMITER ;;
 CREATE TRIGGER `trg_prevent_negative_stock`
 BEFORE UPDATE ON `inventory_stock`
@@ -255,32 +223,3 @@ BEGIN
   END IF;
 END;;
 DELIMITER ;
-
--- ---------------------------------------------------------------------------
--- Datos semilla
--- ---------------------------------------------------------------------------
-
-INSERT INTO `branches` (`id`, `name`, `address`, `phone`, `is_active`, `created_at`, `updated_at`) VALUES
-('48d4ee18-5349-11f1-a915-00ff541b88ad', 'Sucursal Central', 'Por definir', NULL, 1, NOW(), NOW());
-
-INSERT INTO `roles` (`id`, `name`, `description`, `created_at`, `updated_at`) VALUES
-('fb302810-4e95-11f1-b994-00ff541b88ad', 'ADMIN', 'Administrador del sistema', NOW(), NOW()),
-('fb30307f-4e95-11f1-b994-00ff541b88ad', 'AUDITOR', 'Auditoría y gestión de usuarios', NOW(), NOW()),
-('fb30365a-4e95-11f1-b994-00ff541b88ad', 'SELLER', 'Vendedor / operación de sucursal', NOW(), NOW()),
-('6554b196-6375-4d18-b4e5-4e549b4ea6ec', 'COMANDA', 'Usuario para ver comandas en cocina', NOW(), NOW());
-
--- Admin inicial productivo:
--- Se crea automáticamente en api-core (seedBootstrapAdmin) con:
--- email: admin@empanadascostaazul.cl
--- password: @dmin123_
--- role: ADMIN
--- branch: Sucursal Central
-
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;

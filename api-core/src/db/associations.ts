@@ -8,10 +8,29 @@ import InventoryStock from '../modules/inventory/models/InventoryStock.model';
 import Shrinkage from '../modules/shrinkage/models/Shrinkage.model';
 import Sale from '../modules/sales/models/Sale.model';
 import SaleDetail from '../modules/sales/models/SaleDetail.model';
+import Empresa from '../modules/tenant/models/Empresa.model';
 
 export function defineAssociations(): void {
+  Empresa.hasMany(Branch, { foreignKey: 'empresaId', as: 'branches' });
+  Branch.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
+  Empresa.hasMany(User, { foreignKey: 'empresaId', as: 'users' });
+  User.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
+  Empresa.hasMany(Category, { foreignKey: 'empresaId', as: 'categories' });
+  Category.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
+  Empresa.hasMany(Supplier, { foreignKey: 'empresaId', as: 'suppliers' });
+  Supplier.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
+  Empresa.hasMany(Product, { foreignKey: 'empresaId', as: 'products' });
+  Product.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
   Role.hasMany(User, { foreignKey: 'roleId', as: 'users' });
   User.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
+
+  Branch.hasMany(User, { foreignKey: 'branchId', as: 'users' });
+  User.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 
   Category.hasMany(Product, { foreignKey: 'categoryId', as: 'products' });
   Product.belongsTo(Category, { foreignKey: 'categoryId', as: 'category' });

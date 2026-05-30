@@ -3,6 +3,7 @@ import sequelize from '../../../config/database';
 
 class Product extends Model {
   public id!: string;
+  public empresaId!: string;
   public name!: string;
   public sku!: string;
   public price!: number;
@@ -30,7 +31,6 @@ Product.init(
     sku: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: 'idx_product_sku_unique',
     },
     description: {
       type: DataTypes.TEXT,
@@ -55,6 +55,11 @@ Product.init(
       type: DataTypes.CHAR(36),
       allowNull: false,
     },
+    empresaId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'empresa_id',
+    },
     supplierId: {
       type: DataTypes.CHAR(36),
       allowNull: false,
@@ -63,6 +68,13 @@ Product.init(
   {
     sequelize,
     tableName: 'products',
+    indexes: [
+      {
+        unique: true,
+        name: 'uq_products_empresa_sku',
+        fields: ['empresa_id', 'sku'],
+      },
+    ],
   }
 );
 

@@ -3,6 +3,7 @@ import sequelize from '../../../config/database';
 
 class Category extends Model {
   public id!: string;
+  public empresaId!: string;
   public name!: string;
   public description?: string;
   public isActive!: boolean;
@@ -18,10 +19,14 @@ Category.init(
       allowNull: false,
       primaryKey: true,
     },
+    empresaId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'empresa_id',
+    },
     name: {
       type: DataTypes.STRING(150),
       allowNull: false,
-      unique: 'idx_category_name_unique',
     },
     description: {
       type: DataTypes.TEXT,
@@ -36,6 +41,13 @@ Category.init(
   {
     sequelize,
     tableName: 'categories',
+    indexes: [
+      {
+        unique: true,
+        name: 'uq_categories_empresa_name',
+        fields: ['empresa_id', 'name'],
+      },
+    ],
   }
 );
 

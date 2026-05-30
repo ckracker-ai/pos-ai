@@ -33,8 +33,8 @@ export interface AdjustStockInput {
 }
 
 class InventoryDelegate {
-  async getByBranch(branchId: string): Promise<Result<StockRecord[]>> {
-    const branch = await Branch.findByPk(branchId);
+  async getByBranch(empresaId: string, branchId: string): Promise<Result<StockRecord[]>> {
+    const branch = await Branch.findOne({ where: { id: branchId, empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
 
     const rows = await sequelize.query<Record<string, unknown>>(
@@ -48,15 +48,15 @@ class InventoryDelegate {
          p.sku AS product_sku,
          p.price AS product_price
        FROM inventory_stock s
-       LEFT JOIN products p ON p.id = s.product_id
-       WHERE s.branch_id = :branchId`,
-      { replacements: { branchId }, type: QueryTypes.SELECT }
+       LEFT JOIN products p ON p.id = s.product_id AND p.empresa_id = :empresaId
+       WHERE s.empresa_id = :empresaId AND s.branch_id = :branchId`,
+      { replacements: { empresaId, branchId }, type: QueryTypes.SELECT }
     );
 
     return ok(rows.map((row) => this.toPlainStock(this.toRecordFromRow(row))));
   }
 
-  async getOne(productId: string, branchId: string): Promise<Result<StockRecord>> {
+  async getOne(empresaId: string, productId: string, branchId: string): Promise<Result<StockRecord>> {
     const rows = await sequelize.query<Record<string, unknown>>(
       `SELECT
          s.id,
@@ -68,11 +68,12 @@ class InventoryDelegate {
          p.sku AS product_sku,
          p.price AS product_price
        FROM inventory_stock s
-       LEFT JOIN products p ON p.id = s.product_id
-       WHERE s.product_id = :productId
+       LEFT JOIN products p ON p.id = s.product_id AND p.empresa_id = :empresaId
+       WHERE s.empresa_id = :empresaId
+         AND s.product_id = :productId
          AND s.branch_id = :branchId
        LIMIT 1`,
-      { replacements: { productId, branchId }, type: QueryTypes.SELECT }
+      { replacements: { empresaId, productId, branchId }, type: QueryTypes.SELECT }
     );
 
     const row = rows[0];
@@ -80,7 +81,7 @@ class InventoryDelegate {
     return ok(this.toPlainStock(this.toRecordFromRow(row)));
   }
 
-  async upsert(input: UpsertStockInput, transaction?: Transaction): Promise<Result<StockRecord>> {
+  async upsert(empresaId: string, input: UpsertStockInput, transaction?: Transaction): Promise<Result<StockRecord>> {
     if (!input.productId?.trim()) {
       return fail('VALIDATION_ERROR: productId is required');
     }
@@ -88,8 +89,11 @@ class InventoryDelegate {
       return fail('VALIDATION_ERROR: branchId is required');
     }
 
-    const product = await Product.findByPk(input.productId);
+    const product = await Product.findOne({ where: { id: input.productId, empresaId } });
     if (!product) return fail('PRODUCT_NOT_FOUND');
+
+    const branch = await Branch.findOne({ where: { id: input.branchId, empresaId } });
+    if (!branch) return fail('BRANCH_NOT_FOUND');
 
     const minStock = Number.isFinite(input.minStock) ? input.minStock : 0;
     const quantity = Number(input.quantity);
@@ -102,9 +106,10 @@ class InventoryDelegate {
     }
 
     const [entry, created] = await InventoryStock.findOrCreate({
-      where: { productId: input.productId, branchId: input.branchId },
+      where: { empresaId, productId: input.productId, branchId: input.branchId },
       defaults: {
         id: uuidv4(),
+        empresaId,
         productId: input.productId,
         branchId: input.branchId,
         quantity,
@@ -126,7 +131,7 @@ class InventoryDelegate {
   }
 
   /** Solo crea stock en sucursal; falla si el producto ya está asignado a esa sucursal. */
-  async addProductToBranch(input: UpsertStockInput): Promise<Result<StockRecord>> {
+  async addProductToBranch(empresaId: string, input: UpsertStockInput): Promise<Result<StockRecord>> {
     if (!input.productId?.trim()) {
       return fail('VALIDATION_ERROR: productId is required');
     }
@@ -134,11 +139,14 @@ class InventoryDelegate {
       return fail('VALIDATION_ERROR: branchId is required');
     }
 
-    const product = await Product.findByPk(input.productId);
+    const product = await Product.findOne({ where: { id: input.productId, empresaId } });
     if (!product) return fail('PRODUCT_NOT_FOUND');
 
+    const branch = await Branch.findOne({ where: { id: input.branchId, empresaId } });
+    if (!branch) return fail('BRANCH_NOT_FOUND');
+
     const existing = await InventoryStock.findOne({
-      where: { productId: input.productId, branchId: input.branchId },
+      where: { empresaId, productId: input.productId, branchId: input.branchId },
     });
     if (existing) return fail('STOCK_ALREADY_IN_BRANCH');
 
@@ -153,6 +161,7 @@ class InventoryDelegate {
 
     const entry = await InventoryStock.create({
       id: uuidv4(),
+      empresaId,
       productId: input.productId,
       branchId: input.branchId,
       quantity,
@@ -166,7 +175,7 @@ class InventoryDelegate {
     return ok(this.toRecord(reloaded ?? entry));
   }
 
-  async adjust(input: AdjustStockInput): Promise<Result<StockRecord>> {
+  async adjust(empresaId: string, input: AdjustStockInput): Promise<Result<StockRecord>> {
     if (!input.productId?.trim()) {
       return fail('VALIDATION_ERROR: productId is required');
     }
@@ -180,7 +189,7 @@ class InventoryDelegate {
     }
 
     const entry = await InventoryStock.findOne({
-      where: { productId: input.productId, branchId: input.branchId },
+      where: { empresaId, productId: input.productId, branchId: input.branchId },
     });
     if (!entry) return fail('STOCK_RECORD_NOT_FOUND');
 
@@ -198,12 +207,13 @@ class InventoryDelegate {
     return ok(this.toRecord(reloaded ?? entry));
   }
 
-  async getLowStock(branchId: string): Promise<Result<StockRecord[]>> {
-    const branch = await Branch.findByPk(branchId);
+  async getLowStock(empresaId: string, branchId: string): Promise<Result<StockRecord[]>> {
+    const branch = await Branch.findOne({ where: { id: branchId, empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
 
     const entries = await InventoryStock.findAll({
       where: {
+        empresaId,
         branchId,
         [Symbol.for('sequelize.and')]: [literal('quantity <= min_stock')],
       },

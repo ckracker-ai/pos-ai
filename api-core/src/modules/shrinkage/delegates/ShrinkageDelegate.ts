@@ -39,13 +39,14 @@ class ShrinkageDelegate {
 
   private async resolvePendingShrinkage(
     shrinkageId: string,
+    empresaId: string,
     activeBranchId: string,
     roleName?: string
   ): Promise<Result<Shrinkage>> {
     const id = String(shrinkageId ?? '').trim();
     if (!id) return fail('SHRINKAGE_NOT_FOUND');
 
-    const shrinkage = await Shrinkage.findByPk(id);
+    const shrinkage = await Shrinkage.findOne({ where: { id, empresaId } });
     if (!shrinkage) return fail('SHRINKAGE_NOT_FOUND');
 
     if (shrinkage.status !== 'PENDING') {
@@ -62,18 +63,22 @@ class ShrinkageDelegate {
     return ok(shrinkage);
   }
 
-  async listByBranch(branchId: string): Promise<Result<ShrinkageRecord[]>> {
+  async listByBranch(empresaId: string, branchId: string): Promise<Result<ShrinkageRecord[]>> {
     const rows = await Shrinkage.findAll({
-      where: { branchId },
+      where: { empresaId, branchId },
       include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'sku'] }],
       order: [['createdAt', 'DESC']],
     });
     return ok(rows.map((row) => this.toRecord(row)));
   }
 
-  async listByBranchAndStatus(branchId: string, status: string): Promise<Result<ShrinkageRecord[]>> {
+  async listByBranchAndStatus(
+    empresaId: string,
+    branchId: string,
+    status: string
+  ): Promise<Result<ShrinkageRecord[]>> {
     const rows = await Shrinkage.findAll({
-      where: { branchId, status },
+      where: { empresaId, branchId, status },
       include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'sku'] }],
       order: [['createdAt', 'DESC']],
     });
@@ -81,6 +86,7 @@ class ShrinkageDelegate {
   }
 
   async createPending(
+    empresaId: string,
     branchId: string,
     reportedBy: string,
     reason: string,
@@ -93,7 +99,10 @@ class ShrinkageDelegate {
       const created: Shrinkage[] = [];
 
       for (const line of lines) {
-        const product = await Product.findByPk(line.productId, { transaction });
+        const product = await Product.findOne({
+          where: { id: line.productId, empresaId },
+          transaction,
+        });
         if (!product) {
           await transaction.rollback();
           return fail(`PRODUCT_NOT_FOUND:${line.productId}`);
@@ -106,7 +115,7 @@ class ShrinkageDelegate {
         }
 
         const stock = await InventoryStock.findOne({
-          where: { productId: line.productId, branchId },
+          where: { empresaId, productId: line.productId, branchId },
           transaction,
         });
         if (!stock) {
@@ -117,6 +126,7 @@ class ShrinkageDelegate {
         const shrinkage = await Shrinkage.create(
           {
             id: uuidv4(),
+            empresaId,
             productId: line.productId,
             branchId,
             reportedBy,
@@ -145,11 +155,12 @@ class ShrinkageDelegate {
 
   async approve(
     shrinkageId: string,
+    empresaId: string,
     branchId: string,
     approverId: string,
     roleName?: string
   ): Promise<Result<ShrinkageRecord>> {
-    const pending = await this.resolvePendingShrinkage(shrinkageId, branchId, roleName);
+    const pending = await this.resolvePendingShrinkage(shrinkageId, empresaId, branchId, roleName);
     if (!pending.success) return pending;
 
     const transaction = await sequelize.transaction();
@@ -172,7 +183,7 @@ class ShrinkageDelegate {
 
       const stockBranchId = shrinkage.branchId;
       const stock = await InventoryStock.findOne({
-        where: { productId: shrinkage.productId, branchId: stockBranchId },
+        where: { empresaId, productId: shrinkage.productId, branchId: stockBranchId },
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
@@ -211,12 +222,13 @@ class ShrinkageDelegate {
 
   async reject(
     shrinkageId: string,
+    empresaId: string,
     branchId: string,
     approverId: string,
     rejectionNote?: string,
     roleName?: string
   ): Promise<Result<ShrinkageRecord>> {
-    const pending = await this.resolvePendingShrinkage(shrinkageId, branchId, roleName);
+    const pending = await this.resolvePendingShrinkage(shrinkageId, empresaId, branchId, roleName);
     if (!pending.success) return pending;
 
     const shrinkage = pending.value;

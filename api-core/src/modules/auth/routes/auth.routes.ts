@@ -2,7 +2,8 @@ import { Router } from 'express';
 import * as argon2 from 'argon2';
 import AuthController from '../controllers/AuthController';
 import { sendOk } from '../../../middleware/globalErrorHandler';
-import { authenticateToken, requireAdmin, requireAuditor } from '../../../middleware/auth.middleware';
+import { authenticateToken, requireAdmin, requireAuditor, AuthenticatedRequest } from '../../../middleware/auth.middleware';
+import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import User from '../models/User.model';
 import Role from '../models/Role.model';
 
@@ -30,9 +31,11 @@ router.get('/roles', authenticateToken, requireAuditor, async (_req, res) => {
   sendOk(res, { roles });
 });
 
-router.get('/users', authenticateToken, requireAuditor, async (_req, res) => {
+router.get('/users', authenticateToken, requireAuditor, async (req: AuthenticatedRequest, res) => {
+  const empresaId = getEffectiveEmpresaId(req);
   const users = await User.findAll({
-    attributes: ['id', 'fullName', 'email', 'roleId', 'branchId', 'isActive', 'createdAt', 'updatedAt'],
+    where: { empresaId },
+    attributes: ['id', 'fullName', 'email', 'roleId', 'branchId', 'empresaId', 'isActive', 'createdAt', 'updatedAt'],
     include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }],
   });
   sendOk(res, { users });
@@ -41,11 +44,10 @@ router.get('/users', authenticateToken, requireAuditor, async (_req, res) => {
 
 
 router.post('/users', authenticateToken, requireAdmin, AuthController.register);
-router.put('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
-  // Update mínimo: fullName, email, roleId, branchId, isActive si viene.
-  // Nota: password no se actualiza aquí.
+router.put('/users/:id', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const user = await User.findOne({ where: { id: req.params.id, empresaId } });
     if (!user) return res.status(404).json({ success: false, data: null, error: 'USER_NOT_FOUND', code: 404 });
 
     const { fullName, email, roleId, branchId, isActive } = req.body ?? {};
@@ -58,16 +60,17 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
       ...(isActive !== undefined ? { isActive } : {}),
     });
 
-    const updated = await User.findByPk(req.params.id);
+    const updated = await User.findOne({ where: { id: req.params.id, empresaId } });
     return sendOk(res, { user: updated });
   } catch {
     return res.status(400).json({ success: false, data: null, error: 'ERROR_UPDATING_USER', code: 400 });
   }
 });
 
-router.patch('/users/:id/password', authenticateToken, requireAdmin, async (req, res) => {
+router.patch('/users/:id/password', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const empresaId = getEffectiveEmpresaId(req);
+    const user = await User.findOne({ where: { id: req.params.id, empresaId } });
     if (!user) return res.status(404).json({ success: false, data: null, error: 'USER_NOT_FOUND', code: 404 });
 
     const newPasswordRaw = typeof req.body?.password === 'string' ? req.body.password : '';

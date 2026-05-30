@@ -3,6 +3,7 @@ import sequelize from '../../../config/database';
 
 class InventoryStock extends Model {
   public id!: string;
+  public empresaId!: string;
   public productId!: string;
   public branchId!: string;
   public quantity!: number;
@@ -18,6 +19,11 @@ InventoryStock.init(
       defaultValue: DataTypes.UUIDV4,
       allowNull: false,
       primaryKey: true,
+    },
+    empresaId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'empresa_id',
     },
     productId: {
       type: DataTypes.CHAR(36),

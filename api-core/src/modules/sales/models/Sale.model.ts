@@ -3,6 +3,7 @@ import sequelize from '../../../config/database';
 
 class Sale extends Model {
   public id!: string;
+  public empresaId!: string;
   public branchId!: string;
   public sellerId!: string;
   public total!: number;
@@ -20,6 +21,11 @@ Sale.init(
       defaultValue: DataTypes.UUIDV4,
       allowNull: false,
       primaryKey: true,
+    },
+    empresaId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'empresa_id',
     },
     branchId: {
       type: DataTypes.CHAR(36),

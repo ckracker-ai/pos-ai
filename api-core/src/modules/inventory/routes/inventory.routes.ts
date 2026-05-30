@@ -3,19 +3,17 @@ import inventoryDelegate from '../delegates/InventoryDelegate';
 import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import { authenticateToken, requireSeller, AuthenticatedRequest } from '../../../middleware/auth.middleware';
 import { getEffectiveBranchId, resolveBranchId } from '../../../utils/branchContext';
+import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 
 const router = Router();
 
-// All inventory routes require authentication
 router.use(authenticateToken);
 
-// Vendedor can view inventory
 router.get('/branch/:branchId', requireSeller, async (req: AuthenticatedRequest, res) => {
   const branchId = resolveBranchId(req, req.params.branchId);
   if (!branchId) return sendFail(res, 'BRANCH_ACCESS_DENIED', 403);
 
-  const result = await inventoryDelegate.getByBranch(branchId);
-
+  const result = await inventoryDelegate.getByBranch(getEffectiveEmpresaId(req), branchId);
   if (result.success) return sendOk(res, { inventory: result.value });
   return sendFail(res, result.error, 404);
 });
@@ -24,13 +22,15 @@ router.get('/branch/:branchId/product/:productId', requireSeller, async (req: Au
   const branchId = resolveBranchId(req, req.params.branchId);
   if (!branchId) return sendFail(res, 'BRANCH_ACCESS_DENIED', 403);
 
-  const result = await inventoryDelegate.getOne(req.params.productId, branchId);
-
+  const result = await inventoryDelegate.getOne(
+    getEffectiveEmpresaId(req),
+    req.params.productId,
+    branchId
+  );
   if (result.success) return sendOk(res, { stock: result.value });
   return sendFail(res, result.error, 404);
 });
 
-// Asignar producto existente a la sucursal (solo crea fila en inventory_stock)
 router.post('/branch/:branchId/stock', requireSeller, async (req: AuthenticatedRequest, res) => {
   const branchId = resolveBranchId(req, req.params.branchId);
   if (!branchId) return sendFail(res, 'BRANCH_ACCESS_DENIED', 403);
@@ -38,7 +38,7 @@ router.post('/branch/:branchId/stock', requireSeller, async (req: AuthenticatedR
   const body = req.body as { productId?: string; quantity?: number; minStock?: number };
   if (!body?.productId) return sendFail(res, 'VALIDATION_ERROR: productId is required', 422);
 
-  const result = await inventoryDelegate.addProductToBranch({
+  const result = await inventoryDelegate.addProductToBranch(getEffectiveEmpresaId(req), {
     productId: body.productId,
     branchId,
     quantity: Number(body.quantity ?? 0),
@@ -56,8 +56,8 @@ router.post('/branch/:branchId/stock', requireSeller, async (req: AuthenticatedR
   return sendFail(res, result.error, status);
 });
 
-// Actualización directa de cantidad en sucursal (no modifica Products)
 router.patch('/stock', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const empresaId = getEffectiveEmpresaId(req);
   const branchId = getEffectiveBranchId(req);
   const body = req.body as { productId?: string; quantity?: number; minStock?: number };
   if (!body?.productId) return sendFail(res, 'VALIDATION_ERROR: productId is required', 422);
@@ -65,7 +65,7 @@ router.patch('/stock', requireSeller, async (req: AuthenticatedRequest, res) => 
     return sendFail(res, 'VALIDATION_ERROR: quantity is required', 422);
   }
 
-  const result = await inventoryDelegate.upsert({
+  const result = await inventoryDelegate.upsert(empresaId, {
     productId: body.productId,
     branchId,
     quantity: Number(body.quantity),
@@ -77,6 +77,7 @@ router.patch('/stock', requireSeller, async (req: AuthenticatedRequest, res) => 
 });
 
 router.patch('/stock/adjust', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const empresaId = getEffectiveEmpresaId(req);
   const branchId = getEffectiveBranchId(req);
   const body = req.body as { productId?: string; delta?: number; quantity?: number };
   if (!body?.productId) return sendFail(res, 'VALIDATION_ERROR: productId is required', 422);
@@ -86,7 +87,7 @@ router.patch('/stock/adjust', requireSeller, async (req: AuthenticatedRequest, r
     return sendFail(res, 'VALIDATION_ERROR: delta (or quantity) must be a number', 422);
   }
 
-  const result = await inventoryDelegate.adjust({
+  const result = await inventoryDelegate.adjust(empresaId, {
     productId: body.productId,
     branchId,
     delta,
@@ -100,8 +101,7 @@ router.get('/branch/:branchId/low-stock', requireSeller, async (req: Authenticat
   const branchId = resolveBranchId(req, req.params.branchId);
   if (!branchId) return sendFail(res, 'BRANCH_ACCESS_DENIED', 403);
 
-  const result = await inventoryDelegate.getLowStock(branchId);
-
+  const result = await inventoryDelegate.getLowStock(getEffectiveEmpresaId(req), branchId);
   if (result.success) return sendOk(res, result.value);
   return sendFail(res, result.error, 404);
 });
