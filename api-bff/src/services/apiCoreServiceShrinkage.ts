@@ -9,7 +9,7 @@ export class ApiCoreServiceShrinkage extends ApiCoreBaseService {
   }
 
   async listShrinkageByStatus(status: string, token: string, internalKey: string, branchId: string) {
-    const response = await this.client.get(`/shrinkage/shrinkage/${status}`, {
+    const response = await this.client.get(`/shrinkage/shrinkage/status/${status}`, {
       headers: this.authHeaders(token, internalKey, branchId),
     });
     return response.data;

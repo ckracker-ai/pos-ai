@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 
 import User from '../modules/auth/models/User.model';
+import Role from '../modules/auth/models/Role.model';
 import { readModelString } from '../utils/modelAttributes';
 
 export interface AuthenticatedRequest extends Request {
@@ -44,17 +45,26 @@ export const authenticateToken = (
     }
 
     const decodedPayload = decoded as { userId: string; roleId: string; roleName: string; branchId?: string };
-    const user = await User.findByPk(decodedPayload.userId);
+    const user = await User.findByPk(decodedPayload.userId, {
+      include: [{ model: Role, as: 'role', attributes: ['name'] }],
+    });
 
     if (!user) {
       res.status(404).json({ success: false, data: null, error: 'USER_NOT_FOUND', code: 404 });
       return;
     }
 
+    const userPlain =
+      typeof user.toJSON === 'function'
+        ? (user.toJSON() as { role?: { name?: string } })
+        : (user as unknown as { role?: { name?: string } });
+
+    const roleNameFromDb = String(userPlain.role?.name ?? decodedPayload.roleName ?? '').trim();
+    const roleNameUpper = roleNameFromDb.toUpperCase();
+
     const branchIdFromUser =
       readModelString(user, 'branchId') || String(decodedPayload.branchId ?? '').trim();
-    const roleName = String(decodedPayload.roleName ?? '').toUpperCase();
-    const canSwitchBranch = ['ADMIN', 'AUDITOR'].includes(roleName);
+    const canSwitchBranch = ['ADMIN', 'AUDITOR'].includes(roleNameUpper);
     const headerBranch =
       typeof branchIdHeader === 'string' && branchIdHeader.trim() ? branchIdHeader.trim() : '';
 
@@ -64,7 +74,7 @@ export const authenticateToken = (
     req.user = {
       userId: decodedPayload.userId,
       roleId: decodedPayload.roleId,
-      roleName: decodedPayload.roleName,
+      roleName: roleNameFromDb || decodedPayload.roleName,
       branchId: effectiveBranchId,
     };
 

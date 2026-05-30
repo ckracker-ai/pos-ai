@@ -19,6 +19,20 @@
 ### Validación numérica
 - Sanitización de entradas numéricas en productos, mermas y POS (sin negativos ni símbolos inválidos).
 
+### Roles y permisos
+- Configuración centralizada `role-access.ts` (dashboard, menú, rutas).
+- Auditor: aprobar/rechazar mermas, consulta usuarios/sucursales; sin alta/baja ni gestión de locales.
+- Restricciones en API core para sucursales y creación de usuarios (solo admin).
+
+### POS e impuestos
+- IVA Chile **19%** en punto de venta (carrito y comprobante).
+
+### Mermas (fix auditor)
+- Rechazo/aprobación por id con rol desde BD; fallback PATCH; rutas BFF/core alineadas.
+
+### Comercial
+- Propuesta PDF/HTML en `docs/comercial/`.
+
 ### Infraestructura
 - Healthchecks Docker, scripts QA smoke y checklist pre-deploy.
 - Versión expuesta en health API y sidebar (`v1.2`).

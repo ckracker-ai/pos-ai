@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { LoginRequest, User, UserRole } from '@/core/interfaces';
 import { getFriendlyApiError } from '@/core/api/api-error-messages';
+import { getRoleProfile } from '@/core/config/role-access';
 import { useBranchStore } from '@/store/branch';
 
 interface RegisterRequest extends LoginRequest {
@@ -114,7 +115,7 @@ export const useAuthStore = create<AuthStore>()(
             isAuthenticated: true,
             isLoading: false,
           });
-          const canSwitchBranch = ['admin', 'auditor'].includes(normalizedUser.role);
+          const canSwitchBranch = getRoleProfile(normalizedUser.role).canSwitchBranch;
           const effectiveBranchId = normalizedUser.branchId ?? tokenBranchId;
           if (effectiveBranchId && !canSwitchBranch) {
             useBranchStore.getState().setSelectedBranchId(effectiveBranchId);
@@ -203,7 +204,7 @@ export const useAuthStore = create<AuthStore>()(
         const userWithBranch =
           branchId && !user.branchId ? { ...user, branchId } : user;
 
-        const canSwitchBranch = ['admin', 'auditor'].includes(userWithBranch.role);
+        const canSwitchBranch = getRoleProfile(userWithBranch.role).canSwitchBranch;
         if (branchId && !canSwitchBranch) {
           useBranchStore.getState().setSelectedBranchId(branchId);
         }

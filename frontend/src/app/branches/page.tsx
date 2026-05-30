@@ -17,9 +17,11 @@ import { ConfirmActionModal } from '@/components/molecules/ConfirmActionModal';
 import { StatusFilterSelect, StatusFilterValue } from '@/components/molecules/StatusFilterSelect';
 import { filterByStatusAndSearch } from '@/core/utils/soft-delete';
 import { notifyApiError, notifySuccess, notifyUndoAction } from '@/store/ui';
+import { getRoleProfile } from '@/core/config/role-access';
 
 export default function BranchesPage() {
   const currentUser = useAuthStore((state) => state.user);
+  const canManageBranches = getRoleProfile(currentUser?.role).canManageBranches;
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeUsersByBranch, setActiveUsersByBranch] = useState<Map<string, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -204,10 +206,15 @@ export default function BranchesPage() {
               <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Sucursales</p>
               <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de sucursales</h1>
               <p className="mt-2 max-w-2xl text-slate-400">
-                Administra sucursales fijas y puestos temporales (eventos). Usa Desactivar cuando una
-                sucursal cierra: deja de aparecer en ventas nuevas, pero ventas, inventario y reportes
-                históricos se conservan. Restaura desde el filtro Inactivos.
+                {canManageBranches
+                  ? 'Administra sucursales fijas y puestos temporales (eventos). Usa Desactivar cuando una sucursal cierra: deja de aparecer en ventas nuevas, pero ventas, inventario y reportes históricos se conservan. Restaura desde el filtro Inactivos.'
+                  : 'Consulta sucursales para auditoría. Solo el administrador puede crear, editar o desactivar locales.'}
               </p>
+              {!canManageBranches && (
+                <p className="mt-2 text-sm text-amber-300/90">
+                  Modo solo lectura: puedes cambiar la sucursal activa en el encabezado, no desde aquí.
+                </p>
+              )}
               {currentUser && (
                 <p className="mt-3 text-sm text-slate-500">Sesión iniciada como: {currentUser.name}</p>
               )}
@@ -223,19 +230,21 @@ export default function BranchesPage() {
               )}
               {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando sucursales desde BFF...</p>}
             </div>
-            <button
-              onClick={() => {
-                setEditingBranch(null);
-                setForm({ name: '', code: '', city: '', address: '', phone: '' });
-                setErrorMessage(null);
-                setSuccessMessage(null);
-                setShowModal(true);
-              }}
-              disabled={isActionLocked}
-              className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              + Nueva sucursal
-            </button>
+            {canManageBranches && (
+              <button
+                onClick={() => {
+                  setEditingBranch(null);
+                  setForm({ name: '', code: '', city: '', address: '', phone: '' });
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                  setShowModal(true);
+                }}
+                disabled={isActionLocked}
+                className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Nueva sucursal
+              </button>
+            )}
           </div>
 
           <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
@@ -311,7 +320,9 @@ export default function BranchesPage() {
                             <TableActions
                               disabled={isActionLocked}
                               isInactive={!branch.isActive}
-                              onEdit={() => {
+                              onEdit={
+                                canManageBranches
+                                  ? () => {
                                 setSelectedBranch(branch);
                                 setEditingBranch(branch);
                                 setForm({
@@ -324,8 +335,12 @@ export default function BranchesPage() {
                                 setErrorMessage(null);
                                 setSuccessMessage(null);
                                 setShowModal(true);
-                              }}
-                              onDelete={() => {
+                              }
+                                  : undefined
+                              }
+                              onDelete={
+                                canManageBranches
+                                  ? () => {
                                 const assignedUsers = activeUsersByBranch.get(branch.id) ?? 0;
                                 const userNote =
                                   assignedUsers > 0
@@ -338,8 +353,12 @@ export default function BranchesPage() {
                                   'danger',
                                   () => handleDeactivateBranch(branch)
                                 );
-                              }}
-                              onRestore={() => handleRestoreBranch(branch)}
+                              }
+                                  : undefined
+                              }
+                              onRestore={
+                                canManageBranches ? () => handleRestoreBranch(branch) : undefined
+                              }
                             />
                           </td>
                         </tr>

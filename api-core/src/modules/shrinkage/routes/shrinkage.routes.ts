@@ -28,15 +28,6 @@ router.get('/shrinkage/status/:status', requireSeller, async (req: Authenticated
   return sendFail(res, result.error, 404);
 });
 
-router.get('/shrinkage/:status', requireSeller, async (req: AuthenticatedRequest, res) => {
-  const result = await shrinkageDelegate.listByBranchAndStatus(
-    req.user!.branchId,
-    req.params.status
-  );
-  if (result.success) return sendOk(res, { shrinkages: result.value });
-  return sendFail(res, result.error, 404);
-});
-
 const parseCreateBody = (body: unknown):
   | { valid: true; reason: string; details: Array<{ productId: string; quantity: number }> }
   | { valid: false; error: string } => {
@@ -102,11 +93,15 @@ router.post('/shrinkage/:id/approve', requireAuditor, async (req: AuthenticatedR
   const result = await shrinkageDelegate.approve(
     req.params.id,
     req.user!.branchId,
-    req.user!.userId
+    req.user!.userId,
+    req.user!.roleName
   );
 
   if (!result.success) {
-    const status = result.error === 'SHRINKAGE_NOT_FOUND' ? 404 : 400;
+    const status =
+      result.error === 'SHRINKAGE_NOT_FOUND' || result.error === 'SHRINKAGE_BRANCH_MISMATCH'
+        ? 404
+        : 400;
     return sendFail(res, result.error, status);
   }
 
@@ -123,11 +118,15 @@ router.post('/shrinkage/:id/reject', requireAuditor, async (req: AuthenticatedRe
     req.params.id,
     req.user!.branchId,
     req.user!.userId,
-    note
+    note,
+    req.user!.roleName
   );
 
   if (!result.success) {
-    const status = result.error === 'SHRINKAGE_NOT_FOUND' ? 404 : 400;
+    const status =
+      result.error === 'SHRINKAGE_NOT_FOUND' || result.error === 'SHRINKAGE_BRANCH_MISMATCH'
+        ? 404
+        : 400;
     return sendFail(res, result.error, status);
   }
 
@@ -151,10 +150,14 @@ router.patch('/shrinkage/:id', requireAuditor, async (req: AuthenticatedRequest,
     const result = await shrinkageDelegate.approve(
       req.params.id,
       req.user!.branchId,
-      req.user!.userId
+      req.user!.userId,
+      req.user!.roleName
     );
     if (!result.success) {
-      const code = result.error === 'SHRINKAGE_NOT_FOUND' ? 404 : 400;
+      const code =
+        result.error === 'SHRINKAGE_NOT_FOUND' || result.error === 'SHRINKAGE_BRANCH_MISMATCH'
+          ? 404
+          : 400;
       return sendFail(res, result.error, code);
     }
     return sendOk(res, { shrinkage: result.value });
@@ -165,10 +168,14 @@ router.patch('/shrinkage/:id', requireAuditor, async (req: AuthenticatedRequest,
       req.params.id,
       req.user!.branchId,
       req.user!.userId,
-      body.rejectionNote
+      body.rejectionNote,
+      req.user!.roleName
     );
     if (!result.success) {
-      const code = result.error === 'SHRINKAGE_NOT_FOUND' ? 404 : 400;
+      const code =
+        result.error === 'SHRINKAGE_NOT_FOUND' || result.error === 'SHRINKAGE_BRANCH_MISMATCH'
+          ? 404
+          : 400;
       return sendFail(res, result.error, code);
     }
     return sendOk(res, { shrinkage: result.value });

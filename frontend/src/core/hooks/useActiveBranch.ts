@@ -13,7 +13,7 @@ import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
 import { sanitizeBranchDisplayLabel } from '@/core/utils/branch-display';
 
-const ROLES_WITH_BRANCH_SWITCH = ['admin', 'auditor'];
+import { getRoleProfile } from '@/core/config/role-access';
 
 export function useActiveBranch() {
   const user = useAuthStore((s) => s.user);
@@ -23,7 +23,7 @@ export function useActiveBranch() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const canSwitchBranch = ROLES_WITH_BRANCH_SWITCH.includes(user?.role ?? '');
+  const canSwitchBranch = getRoleProfile(user?.role).canSwitchBranch;
 
   useEffect(() => {
     let cancelled = false;

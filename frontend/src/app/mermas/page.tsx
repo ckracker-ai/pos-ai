@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '@/core/api/api-client';
+import { api, ApiError } from '@/core/api/api-client';
 import {
   extractList,
   fetchProductsForBranch,
@@ -12,6 +12,7 @@ import {
 import { Product } from '@/core/interfaces';
 import { useBranchStore } from '@/store/branch';
 import { useAuthStore } from '@/store/auth';
+import { getRoleProfile } from '@/core/config/role-access';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -35,7 +36,7 @@ export default function MermasPage() {
   const branchId = useBranchStore((s) => s.selectedBranchId);
   const activeBranchName = useBranchStore((s) => s.activeBranchLabel);
   const user = useAuthStore((s) => s.user);
-  const canApprove = user?.role === 'admin' || user?.role === 'auditor';
+  const canApprove = getRoleProfile(user?.role).canApproveShrinkages;
 
   const [mermas, setMermas] = useState<ShrinkageRecord[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -192,9 +193,29 @@ export default function MermasPage() {
     }
   };
 
-  const handleReject = async (id: string, note: string) => {
+  const rejectShrinkageRequest = async (id: string, note: string) => {
     try {
-      await api.rejectShrinkage(id, { rejectionNote: note });
+      await api.rejectShrinkage(id, { rejectionNote: note || undefined });
+    } catch (error) {
+      const status = error instanceof ApiError ? error.status : undefined;
+      if (status === 404 || status === 405) {
+        await api.updateShrinkage(id, {
+          status: 'REJECTED',
+          rejectionNote: note || undefined,
+        });
+        return;
+      }
+      throw error;
+    }
+  };
+
+  const handleReject = async (id: string, note: string) => {
+    if (!id.trim()) {
+      setErrorMessage('No se pudo identificar la merma. Recarga la página e inténtalo de nuevo.');
+      return;
+    }
+    try {
+      await rejectShrinkageRequest(id, note);
       setSuccessMessage('Merma rechazada. No se modificó el inventario.');
       notifySuccess('Merma rechazada', 'No se modificó el inventario.');
       await loadData();

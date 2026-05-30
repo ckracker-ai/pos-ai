@@ -3,7 +3,7 @@ import Branch from '../models/Branch.model';
 import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import {
   authenticateToken,
-  requireSeller,
+  requireAdmin,
   requireComanda,
   AuthenticatedRequest,
 } from '../../../middleware/auth.middleware';
@@ -43,7 +43,7 @@ router.get('/:id', requireComanda, async (req: AuthenticatedRequest, res) => {
 });
 
 // Create
-router.post('/', requireSeller, async (req: AuthenticatedRequest, res) => {
+router.post('/', requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const branch = await Branch.create(req.body);
     return sendOk(res, { branch }, 201);
@@ -61,7 +61,7 @@ const validateBranchCreatePayload = (body: unknown): { valid: true; payload: Rec
   return { valid: true, payload: { ...b, name } };
 };
 
-router.post('/branchAction', requireSeller, async (req: AuthenticatedRequest, res) => {
+router.post('/branchAction', requireAdmin, async (req: AuthenticatedRequest, res) => {
   const validation = validateBranchCreatePayload(req.body);
   if (!validation.valid) return sendFail(res, 'VALIDATION_ERROR: Branch.name is required', 422);
 
@@ -77,7 +77,7 @@ router.post('/branchAction', requireSeller, async (req: AuthenticatedRequest, re
 
 
 // Update (partial)
-router.patch('/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
+router.patch('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const branch = await Branch.findByPk(req.params.id);
     if (!branch) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
@@ -104,7 +104,7 @@ router.patch('/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.post('/:id/restore', requireSeller, async (req: AuthenticatedRequest, res) => {
+router.post('/:id/restore', requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const branch = await Branch.findByPk(req.params.id);
     if (!branch) return sendFail(res, 'BRANCH_NOT_FOUND', 404);
@@ -119,7 +119,7 @@ router.post('/:id/restore', requireSeller, async (req: AuthenticatedRequest, res
 });
 
 // Desactivación lógica (soft delete) — conserva ventas e inventario histórico
-router.delete('/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
+router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const branch = await Branch.findByPk(req.params.id);
     if (!branch) return sendFail(res, 'BRANCH_NOT_FOUND', 404);

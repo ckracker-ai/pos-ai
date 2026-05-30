@@ -241,7 +241,7 @@ export interface ShrinkageRecord {
 export function normalizeShrinkage(raw: Record<string, unknown>): ShrinkageRecord {
   const product = raw.product as { name?: string } | undefined;
   return {
-    id: String(raw.id ?? ''),
+    id: String(raw.id ?? raw.shrinkage_id ?? raw.shrinkageId ?? ''),
     productId: String(raw.productId ?? ''),
     productName: product?.name ? String(product.name) : undefined,
     branchId: String(raw.branchId ?? ''),

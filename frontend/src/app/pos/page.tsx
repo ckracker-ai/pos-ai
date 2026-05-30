@@ -11,6 +11,11 @@ import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
 import { ProductQuickPicker } from '@/components/organisms/ProductQuickPicker';
 import { coercePositiveIntInput } from '@/core/utils/numeric-input';
+import {
+  CHILE_IVA_LABEL,
+  calculateIvaFromNet,
+  calculateTotalWithIva,
+} from '@/core/constants/tax';
 
 
 
@@ -86,8 +91,8 @@ export default function PosPage() {
     [cart]
   );
 
-  const tax = Math.round(subtotal * 0.16);
-  const total = subtotal + tax;
+  const tax = calculateIvaFromNet(subtotal);
+  const total = calculateTotalWithIva(subtotal);
 
   const handleAddProduct = () => {
     if (!selectedProduct) return;
@@ -368,7 +373,7 @@ export default function PosPage() {
                     <span>${subtotal}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>IVA (16%)</span>
+                    <span>{CHILE_IVA_LABEL}</span>
                     <span>${tax}</span>
                   </div>
                   <div className="flex justify-between text-white font-semibold text-lg">
@@ -446,7 +451,7 @@ export default function PosPage() {
                       <span>${receiptData.subtotal}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>IVA (16%)</span>
+                      <span>{CHILE_IVA_LABEL}</span>
                       <span>${receiptData.tax}</span>
                     </div>
                     <div className="flex justify-between text-white font-semibold text-lg">
@@ -519,7 +524,7 @@ export default function PosPage() {
                   <span className="font-semibold text-slate-900">${receiptData?.subtotal ?? 0}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">IVA (16%)</span>
+                  <span className="text-slate-600">{CHILE_IVA_LABEL}</span>
                   <span className="font-semibold text-slate-900">${receiptData?.tax ?? 0}</span>
                 </div>
                 <div className="flex justify-between text-base font-semibold text-slate-900">

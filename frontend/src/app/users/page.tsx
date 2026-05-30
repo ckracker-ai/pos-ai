@@ -24,6 +24,7 @@ import {
   matchesStatusFilter,
 } from '@/components/molecules/StatusFilterSelect';
 import { notifyApiError, notifySuccess, notifyUndoAction } from '@/store/ui';
+import { getRoleProfile } from '@/core/config/role-access';
 
 type UserRow = User & { branchName: string; roleId: string };
 
@@ -86,7 +87,8 @@ export default function UsersPage() {
 
   const activeUserCount = useMemo(() => users.filter((user) => user.isActive).length, [users]);
   const inactiveUserCount = useMemo(() => users.filter((user) => !user.isActive).length, [users]);
-  const canManageUserLifecycle = currentUser?.role === 'admin';
+  const roleProfile = getRoleProfile(currentUser?.role);
+  const canManageUserLifecycle = roleProfile.canManageUsers;
   const activeAdminCount = useMemo(
     () => users.filter((user) => user.isActive && user.role === 'admin').length,
     [users]
@@ -336,7 +338,7 @@ export default function UsersPage() {
               </p>
               {!canManageUserLifecycle && (
                 <p className="mt-2 text-sm text-amber-300/90">
-                  Solo el administrador puede desactivar o restaurar usuarios.
+                  Modo consulta: solo el administrador puede crear, editar, desactivar o restaurar usuarios.
                 </p>
               )}
               {currentUser && (
@@ -356,26 +358,28 @@ export default function UsersPage() {
               )}
               {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando usuarios desde BFF...</p>}
             </div>
-            <button
-              onClick={() => {
-                setEditingUser(null);
-                setForm({
-                  name: '',
-                  email: '',
-                  password: '',
-                  roleId: roles[0]?.id ?? '',
-                  branchId: assignableBranches[0]?.id ?? '',
-                  isActive: true,
-                });
-                setErrorMessage(null);
-                setSuccessMessage(null);
-                setShowModal(true);
-              }}
-              disabled={isActionLocked}
-              className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              + Nuevo Usuario
-            </button>
+            {canManageUserLifecycle && (
+              <button
+                onClick={() => {
+                  setEditingUser(null);
+                  setForm({
+                    name: '',
+                    email: '',
+                    password: '',
+                    roleId: roles[0]?.id ?? '',
+                    branchId: assignableBranches[0]?.id ?? '',
+                    isActive: true,
+                  });
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                  setShowModal(true);
+                }}
+                disabled={isActionLocked}
+                className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Nuevo Usuario
+              </button>
+            )}
           </div>
 
           <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
@@ -433,7 +437,7 @@ export default function UsersPage() {
                           <StatusBadge active={user.isActive} />
                         </td>
                         <td className="px-6 py-5">
-                          {user.isActive && (
+                          {canManageUserLifecycle && user.isActive && (
                             <button
                               type="button"
                               disabled={isActionLocked}
@@ -450,7 +454,9 @@ export default function UsersPage() {
                           <TableActions
                             disabled={isActionLocked}
                             isInactive={!user.isActive}
-                            onEdit={() => {
+                            onEdit={
+                              canManageUserLifecycle
+                                ? () => {
                               setEditingUser(user);
                               setForm({
                                 name: user.name,
@@ -461,7 +467,9 @@ export default function UsersPage() {
                                 isActive: user.isActive,
                               });
                               setShowModal(true);
-                            }}
+                            }
+                                : undefined
+                            }
                             onRestore={
                               canManageUserLifecycle ? () => handleRestore(user) : undefined
                             }

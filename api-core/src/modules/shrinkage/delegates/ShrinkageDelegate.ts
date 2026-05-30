@@ -26,6 +26,42 @@ export interface CreateShrinkageLine {
 }
 
 class ShrinkageDelegate {
+  private branchKey(branchId: string): string {
+    return String(branchId ?? '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private isAuditorRole(roleName?: string): boolean {
+    const role = String(roleName ?? '').toUpperCase();
+    return role === 'ADMIN' || role === 'AUDITOR';
+  }
+
+  private async resolvePendingShrinkage(
+    shrinkageId: string,
+    activeBranchId: string,
+    roleName?: string
+  ): Promise<Result<Shrinkage>> {
+    const id = String(shrinkageId ?? '').trim();
+    if (!id) return fail('SHRINKAGE_NOT_FOUND');
+
+    const shrinkage = await Shrinkage.findByPk(id);
+    if (!shrinkage) return fail('SHRINKAGE_NOT_FOUND');
+
+    if (shrinkage.status !== 'PENDING') {
+      return fail('SHRINKAGE_NOT_PENDING');
+    }
+
+    const rowBranch = this.branchKey(shrinkage.branchId);
+    const headerBranch = this.branchKey(activeBranchId);
+
+    if (rowBranch !== headerBranch && !this.isAuditorRole(roleName)) {
+      return fail('SHRINKAGE_BRANCH_MISMATCH');
+    }
+
+    return ok(shrinkage);
+  }
+
   async listByBranch(branchId: string): Promise<Result<ShrinkageRecord[]>> {
     const rows = await Shrinkage.findAll({
       where: { branchId },
@@ -107,11 +143,18 @@ class ShrinkageDelegate {
     }
   }
 
-  async approve(shrinkageId: string, branchId: string, approverId: string): Promise<Result<ShrinkageRecord>> {
+  async approve(
+    shrinkageId: string,
+    branchId: string,
+    approverId: string,
+    roleName?: string
+  ): Promise<Result<ShrinkageRecord>> {
+    const pending = await this.resolvePendingShrinkage(shrinkageId, branchId, roleName);
+    if (!pending.success) return pending;
+
     const transaction = await sequelize.transaction();
     try {
-      const shrinkage = await Shrinkage.findOne({
-        where: { id: shrinkageId, branchId },
+      const shrinkage = await Shrinkage.findByPk(pending.value.id, {
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
@@ -120,10 +163,6 @@ class ShrinkageDelegate {
         await transaction.rollback();
         return fail('SHRINKAGE_NOT_FOUND');
       }
-      if (shrinkage.status !== 'PENDING') {
-        await transaction.rollback();
-        return fail('SHRINKAGE_NOT_PENDING');
-      }
 
       const shrinkageQty = Number(shrinkage.quantity);
       if (!Number.isFinite(shrinkageQty) || shrinkageQty <= 0) {
@@ -131,8 +170,9 @@ class ShrinkageDelegate {
         return fail('VALIDATION_ERROR: quantity must be greater than zero');
       }
 
+      const stockBranchId = shrinkage.branchId;
       const stock = await InventoryStock.findOne({
-        where: { productId: shrinkage.productId, branchId },
+        where: { productId: shrinkage.productId, branchId: stockBranchId },
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
@@ -173,11 +213,13 @@ class ShrinkageDelegate {
     shrinkageId: string,
     branchId: string,
     approverId: string,
-    rejectionNote?: string
+    rejectionNote?: string,
+    roleName?: string
   ): Promise<Result<ShrinkageRecord>> {
-    const shrinkage = await Shrinkage.findOne({ where: { id: shrinkageId, branchId } });
-    if (!shrinkage) return fail('SHRINKAGE_NOT_FOUND');
-    if (shrinkage.status !== 'PENDING') return fail('SHRINKAGE_NOT_PENDING');
+    const pending = await this.resolvePendingShrinkage(shrinkageId, branchId, roleName);
+    if (!pending.success) return pending;
+
+    const shrinkage = pending.value;
 
     await shrinkage.update({
       status: 'REJECTED',

@@ -40,7 +40,7 @@ router.get('/users', authenticateToken, requireAuditor, async (_req, res) => {
 
 
 
-router.post('/users', authenticateToken, requireAuditor, AuthController.register);
+router.post('/users', authenticateToken, requireAdmin, AuthController.register);
 router.put('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   // Update mínimo: fullName, email, roleId, branchId, isActive si viene.
   // Nota: password no se actualiza aquí.
@@ -65,7 +65,7 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-router.patch('/users/:id/password', authenticateToken, requireAuditor, async (req, res) => {
+router.patch('/users/:id/password', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ success: false, data: null, error: 'USER_NOT_FOUND', code: 404 });

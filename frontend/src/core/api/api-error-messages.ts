@@ -116,6 +116,10 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   ERROR_DELETING_PRODUCT: 'No se pudo eliminar el producto.',
   ERROR_FETCHING_SALES: 'No se pudieron cargar las ventas.',
   INSUFFICIENT_STOCK: 'No hay stock suficiente para completar la operación.',
+  SHRINKAGE_NOT_FOUND: 'No encontramos esa merma en la sucursal activa.',
+  SHRINKAGE_NOT_PENDING: 'Esta merma ya fue aprobada o rechazada.',
+  SHRINKAGE_BRANCH_MISMATCH:
+    'La merma pertenece a otra sucursal. Cambia la sucursal activa en el encabezado e inténtalo de nuevo.',
 };
 
 const ENDPOINT_HINTS: Array<{ pattern: RegExp; hint: string }> = [

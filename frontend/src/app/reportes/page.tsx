@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, getApiErrorMessage } from '@/core/api/api-client';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
 import { useAuthStore } from '@/store/auth';
+import { getRoleProfile } from '@/core/config/role-access';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
@@ -151,7 +152,7 @@ function normalizeShrinkageReportRow(raw: Record<string, unknown>): ShrinkageRep
 export default function ReportesPage() {
   const user = useAuthStore((s) => s.user);
   const { branchId, activeBranchName } = useActiveBranch();
-  const canGlobal = user?.role === 'admin' || user?.role === 'auditor';
+  const canGlobal = getRoleProfile(user?.role).canSwitchBranch;
 
   const [globalView, setGlobalView] = useState(false);
   const [activeTab, setActiveTab] = useState<'ventas' | 'inventario' | 'mermas'>('ventas');

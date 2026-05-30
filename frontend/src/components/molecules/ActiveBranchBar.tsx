@@ -2,6 +2,7 @@
 
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
+import { getRoleProfile } from '@/core/config/role-access';
 import { sanitizeBranchDisplayLabel } from '@/core/utils/branch-display';
 
 /** Indica qué sucursal filtra las peticiones API (header x-branch-id). */
@@ -11,7 +12,7 @@ export function ActiveBranchBar() {
     useBranchStore((s) => s.activeBranchLabel),
     'Cargando…'
   );
-  const canSwitchBranch = ['admin', 'auditor'].includes(user?.role ?? '');
+  const canSwitchBranch = getRoleProfile(user?.role).canSwitchBranch;
 
   return (
     <div className="border-b border-sky-500/20 bg-sky-500/10 px-4 py-2 text-center text-sm text-sky-900 dark:text-sky-100 sm:px-6">

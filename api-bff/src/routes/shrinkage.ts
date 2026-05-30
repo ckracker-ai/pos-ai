@@ -4,6 +4,7 @@ import { ApiCoreServiceShrinkage } from '../services/apiCoreServiceShrinkage.js'
 import { requireSeller } from '../middlewares/requireSeller.js';
 import { requireCoreRequestContext } from '../utils/coreRequestContext.js';
 import { sendFail, sendOk } from '../utils/response.js';
+import { extractCoreError } from '../utils/extractCoreError.js';
 
 const shrinkageDetailSchema = z.object({
   productId: z.string().min(1),
@@ -95,9 +96,9 @@ const shrinkageRoutes = async (app: FastifyInstance) => {
     try {
       const data = await shrinkageCore.approveShrinkage(id, ctx.token, ctx.internalKey, ctx.branchId);
       return sendOk(reply, data);
-    } catch (e: any) {
-      const statusCode = e?.response?.status ?? 400;
-      const error = e?.response?.data?.error ?? 'Failed to approve shrinkage';
+    } catch (e: unknown) {
+      const statusCode = (e as { response?: { status?: number } })?.response?.status ?? 400;
+      const error = extractCoreError(e, 'Failed to approve shrinkage');
       return sendFail(reply, error, statusCode);
     }
   });
@@ -120,9 +121,9 @@ const shrinkageRoutes = async (app: FastifyInstance) => {
         ctx.branchId
       );
       return sendOk(reply, data);
-    } catch (e: any) {
-      const statusCode = e?.response?.status ?? 400;
-      const error = e?.response?.data?.error ?? 'Failed to reject shrinkage';
+    } catch (e: unknown) {
+      const statusCode = (e as { response?: { status?: number } })?.response?.status ?? 400;
+      const error = extractCoreError(e, 'Failed to reject shrinkage');
       return sendFail(reply, error, statusCode);
     }
   });
