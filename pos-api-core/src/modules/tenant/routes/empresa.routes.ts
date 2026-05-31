@@ -42,6 +42,18 @@ router.post('/', async (req, res) => {
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
+router.get('/platform/list', async (_req, res) => {
+  const result = await empresaDelegate.listForPlatform();
+  if (result.success) return sendOk(res, { empresas: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/:id', async (req, res) => {
+  const result = await empresaDelegate.findById(req.params.id);
+  if (result.success) return sendOk(res, { empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
 router.patch('/:id/platform', async (req, res) => {
   const result = await empresaDelegate.updatePlatform(req.params.id, req.body ?? {});
   if (result.success) return sendOk(res, { empresa: result.value });

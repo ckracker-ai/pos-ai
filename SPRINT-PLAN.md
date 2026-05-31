@@ -1,68 +1,37 @@
-# Plan de sprints — POS-AI v1.4 → v1.5
+# Plan de sprints — POS-AI
 
-Última actualización: 2026-05-31 (Sprint 2 hardening cerrado).
-
----
-
-## ✅ Sprint 1 — Multi-tenant v1.4 (cerrado)
-
-| Entrega | Estado |
-|---------|--------|
-| Core `/empresas` tenant + plataforma | ✅ |
-| BFF proxy `/pos/proxy/empresas/*` | ✅ |
-| Frontend `/empresas` (perfil tenant) | ✅ |
-| Postman carpeta Empresas + Newman QA | ✅ |
-| Docker puertos 8010 / 2020 / 1010 | ✅ |
+**v1.4.0 — FINALIZADA** (2026-05-31)
 
 ---
 
-## ✅ Sprint 2 — Hardening v1.4 (cerrado)
+## ✅ v1.4 — Entregado
 
-| # | Tarea | Estado |
-|---|-------|--------|
-| 2.1 | Commit atómico (BFF + frontend + Postman) | Pendiente si tú lo pides |
-| 2.2 | Docs puertos/prefijos | ✅ |
-| 2.3 | Smoke `qa-smoke.ps1` / `.sh` + empresas BFF | ✅ |
-| 2.4 | Newman assertions carpeta Empresas | ✅ |
-| 2.5 | Auditor solo lectura en `/empresas` | ✅ (UI) |
+| Área | Entrega |
+|------|---------|
+| Core | `/empresas` tenant + plataforma, `pos-ai-db`, puerto 1010 |
+| BFF | `/pos/proxy/*`, proxy empresas tenant + plataforma |
+| Frontend tenant | `/empresas`, POS, mantenedores |
+| Frontend plataforma | `/platform/login`, `/platform/empresas` (MVP tabla + lifecycle) |
+| QA | Smoke, Postman Empresas, checklist deploy |
 
-**Verificación:** `.\scripts\qa-smoke.ps1` · Newman carpeta Empresas · UI http://localhost:8010/empresas
+**URLs dev:** http://localhost:8010 → `/platform/login` · tenant: `/login` · BFF health: `:2020/pos/proxy/health`
 
----
-
-## Sprint 3 — Plataforma super-admin (siguiente, 1–2 días)
-
-Objetivo: onboarding y lifecycle de empresas desde producto (no solo Postman).
-
-| # | Tarea | Notas |
-|---|-------|-------|
-| 3.1 | Rol `PLATFORM_ADMIN` (o auth separado sin tenant) | Sin `x-branch-id` |
-| 3.2 | BFF `/platform/empresas/*` proxy hacia core | POST, suspend, activate, PATCH platform |
-| 3.3 | UI `/platform/empresas` — listado + alta tenant | Tabla, filtros por estado |
-| 3.4 | UI acciones suspend/activate | Confirmación modal |
-| 3.5 | Postman/collection plataforma en BFF | Paridad con core |
-
-**Fuera de scope Sprint 3:** billing SaaS, planes, facturación.
+**Credenciales:** ver `README.md` y `.env.docker.example`
 
 ---
 
-## Sprint 4 — Asistente tel/WSP (v1.5+, según README)
+## v1.5 — Siguiente (no iniciado)
 
 | # | Tarea |
 |---|-------|
-| 4.1 | Servicio `pos-api-assistant` (esqueleto) |
-| 4.2 | Integración WhatsApp / telefonía (TBD) |
-| 4.3 | Contexto tenant en conversaciones |
+| 5.1 | Dashboard super-admin completo (KPIs, búsqueda, filtros estado) |
+| 5.2 | Rol `PLATFORM_ADMIN` en BD (opcional vs solo env) |
+| 5.3 | Postman BFF plataforma |
+| 5.4 | `pos-api-assistant` (tel/WSP) |
 
----
+## v1.6+ — Billing SaaS
 
-## Sprint 5 — Billing SaaS (v1.6+)
-
-| # | Tarea |
-|---|-------|
-| 5.1 | Modelo planes / suscripción |
-| 5.2 | Middleware bloqueo por plan vencido |
-| 5.3 | UI facturación plataforma |
+Planes, suscripción, bloqueo por plan vencido.
 
 ---
 
@@ -72,11 +41,3 @@ Objetivo: onboarding y lifecycle de empresas desde producto (no solo Postman).
 |----------|---------|------|-----|
 | **POS-AI** | `d:\Proyectos\POS-AI` | `POS-AI` | `pos-ai-db` |
 | **SVM** | `d:\Proyectos\svm\node` | `prod` | `erp_core_db` |
-
----
-
-## Deuda técnica conocida
-
-- Postman MCP en Cursor requiere `/setup` con API key (hoy Newman CLI).
-- `pos-api-bff/svm-api-bff.postaman_collection.json` — renombrar/limpiar legacy SVM.
-- Frontend build local requiere `npm install` en `pos-frontend` (Docker es la vía principal).

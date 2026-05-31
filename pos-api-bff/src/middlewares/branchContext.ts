@@ -1,9 +1,9 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import config from '../config/index.js';
-import { isPublicProxyPath } from '../constants/proxyPrefix.js';
+import { isPublicProxyPath, isPlatformProxyPath } from '../constants/proxyPrefix.js';
 export const branchContextMiddleware = async (request: FastifyRequest, reply: FastifyReply) => {
   const path = request.url.split('?')[0];
-  if (isPublicProxyPath(path, config.apiPrefix)) {
+  if (isPublicProxyPath(path, config.apiPrefix) || isPlatformProxyPath(path, config.apiPrefix)) {
     return;
   }
 

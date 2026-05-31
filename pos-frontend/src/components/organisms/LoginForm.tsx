@@ -41,10 +41,10 @@ export function LoginForm() {
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            SVM
+            POS-AI
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Sistema de Ventas Multisucursal
+            Punto de venta multi-sucursal
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
             Ingresa a tu cuenta
@@ -114,10 +114,13 @@ export function LoginForm() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          ¿Problemas para acceder? <br />
-          <a href="mailto:admin@svm.local" className="text-blue-600 hover:text-blue-700 dark:text-blue-400">
-            Contacta al administrador
+          <a href="/platform/login" className="text-blue-600 hover:text-blue-700 dark:text-blue-400">
+            Acceso super-admin plataforma
           </a>
+          <br />
+          <span className="mt-2 inline-block text-xs text-gray-500">
+            Tenant demo: admin@empanadascostaazul.cl
+          </span>
         </p>
       </div>
     </div>

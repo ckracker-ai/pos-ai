@@ -96,8 +96,16 @@ export const useAuthStore = create<AuthStore>()(
           console.info('Login response:', payload);
 
           if (!response.ok || payload.success === false) {
-            const apiErr = payload.error || payload.message || 'INVALID_CREDENTIALS';
-            throw new Error(String(apiErr));
+            const apiErr = String(payload.error || payload.message || 'INVALID_CREDENTIALS');
+            if (
+              credentials.email.trim().toLowerCase() === 'platform@pos-ai.local' ||
+              credentials.email.trim().toLowerCase().includes('platform@')
+            ) {
+              throw new Error(
+                'Estas credenciales son de super-admin plataforma. Usa http://localhost:8010/platform/login'
+              );
+            }
+            throw new Error(apiErr);
           }
 
           const authData = payload.data;

@@ -1,6 +1,6 @@
 # POS-AI — ERP SaaS multi-tenant
 
-Producto v1.4: multi-empresa en core, BFF y frontend.
+Producto **v1.4.0** (finalizada): multi-empresa en core, BFF y frontend; MVP plataforma super-admin.
 
 ## Roadmap
 
@@ -44,7 +44,8 @@ docker compose up -d --build
 
 > MySQL host: **3308** (SVM usa 3306). Override: `MYSQL_HOST_PORT=3309`.
 
-- UI: http://localhost:8010
+- UI: http://localhost:8010 → redirige a `/platform/login`
+- Login tenant: http://localhost:8010/login
 - BFF health: http://localhost:2020/pos/proxy/health
 - Core health: http://localhost:1010/health
 
@@ -61,4 +62,5 @@ Checklist manual: `deploy/QA-SMOKE-CHECKLIST.md` · Empresas Postman: `pos-api-c
 ## Credenciales dev
 
 - Admin: `admin@empanadascostaazul.cl` / `@dmin123_`
+- **Plataforma:** `platform@pos-ai.local` / `PlatformAdmin2026!` → http://localhost:8010/platform/login
 - MySQL user: `usr_pos_ai` / `Usr@12345`

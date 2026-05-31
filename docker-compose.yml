@@ -48,6 +48,8 @@ services:
       - API_PREFIX=/pos/proxy
       - CORE_API_BASE_URL=http://pos-api-core:1010
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
+      - PLATFORM_ADMIN_EMAIL=${PLATFORM_ADMIN_EMAIL:-platform@pos-ai.local}
+      - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
       - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-pos_ai_jwt_refresh_secret_2026}
       - APP_VERSION=${APP_VERSION:-1.4.0}

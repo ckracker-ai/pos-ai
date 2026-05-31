@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { canAccessPath } from '@/core/config/role-access';
 
-const PUBLIC_ROUTES = ['/login', '/'];
+const PUBLIC_ROUTES = ['/login'];
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -20,6 +20,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isHydrated) return;
+
+    if (pathname.startsWith('/platform')) return;
 
     if (PUBLIC_ROUTES.includes(pathname)) return;
 

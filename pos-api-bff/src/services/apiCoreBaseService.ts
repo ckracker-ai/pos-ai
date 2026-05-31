@@ -54,4 +54,14 @@ export abstract class ApiCoreBaseService {
 
     return headers;
   }
+
+  /** Llamadas plataforma al core (solo x-internal-key del servidor BFF). */
+  protected platformHeaders(): Record<string, string> {
+    const key = config.internalApiKey;
+    if (!key) throw new Error(`${this.constructor.name}: missing INTERNAL_API_KEY`);
+    return {
+      'Content-Type': 'application/json',
+      'x-internal-key': key,
+    };
+  }
 }

@@ -110,6 +110,12 @@ class EmpresaDelegate {
     return ok([this.toRecord(row)]);
   }
 
+  /** Listado global — solo plataforma (x-internal-key). */
+  async listForPlatform(): Promise<Result<EmpresaRecord[]>> {
+    const rows = await Empresa.findAll({ order: [['createdAt', 'DESC']] });
+    return ok(rows.map((row) => this.toRecord(row)));
+  }
+
   async create(
     input: CreateEmpresaInput
   ): Promise<Result<{ empresa: EmpresaRecord; branch?: Branch; adminUserId?: string }>> {

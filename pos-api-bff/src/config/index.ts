@@ -1,9 +1,13 @@
 const config = {
   port: Number(process.env.PORT ?? 2020),
   apiPrefix: (process.env.API_PREFIX ?? '/pos/proxy').replace(/\/$/, ''),
-  coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? 'http://localhost:1010',  jwtSecret: process.env.JWT_SECRET ?? 'replace-with-strong-secret',
+  coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? 'http://localhost:1010',
+  internalApiKey: process.env.INTERNAL_API_KEY ?? 'supersecretkey',
+  jwtSecret: process.env.JWT_SECRET ?? 'replace-with-strong-secret',
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? 'replace-with-refresh-secret',
   branchHeader: 'x-branch-id',
+  platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? 'platform@pos-ai.local',
+  platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? 'PlatformAdmin2026!',
 };
 
 export default config;
