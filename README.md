@@ -9,7 +9,14 @@ Producto **v1.4.0** (finalizada): multi-empresa en core, BFF y frontend; MVP pla
 | **v1.4** (actual) | Multi-tenant, BD `pos-ai-db`, core puerto **1010** |
 | **v1.5** | Asistente tel/WSP (`pos-api-assistant`) |
 
-## Relación con SVM
+## Repositorios GitHub
+
+| Producto | Repositorio | Rama principal |
+|----------|-------------|----------------|
+| **POS-AI** | https://github.com/ckracker-ai/pos-ai | `main` (desarrollo: `POS-AI`) |
+| **SVM** | https://github.com/ckracker-ai/svm-erp | `prod` / `dev` |
+
+## Relación con SVM (local)
 
 | | **SVM** | **POS-AI** |
 |---|---|---|
