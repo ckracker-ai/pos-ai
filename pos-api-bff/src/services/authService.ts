@@ -6,7 +6,13 @@ export class AuthService {
 
   async register(fullName: string, email: string, password: string, roleId: string, branchId: string) {
     try {
-      const response = await this.coreApi.register(fullName, email, password, roleId, branchId);
+      const response = await this.coreApi.register({
+        fullName,
+        email,
+        password,
+        roleId,
+        branchId,
+      });
       return ok({ data: response });
     } catch (error: any) {
       const statusCode = error.response?.status || 502;

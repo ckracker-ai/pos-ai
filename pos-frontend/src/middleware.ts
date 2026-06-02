@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-/** Raíz del sitio → login super-admin plataforma. */
+const MARKETING_PATHS = new Set(['/', '/login', '/registro', '/checkout']);
+
+/** Evita que rutas públicas hereden redirecciones legacy; no envía a /login. */
 export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/platform/login', request.url));
+  const path = request.nextUrl.pathname;
+
+  if (MARKETING_PATHS.has(path) || path.startsWith('/platform')) {
+    return NextResponse.next();
   }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo).*)'],
 };

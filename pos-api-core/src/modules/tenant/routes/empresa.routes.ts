@@ -8,6 +8,10 @@ import {
 } from '../../../middleware/auth.middleware';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import empresaDelegate from '../delegates/EmpresaDelegate';
+import planRoutes from '../../saas/routes/plan.routes';
+import assistantDelegate from '../../assistant/delegates/AssistantDelegate';
+import suscripcionDelegate from '../../saas/delegates/SuscripcionDelegate';
+import { countPlatformStats } from '../../saas/utils/planLimits';
 
 const router = Router();
 
@@ -19,6 +23,11 @@ const mapErrorStatus = (error: string): number => {
     return 409;
   }
   if (error.startsWith('EMAIL_TAKEN') || error.startsWith('ROLE_NOT_FOUND')) return 409;
+  if (error === 'PLAN_NOT_FOUND') return 404;
+  if (error === 'SUBSCRIPTION_ALREADY_ACTIVE') return 409;
+  if (error === 'ASSISTANT_PHONE_IN_USE') return 409;
+  if (error.startsWith('ASSISTANT_PLAN_REQUIRED')) return 403;
+  if (error.startsWith('PLAN_LIMIT_')) return 403;
   return 400;
 };
 
@@ -42,9 +51,54 @@ router.post('/', async (req, res) => {
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
+router.use('/planes', planRoutes);
+
+router.get('/platform/dashboard', async (_req, res) => {
+  const result = await countPlatformStats();
+  if (result.success) return sendOk(res, { stats: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
 router.get('/platform/list', async (_req, res) => {
   const result = await empresaDelegate.listForPlatform();
   if (result.success) return sendOk(res, { empresas: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/assistant-bindings', async (_req, res) => {
+  const result = await assistantDelegate.listAllBindings();
+  if (result.success) return sendOk(res, { bindings: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/:empresaId/branches', async (req, res) => {
+  const result = await assistantDelegate.listBranches(req.params.empresaId);
+  if (result.success) return sendOk(res, { sucursales: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.patch('/platform/assistant-bindings/:bindingId/session-branch', async (req, res) => {
+  const branchId = req.body?.branchId ?? null;
+  const result = await assistantDelegate.setSessionBranch(req.params.bindingId, branchId);
+  if (result.success) return sendOk(res, { updated: true, branchId });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/:empresaId/assistant-bindings', async (req, res) => {
+  const result = await assistantDelegate.listBindingsForEmpresa(req.params.empresaId);
+  if (result.success) return sendOk(res, { bindings: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/assistant-bindings', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await assistantDelegate.upsertWhatsappBinding({
+    empresaId: req.params.empresaId,
+    externalId: String(body.externalId ?? body.telefono ?? ''),
+    defaultBranchId: body.defaultBranchId ?? body.default_branch_id ?? null,
+    adminNotifyPhone: body.adminNotifyPhone ?? body.admin_notify_phone ?? undefined,
+  });
+  if (result.success) return sendOk(res, result.value, 201);
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
@@ -57,6 +111,41 @@ router.get('/platform/:id', async (req, res) => {
 router.patch('/:id/platform', async (req, res) => {
   const result = await empresaDelegate.updatePlatform(req.params.id, req.body ?? {});
   if (result.success) return sendOk(res, { empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.patch('/platform/:empresaId/suscripcion', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await empresaDelegate.patchSuscripcionPlatform(req.params.empresaId, {
+    extendDays: body.extendDays != null ? Number(body.extendDays) : undefined,
+    graceDays: body.graceDays != null ? Number(body.graceDays) : undefined,
+    cancel: Boolean(body.cancel),
+    note: body.note != null ? String(body.note) : undefined,
+  });
+  if (result.success) return sendOk(res, { suscripcion: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/jobs/refresh-subscriptions', async (_req, res) => {
+  const result = await suscripcionDelegate.refreshAllExpired();
+  if (result.success) return sendOk(res, { job: 'refresh-subscriptions', ...result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/:empresaId/checkout', async (req, res) => {
+  const result = await empresaDelegate.getCheckoutSummary(req.params.empresaId);
+  if (result.success) return sendOk(res, { checkout: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/checkout/confirm-payment', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await empresaDelegate.confirmCheckoutPayment(req.params.empresaId, {
+    provider: String(body.provider ?? 'SANDBOX'),
+    reference: String(body.reference ?? body.transactionId ?? `sandbox-${Date.now()}`),
+    extendDays: body.extendDays != null ? Number(body.extendDays) : undefined,
+  });
+  if (result.success) return sendOk(res, result.value);
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 

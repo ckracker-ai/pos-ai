@@ -55,6 +55,11 @@ User.init(
       allowNull: false,
       defaultValue: true,
     },
+    whatsappPhone: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      field: 'whatsapp_phone',
+    },
   },
   {
     sequelize,

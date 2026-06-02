@@ -40,6 +40,7 @@ services:
     container_name: pos-ai-api-bff
     restart: unless-stopped
     user: "1000:1000"
+    command: sh -c "if [ -f dist/server.js ]; then node dist/server.js; else npm ci && npm run build && node dist/server.js; fi"
     ports:
       - '2020:2020'
     environment:
@@ -47,7 +48,9 @@ services:
       - PORT=2020
       - API_PREFIX=/pos/proxy
       - CORE_API_BASE_URL=http://pos-api-core:1010
+      - ASSISTANT_API_BASE_URL=http://pos-api-assistant:3030
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
+      - SUBSCRIPTION_WEBHOOK_SECRET=${SUBSCRIPTION_WEBHOOK_SECRET:-supersecretkey}
       - PLATFORM_ADMIN_EMAIL=${PLATFORM_ADMIN_EMAIL:-platform@pos-ai.local}
       - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
       - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
@@ -62,12 +65,48 @@ services:
     depends_on:
       pos-api-core:
         condition: service_healthy
+      pos-api-assistant:
+        condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2020/pos/proxy/health']
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # ==========================================
+  # POS-AI v1.7 — Assistant WhatsApp (plan Estándar, puerto 3030)
+  # ==========================================
+  pos-api-assistant:
+    build: ./pos-api-assistant
+    container_name: pos-ai-api-assistant
+    restart: unless-stopped
+    ports:
+      - '3030:3030'
+    environment:
+      - NODE_ENV=development
+      - PORT=3030
+      - CORE_API_BASE_URL=http://pos-api-core:1010
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-pos-ai-dev-verify}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+      - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+      - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
+    networks:
+      - internal_backend
+      - public_gateway
+    depends_on:
+      pos-api-core:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3030/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # ==========================================
   # POS-AI v1.4 — Core API (multi-tenant, puerto 1010)
@@ -92,7 +131,15 @@ services:
       - BOOTSTRAP_ADMIN_FULL_NAME=${BOOTSTRAP_ADMIN_FULL_NAME:-Administrador Costa Azul}
       - BOOTSTRAP_ADMIN_BRANCH_NAME=${BOOTSTRAP_ADMIN_BRANCH_NAME:-Sucursal Central}
       - BOOTSTRAP_ADMIN_RESET_PASSWORD=${BOOTSTRAP_ADMIN_RESET_PASSWORD:-false}
+      - BOOTSTRAP_DEMO_USERS_ENABLED=${BOOTSTRAP_DEMO_USERS_ENABLED:-true}
+      - BOOTSTRAP_SELLER_EMAIL=${BOOTSTRAP_SELLER_EMAIL:-vendedor@empanadascostaazul.cl}
+      - BOOTSTRAP_SELLER_PASSWORD=${BOOTSTRAP_SELLER_PASSWORD:-Vendedor@12345}
+      - BOOTSTRAP_DEMO_USERS_RESET_PASSWORD=${BOOTSTRAP_DEMO_USERS_RESET_PASSWORD:-false}
+      - BOOTSTRAP_PLATFORM_ADMIN_ENABLED=${BOOTSTRAP_PLATFORM_ADMIN_ENABLED:-true}
+      - PLATFORM_ADMIN_EMAIL=${PLATFORM_ADMIN_EMAIL:-platform@pos-ai.local}
+      - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
       - APP_VERSION=${APP_VERSION:-1.4.0}
+      - PAYMENT_LINK_BASE_URL=${PAYMENT_LINK_BASE_URL:-https://pay.pos-ai.local/p}
       - DB_HOST=pos-ai-db-mysql
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-pos-ai-db}

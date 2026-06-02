@@ -143,13 +143,8 @@ export function initializeApiClient() {
 
         if (shouldForceLogout && !isHandlingUnauthorized401) {
           isHandlingUnauthorized401 = true;
-
           useAuthStore.getState().logout();
-
-          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-            window.location.replace('/login');
-          }
-
+          // No redirigir aquí: RouteGuard en `(app)` envía a /login si hace falta.
           setTimeout(() => {
             isHandlingUnauthorized401 = false;
           }, 5000);
@@ -328,6 +323,18 @@ export const api = {
     getApiClient().get('/pos/proxy/empresas/me', config),
   updateEmpresa: (id: string, data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().patch(`/pos/proxy/empresas/${id}`, data, config),
+
+  // Comprobantes WSP (plan Estándar)
+  getPaymentProofs: (status: 'pending' | 'all' = 'pending', config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/payment-proofs', { ...config, params: { status } }),
+  getPaymentProofImage: (id: string, config?: AxiosRequestConfig) =>
+    getApiClient().get(`/pos/proxy/payment-proofs/${id}/image`, config),
+  confirmPaymentProof: (id: string, config?: AxiosRequestConfig) =>
+    getApiClient().post(`/pos/proxy/payment-proofs/${id}/confirm`, {}, config),
+  rejectPaymentProof: (id: string, data?: { note?: string }, config?: AxiosRequestConfig) =>
+    getApiClient().post(`/pos/proxy/payment-proofs/${id}/reject`, data ?? {}, config),
+  consolidatePaymentProofDuplicates: (config?: AxiosRequestConfig) =>
+    getApiClient().post('/pos/proxy/payment-proofs/consolidate-duplicates', {}, config),
 
   // Bulk Import
   importProducts: (formData: FormData, config?: AxiosRequestConfig) =>

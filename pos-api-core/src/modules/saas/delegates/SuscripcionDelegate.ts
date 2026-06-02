@@ -1,0 +1,256 @@
+import { Op } from 'sequelize';
+import { v4 as uuidv4 } from 'uuid';
+import EmpresaSuscripcion, {
+  SuscripcionEstado,
+  SuscripcionOrigen,
+  SuscripcionPeriodo,
+} from '../models/EmpresaSuscripcion.model';
+import Empresa from '../../tenant/models/Empresa.model';
+import { Result, ok, fail } from '../../../types/result';
+
+export type SuscripcionSummary = {
+  id: string;
+  estado: SuscripcionEstado;
+  origen: SuscripcionOrigen;
+  periodo: SuscripcionPeriodo;
+  inicioEn: string;
+  proximoCobroEn: string | null;
+  venceEn: string | null;
+  graceHasta: string | null;
+  notas: string | null;
+};
+
+function addDays(base: Date, days: number): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function toIso(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  return d instanceof Date ? d.toISOString() : String(d);
+}
+
+class SuscripcionDelegate {
+  toSummary(row: EmpresaSuscripcion): SuscripcionSummary {
+    return {
+      id: String(row.getDataValue('id') ?? ''),
+      estado: String(row.getDataValue('estado') ?? 'PILOTO') as SuscripcionEstado,
+      origen: String(row.getDataValue('origen') ?? 'PLATAFORMA') as SuscripcionOrigen,
+      periodo: String(row.getDataValue('periodo') ?? 'MENSUAL') as SuscripcionPeriodo,
+      inicioEn: toIso(row.getDataValue('inicioEn') as Date) ?? new Date().toISOString(),
+      proximoCobroEn: toIso(row.getDataValue('proximoCobroEn') as Date | null),
+      venceEn: toIso(row.getDataValue('venceEn') as Date | null),
+      graceHasta: toIso(row.getDataValue('graceHasta') as Date | null),
+      notas: (row.getDataValue('notas') as string | null) ?? null,
+    };
+  }
+
+  async findByEmpresaId(empresaId: string): Promise<EmpresaSuscripcion | null> {
+    return EmpresaSuscripcion.findOne({ where: { empresaId } });
+  }
+
+  async ensureForEmpresa(
+    empresaId: string,
+    planId: string,
+    options?: {
+      estado?: SuscripcionEstado;
+      origen?: SuscripcionOrigen;
+      periodo?: SuscripcionPeriodo;
+      diasVigencia?: number;
+    }
+  ): Promise<Result<SuscripcionSummary>> {
+    const existing = await this.findByEmpresaId(empresaId);
+    if (existing) return ok(this.toSummary(existing));
+
+    const now = new Date();
+    const dias = options?.diasVigencia ?? 90;
+    const row = await EmpresaSuscripcion.create({
+      id: uuidv4(),
+      empresaId,
+      planId,
+      estado: options?.estado ?? 'PILOTO',
+      origen: options?.origen ?? 'PLATAFORMA',
+      periodo: options?.periodo ?? 'MENSUAL',
+      inicioEn: now,
+      proximoCobroEn: addDays(now, 30),
+      venceEn: addDays(now, dias),
+      graceHasta: null,
+      notas: null,
+    });
+    return ok(this.toSummary(row));
+  }
+
+  async syncPlanChange(empresaId: string, planId: string): Promise<Result<SuscripcionSummary>> {
+    const row = await this.findByEmpresaId(empresaId);
+    if (!row) {
+      return this.ensureForEmpresa(empresaId, planId, { estado: 'PILOTO', diasVigencia: 90 });
+    }
+    await row.update({ planId });
+    return ok(this.toSummary(row));
+  }
+
+  private async refreshVencimiento(row: EmpresaSuscripcion): Promise<EmpresaSuscripcion> {
+    const now = new Date();
+    const vence = row.getDataValue('venceEn') as Date | null;
+    const estado = String(row.getDataValue('estado') ?? '') as SuscripcionEstado;
+    if (
+      vence &&
+      now > vence &&
+      (estado === 'ACTIVA' || estado === 'PILOTO' || estado === 'GRACIA')
+    ) {
+      const grace = row.getDataValue('graceHasta') as Date | null;
+      if (!grace || now > grace) {
+        await row.update({ estado: 'VENCIDA' });
+      }
+    }
+    return row;
+  }
+
+  async assertAllowsTenantAccess(empresaId: string): Promise<Result<true>> {
+    let row = await this.findByEmpresaId(empresaId);
+    if (!row) {
+      const empresa = await Empresa.findByPk(empresaId, { attributes: ['id', 'planId', 'estado'] });
+      if (!empresa) return fail('EMPRESA_NOT_FOUND');
+      const ensured = await this.ensureForEmpresa(
+        empresaId,
+        String(empresa.getDataValue('planId') ?? ''),
+        {
+          estado: String(empresa.getDataValue('estado') ?? '') === 'ACTIVO' ? 'PILOTO' : 'VENCIDA',
+          diasVigencia: 90,
+        }
+      );
+      if (!ensured.success) return ensured;
+      row = await this.findByEmpresaId(empresaId);
+      if (!row) return fail('SUBSCRIPTION_NOT_FOUND');
+    }
+
+    row = await this.refreshVencimiento(row);
+    const estado = String(row.getDataValue('estado') ?? '') as SuscripcionEstado;
+
+    if (estado === 'CANCELADA') {
+      return fail('SUBSCRIPTION_CANCELLED');
+    }
+
+    if (estado === 'VENCIDA') {
+      const grace = row.getDataValue('graceHasta') as Date | null;
+      if (grace && new Date() <= grace) {
+        return ok(true);
+      }
+      return fail('SUBSCRIPTION_EXPIRED');
+    }
+
+    return ok(true);
+  }
+
+  async extendVigencia(
+    empresaId: string,
+    extendDays: number
+  ): Promise<Result<SuscripcionSummary>> {
+    if (!Number.isFinite(extendDays) || extendDays <= 0) {
+      return fail('VALIDATION_ERROR: extendDays must be positive');
+    }
+    const row = await this.findByEmpresaId(empresaId);
+    if (!row) return fail('SUBSCRIPTION_NOT_FOUND');
+
+    const base = (row.getDataValue('venceEn') as Date | null) ?? new Date();
+    const newVence = addDays(base > new Date() ? base : new Date(), extendDays);
+    await row.update({
+      venceEn: newVence,
+      estado: 'PILOTO',
+      graceHasta: null,
+    });
+    return ok(this.toSummary(row));
+  }
+
+  async setGracePeriod(
+    empresaId: string,
+    graceDays: number
+  ): Promise<Result<SuscripcionSummary>> {
+    if (!Number.isFinite(graceDays) || graceDays <= 0) {
+      return fail('VALIDATION_ERROR: graceDays must be positive');
+    }
+    const row = await this.findByEmpresaId(empresaId);
+    if (!row) return fail('SUBSCRIPTION_NOT_FOUND');
+
+    await row.update({
+      graceHasta: addDays(new Date(), graceDays),
+      estado: 'GRACIA',
+    });
+    return ok(this.toSummary(row));
+  }
+
+  async cancel(empresaId: string, note?: string | null): Promise<Result<SuscripcionSummary>> {
+    const row = await this.findByEmpresaId(empresaId);
+    if (!row) return fail('SUBSCRIPTION_NOT_FOUND');
+    const prev = String(row.getDataValue('notas') ?? '');
+    const line = note?.trim() ? `Cancelada: ${note.trim()}` : 'Cancelada por plataforma';
+    await row.update({
+      estado: 'CANCELADA',
+      notas: prev ? `${prev}\n${line}` : line,
+    });
+    return ok(this.toSummary(row));
+  }
+
+  /** Job batch: marca VENCIDA según `vence_en` / `grace_hasta` (mismo criterio que login). */
+  async confirmSubscriptionPayment(
+    empresaId: string,
+    input: { provider: string; reference: string; extendDays?: number }
+  ): Promise<Result<SuscripcionSummary>> {
+    const provider = input.provider?.trim();
+    const reference = input.reference?.trim();
+    if (!provider || !reference) {
+      return fail('VALIDATION_ERROR: provider and reference are required');
+    }
+
+    const row = await this.findByEmpresaId(empresaId);
+    if (!row) return fail('SUBSCRIPTION_NOT_FOUND');
+
+    const estado = String(row.getDataValue('estado') ?? '') as SuscripcionEstado;
+    if (estado === 'CANCELADA') {
+      return fail('SUBSCRIPTION_CANCELLED');
+    }
+
+    const days = Number.isFinite(input.extendDays) && input.extendDays! > 0 ? input.extendDays! : 30;
+    const now = new Date();
+    const vence = addDays(now, days);
+    const prevNotes = String(row.getDataValue('notas') ?? '').trim();
+    const line = `Pago ${provider} ref ${reference} (${now.toISOString().slice(0, 10)})`;
+    const notas = prevNotes ? `${prevNotes}\n${line}` : line;
+
+    await row.update({
+      estado: 'ACTIVA',
+      venceEn: vence,
+      proximoCobroEn: vence,
+      graceHasta: null,
+      externalSubscriptionId: reference,
+      notas,
+    });
+
+    return ok(this.toSummary(row));
+  }
+
+  async refreshAllExpired(): Promise<Result<{ scanned: number; markedVencida: number }>> {
+    const now = new Date();
+    const candidates = await EmpresaSuscripcion.findAll({
+      where: {
+        venceEn: { [Op.lt]: now },
+        estado: { [Op.in]: ['ACTIVA', 'PILOTO', 'GRACIA'] as SuscripcionEstado[] },
+      },
+    });
+
+    let markedVencida = 0;
+    for (const row of candidates) {
+      const before = String(row.getDataValue('estado') ?? '');
+      const refreshed = await this.refreshVencimiento(row);
+      const after = String(refreshed.getDataValue('estado') ?? '');
+      if (before !== 'VENCIDA' && after === 'VENCIDA') {
+        markedVencida += 1;
+      }
+    }
+
+    return ok({ scanned: candidates.length, markedVencida });
+  }
+}
+
+export default new SuscripcionDelegate();

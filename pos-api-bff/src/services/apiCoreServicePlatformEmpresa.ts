@@ -15,10 +15,21 @@ export type CreateEmpresaPlatformInput = {
   adminEmail?: string;
   adminPassword?: string;
   adminFullName?: string;
+  planId?: string;
+  planCodigo?: string;
+  suscripcionOrigen?: 'PLATAFORMA' | 'CHECKOUT' | 'COMERCIAL';
 };
 
 export type UpdateEmpresaPlatformInput = UpdateEmpresaTenantInput & {
   estado?: 'ACTIVO' | 'SUSPENDIDO' | 'PENDIENTE_ONBOARDING';
+  planId?: string;
+  planCodigo?: string;
+  assistantAdminPhone?: string | null;
+  transferBankName?: string | null;
+  transferAccountType?: string | null;
+  transferAccount?: string | null;
+  transferHolderName?: string | null;
+  transferRut?: string | null;
 };
 
 export class ApiCoreServicePlatformEmpresa extends ApiCoreBaseService {
@@ -27,6 +38,13 @@ export class ApiCoreServicePlatformEmpresa extends ApiCoreBaseService {
       'Content-Type': 'application/json',
       'x-internal-key': config.internalApiKey,
     };
+  }
+
+  async getDashboard() {
+    const response = await this.client.get('/empresas/platform/dashboard', {
+      headers: this.corePlatformHeaders(),
+    });
+    return response.data;
   }
 
   async list() {
@@ -68,6 +86,72 @@ export class ApiCoreServicePlatformEmpresa extends ApiCoreBaseService {
     const response = await this.client.post(`/empresas/${id}/activate`, {}, {
       headers: this.corePlatformHeaders(),
     });
+    return response.data;
+  }
+
+  async listAssistantBindings() {
+    const response = await this.client.get('/empresas/platform/assistant-bindings', {
+      headers: this.corePlatformHeaders(),
+    });
+    return response.data;
+  }
+
+  async getCheckout(empresaId: string) {
+    const response = await this.client.get(`/empresas/platform/${empresaId}/checkout`, {
+      headers: this.corePlatformHeaders(),
+    });
+    return response.data;
+  }
+
+  async confirmCheckout(
+    empresaId: string,
+    body: { provider: string; reference: string; extendDays?: number }
+  ) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/checkout/confirm-payment`,
+      body,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async patchSuscripcion(
+    empresaId: string,
+    input: { extendDays?: number; graceDays?: number; cancel?: boolean; note?: string }
+  ) {
+    const response = await this.client.patch(
+      `/empresas/platform/${empresaId}/suscripcion`,
+      input,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async upsertAssistantBinding(
+    empresaId: string,
+    input: { externalId: string; defaultBranchId?: string | null }
+  ) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/assistant-bindings`,
+      input,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async listBranchesForEmpresa(empresaId: string) {
+    const response = await this.client.get(`/empresas/platform/${empresaId}/branches`, {
+      headers: this.corePlatformHeaders(),
+    });
+    return response.data;
+  }
+
+  async setBindingSessionBranch(bindingId: string, branchId: string | null) {
+    const response = await this.client.patch(
+      `/empresas/platform/assistant-bindings/${bindingId}/session-branch`,
+      { branchId },
+      { headers: this.corePlatformHeaders() }
+    );
     return response.data;
   }
 }

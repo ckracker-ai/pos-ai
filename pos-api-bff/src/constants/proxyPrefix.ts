@@ -8,7 +8,11 @@ export function isPublicProxyPath(path: string, prefix = POS_PROXY_PREFIX): bool
     normalized === prefix ||
     normalized === `${prefix}/health` ||
     normalized.startsWith(`${prefix}/auth`) ||
-    normalized === `${prefix}/platform/auth/login`
+    normalized === `${prefix}/platform/auth/login` ||
+    normalized === `${prefix}/public/planes` ||
+    normalized === `${prefix}/public/registro` ||
+    normalized.startsWith(`${prefix}/public/checkout`) ||
+    normalized === `${prefix}/public/webhooks/subscription-payment`
   );
 }
 

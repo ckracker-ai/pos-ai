@@ -63,6 +63,7 @@ export interface User {
   name: string;
   role: UserRole;
   branchId?: string;
+  whatsappPhone?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -145,6 +146,58 @@ export interface RoleOption {
 
 export type EmpresaEstado = 'ACTIVO' | 'SUSPENDIDO' | 'PENDIENTE_ONBOARDING';
 
+export type SuscripcionEstado = 'ACTIVA' | 'GRACIA' | 'VENCIDA' | 'CANCELADA' | 'PILOTO';
+
+export interface EmpresaSuscripcionSummary {
+  id: string;
+  estado: SuscripcionEstado;
+  origen: string;
+  periodo: string;
+  inicioEn: string;
+  proximoCobroEn: string | null;
+  venceEn: string | null;
+  graceHasta: string | null;
+  notas: string | null;
+}
+
+export type SaasPlanCodigo = 'BASICO' | 'ESTANDAR' | 'FULL';
+
+export type SaasMetodoPago = 'TRANSFERENCIA' | 'WEBPAY' | 'MERCADO_PAGO' | 'FLOW' | 'MIXTO';
+
+export interface SaasPlanFeatures {
+  modulosCore: boolean;
+  assistantWhatsapp: boolean;
+  assistantVoz: boolean;
+  pagosOnline: boolean;
+}
+
+export interface EmpresaPlanSummary {
+  id: string;
+  codigo: SaasPlanCodigo;
+  nombre: string;
+  descripcion: string | null;
+  valor: number;
+  metodoPago: SaasMetodoPago;
+  activo: boolean;
+  maxSucursales: number;
+  maxUsuarios: number;
+  features: SaasPlanFeatures;
+}
+
+export interface SaasPlan {
+  id: string;
+  codigo: SaasPlanCodigo;
+  nombre: string;
+  descripcion: string | null;
+  valor: number;
+  metodoPago: SaasMetodoPago;
+  activo: boolean;
+  maxSucursales: number;
+  maxUsuarios: number;
+  features: SaasPlanFeatures;
+  orden: number;
+}
+
 export interface Empresa {
   id: string;
   rutEmpresa: string;
@@ -156,6 +209,15 @@ export interface Empresa {
   urlLogo: string | null;
   slug: string;
   estado: EmpresaEstado;
+  planId: string;
+  plan: EmpresaPlanSummary;
+  assistantAdminPhone?: string | null;
+  transferBankName?: string | null;
+  transferAccountType?: string | null;
+  transferAccount?: string | null;
+  transferHolderName?: string | null;
+  transferRut?: string | null;
+  suscripcion?: EmpresaSuscripcionSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -168,6 +230,11 @@ export interface UpdateEmpresaInput {
   correoFacturacion?: string | null;
   urlLogo?: string | null;
   slug?: string;
+  transferBankName?: string | null;
+  transferAccountType?: string | null;
+  transferAccount?: string | null;
+  transferHolderName?: string | null;
+  transferRut?: string | null;
 }
 
 export interface KitchenOrderLine {

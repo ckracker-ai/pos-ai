@@ -50,7 +50,15 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req: Authentica
     const user = await User.findOne({ where: { id: req.params.id, empresaId } });
     if (!user) return res.status(404).json({ success: false, data: null, error: 'USER_NOT_FOUND', code: 404 });
 
-    const { fullName, email, roleId, branchId, isActive } = req.body ?? {};
+    const { fullName, email, roleId, branchId, isActive, whatsappPhone } = req.body ?? {};
+
+    let normalizedWhatsapp: string | null | undefined;
+    if (whatsappPhone !== undefined) {
+      const digits = String(whatsappPhone ?? '')
+        .replace(/\D/g, '')
+        .replace(/^0+/, '');
+      normalizedWhatsapp = digits.length >= 8 ? digits : null;
+    }
 
     await user.update({
       ...(fullName !== undefined ? { fullName } : {}),
@@ -58,6 +66,7 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req: Authentica
       ...(roleId !== undefined ? { roleId } : {}),
       ...(branchId !== undefined ? { branchId } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
+      ...(normalizedWhatsapp !== undefined ? { whatsappPhone: normalizedWhatsapp } : {}),
     });
 
     const updated = await User.findOne({ where: { id: req.params.id, empresaId } });

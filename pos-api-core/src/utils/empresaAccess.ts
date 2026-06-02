@@ -1,4 +1,5 @@
 import Empresa, { EmpresaEstado } from '../modules/tenant/models/Empresa.model';
+import suscripcionDelegate from '../modules/saas/delegates/SuscripcionDelegate';
 import { readModelString } from './modelAttributes';
 import { Result, ok, fail } from '../types/result';
 
@@ -14,6 +15,10 @@ export async function assertEmpresaAllowsLogin(empresaId: string): Promise<Resul
   if (!estado) return fail('EMPRESA_NOT_FOUND');
   if (estado === 'SUSPENDIDO') return fail('EMPRESA_SUSPENDED');
   if (estado === 'PENDIENTE_ONBOARDING') return fail('EMPRESA_PENDING_ONBOARDING');
+
+  const sub = await suscripcionDelegate.assertAllowsTenantAccess(empresaId);
+  if (!sub.success) return sub;
+
   return ok(true);
 }
 

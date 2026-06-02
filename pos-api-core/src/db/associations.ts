@@ -9,8 +9,21 @@ import Shrinkage from '../modules/shrinkage/models/Shrinkage.model';
 import Sale from '../modules/sales/models/Sale.model';
 import SaleDetail from '../modules/sales/models/SaleDetail.model';
 import Empresa from '../modules/tenant/models/Empresa.model';
+import SaasPlan from '../modules/saas/models/SaasPlan.model';
+import AssistantChannelBinding from '../modules/assistant/models/AssistantChannelBinding.model';
+import EmpresaSuscripcion from '../modules/saas/models/EmpresaSuscripcion.model';
 
 export function defineAssociations(): void {
+  SaasPlan.hasMany(Empresa, { foreignKey: 'planId', as: 'empresas' });
+  Empresa.belongsTo(SaasPlan, { foreignKey: 'planId', as: 'plan' });
+
+  Empresa.hasOne(EmpresaSuscripcion, { foreignKey: 'empresaId', as: 'suscripcion' });
+  EmpresaSuscripcion.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+  EmpresaSuscripcion.belongsTo(SaasPlan, { foreignKey: 'planId', as: 'plan' });
+
+  Empresa.hasMany(AssistantChannelBinding, { foreignKey: 'empresaId', as: 'assistantBindings' });
+  AssistantChannelBinding.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
   Empresa.hasMany(Branch, { foreignKey: 'empresaId', as: 'branches' });
   Branch.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
 

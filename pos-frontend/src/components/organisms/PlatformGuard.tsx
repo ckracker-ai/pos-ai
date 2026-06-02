@@ -25,7 +25,7 @@ export function PlatformGuard({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+      <div className="app-surface-page flex min-h-screen items-center justify-center text-brand-ink-muted">
         Cargando...
       </div>
     );

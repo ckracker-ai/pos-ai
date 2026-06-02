@@ -11,6 +11,7 @@ const registerSchema = z.object({
   password: z.string().min(1),
   roleId: z.string().min(1),
   branchId: z.string().min(1),
+  whatsappPhone: z.string().max(32).optional().nullable(),
 });
 
 const loginSchema = z.object({
@@ -22,6 +23,7 @@ const userUpsertSchema = z.object({
   fullName: z.string().min(1),
   email: z.string().email(),
   roleId: z.string().min(1),
+  whatsappPhone: z.string().max(32).optional().nullable(),
 });
 
 const resetPasswordSchema = z.object({
@@ -54,13 +56,14 @@ const authRoutes = async (app: FastifyInstance) => {
     const body = registerSchema.parse(request.body);
 
     try {
-      const data = await authCore.register(
-        body.fullName,
-        body.email,
-        body.password,
-        body.roleId,
-        body.branchId
-      );
+      const data = await authCore.register({
+        fullName: body.fullName,
+        email: body.email,
+        password: body.password,
+        roleId: body.roleId,
+        branchId: body.branchId,
+        whatsappPhone: body.whatsappPhone,
+      });
       return sendOk(reply, data, 201);
 
     } catch (e: any) {

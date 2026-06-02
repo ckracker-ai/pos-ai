@@ -21,7 +21,7 @@ function NavIcon({ children }: { children: string }) {
 
 function navButtonClass(isActive: boolean) {
   return `flex w-full min-h-[2.75rem] items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition ${
-    isActive ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-900/80'
+    isActive ? 'app-sidebar-nav-active' : 'app-sidebar-nav-idle'
   }`;
 }
 
@@ -47,9 +47,9 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
 
   if (!user) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-slate-950 p-4 sm:p-5">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
-          <p className="text-xs uppercase tracking-widest text-slate-500">Sesión</p>
+      <div className="app-sidebar flex h-full min-h-0 flex-col p-4 sm:p-5">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-xs uppercase tracking-widest text-brand-linen/70">Sesión</p>
           <p className="mt-3 text-sm font-semibold text-white">Cargando...</p>
         </div>
       </div>
@@ -57,21 +57,21 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-950 text-slate-100">
-      <div className="flex-shrink-0 border-b border-slate-800/80 p-4 sm:p-5">
-        <p className="text-xs uppercase tracking-widest text-slate-500">Sesión</p>
+    <div className="app-sidebar flex h-full min-h-0 flex-col">
+      <div className="flex-shrink-0 border-b border-white/10 p-4 sm:p-5">
+        <p className="text-xs uppercase tracking-widest text-brand-linen/80">Sesión</p>
         <p className="mt-2 truncate text-sm font-semibold text-white">{user.name}</p>
-        <p className="text-xs text-slate-400">{getRoleLabel(currentRole)}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{user.email}</p>
+        <p className="text-xs text-brand-linen/90">{getRoleLabel(currentRole)}</p>
+        <p className="mt-1 truncate text-xs text-white/55">{user.email}</p>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-6">
+      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
         {navSections.map((group) => (
           <div key={group.id}>
-            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-linen/60">
               {group.label}
             </p>
-            <div className="space-y-1 rounded-2xl border border-slate-800/80 bg-slate-900/50 p-1.5">
+            <div className="space-y-1 rounded-2xl border border-white/10 bg-black/10 p-1.5">
               {group.catalogItems.length > 0 && (
                 <div>
                   <button
@@ -85,14 +85,14 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
                       <span className="font-medium">Catálogo</span>
                     </span>
                     <span
-                      className={`text-slate-400 transition-transform ${catalogOpen ? 'rotate-180' : ''}`}
+                      className={`text-brand-linen/70 transition-transform ${catalogOpen ? 'rotate-180' : ''}`}
                       aria-hidden
                     >
                       ▾
                     </span>
                   </button>
                   {catalogOpen && (
-                    <div className="ml-3 mt-1 space-y-0.5 border-l border-slate-700/80 pl-2">
+                    <div className="ml-3 mt-1 space-y-0.5 border-l border-white/15 pl-2">
                       {group.catalogItems.map((item) => (
                         <button
                           key={item.key}
@@ -125,9 +125,9 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
         ))}
       </nav>
 
-      <div className="flex-shrink-0 border-t border-slate-800/80 p-4 sm:p-5">
-        <p className="text-[10px] uppercase tracking-widest text-slate-600">SVM ERP</p>
-        <p className="mt-1 text-xs text-slate-500">{APP_VERSION_LABEL}</p>
+      <div className="flex-shrink-0 border-t border-white/10 p-4 sm:p-5">
+        <p className="text-[10px] uppercase tracking-widest text-brand-linen/50">POS-AI</p>
+        <p className="mt-1 text-xs text-white/50">{APP_VERSION_LABEL}</p>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import sequelize from './config/database';
 import { defineAssociations } from './db/associations';
 import { seedRoles } from './db/seedRoles';
 import { seedBootstrapAdmin } from './db/seedBootstrapAdmin';
+import { seedBootstrapDemoUsers } from './db/seedBootstrapDemoUsers';
 import { globalErrorHandler, sendOk } from './middleware/globalErrorHandler';
 
 import authRoutes from './modules/auth/routes/auth.routes';
@@ -18,6 +19,10 @@ import shrinkageRoutes from './modules/shrinkage/routes/shrinkage.routes';
 import branchRoutes from './modules/branch/routes/branch.routes';
 import reportsRoutes from './modules/reports/routes/reports.routes';
 import empresaRoutes from './modules/tenant/routes/empresa.routes';
+import assistantRoutes from './modules/assistant/routes/assistant.routes';
+import paymentProofRoutes from './modules/assistant/routes/paymentProof.routes';
+import platformAuthRoutes from './modules/platform/routes/platformAuth.routes';
+import { seedBootstrapPlatformAdmin } from './db/seedBootstrapPlatformAdmin';
 import { APP_NAME, APP_VERSION } from './version';
 
 
@@ -48,6 +53,8 @@ async function bootstrap(): Promise<void> {
     }
 
     await seedBootstrapAdmin();
+    await seedBootstrapDemoUsers();
+    await seedBootstrapPlatformAdmin();
   } catch (err) {
     console.error('❌  Unable to connect to the database:', err);
     process.exit(1);
@@ -67,6 +74,7 @@ async function bootstrap(): Promise<void> {
 
   // Public routes (no internal key guard)
   app.use('/auth', authRoutes);
+  app.use('/platform', platformAuthRoutes);
 
   // Protected routes (require internal key)
   app.use(internalKeyGuard);
@@ -78,7 +86,8 @@ async function bootstrap(): Promise<void> {
   app.use('/shrinkage', shrinkageRoutes);
   app.use('/reports', reportsRoutes);
   app.use('/empresas', empresaRoutes);
-
+  app.use('/assistant', assistantRoutes);
+  app.use('/payment-proofs', paymentProofRoutes);
 
   app.use(globalErrorHandler);
 

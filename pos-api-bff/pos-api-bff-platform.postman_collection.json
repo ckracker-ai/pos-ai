@@ -1,0 +1,263 @@
+{
+  "info": {
+    "name": "POS-AI BFF — Plataforma v1.5",
+    "description": "Super-admin vía BFF (`/pos/proxy/platform/*`). Login guarda `platformToken`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "bffBaseUrl", "value": "http://localhost:2020/pos/proxy" },
+    { "key": "platformEmail", "value": "platform@pos-ai.local" },
+    { "key": "platformPassword", "value": "PlatformAdmin2026!" },
+    { "key": "platformToken", "value": "" },
+    { "key": "empresaId", "value": "11111111-1111-4111-8111-111111111111" },
+    { "key": "planId", "value": "a0000000-0000-4000-8000-000000000002" },
+    { "key": "keyInternal", "value": "supersecretkey" },
+    { "key": "coreBaseUrl", "value": "http://localhost:1010" }
+  ],
+  "item": [
+    {
+      "name": "Public (marketing)",
+      "item": [
+        {
+          "name": "GET /public/planes",
+          "request": {
+            "method": "GET",
+            "url": "{{bffBaseUrl}}/public/planes"
+          }
+        },
+        {
+          "name": "POST /public/registro",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rut\": \"77.777.777-7\",\n  \"razonSocial\": \"Piloto QA SpA\",\n  \"nombreFantasia\": \"Piloto QA\",\n  \"adminEmail\": \"piloto.qa@example.com\",\n  \"adminPassword\": \"Str0ngPass!123\",\n  \"adminFullName\": \"Admin Piloto\",\n  \"planCodigo\": \"BASICO\",\n  \"branchName\": \"Sucursal Piloto\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/registro"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{bffBaseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /platform/auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('token', () => !!data.token);",
+                  "if (data.token) pm.collectionVariables.set('platformToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{platformEmail}}\",\n  \"password\": \"{{platformPassword}}\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/platform/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "GET /platform/dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{platformToken}}" }],
+            "url": "{{bffBaseUrl}}/platform/dashboard"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Empresas",
+      "item": [
+        {
+          "name": "GET /platform/empresas",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{platformToken}}" }],
+            "url": "{{bffBaseUrl}}/platform/empresas"
+          }
+        },
+        {
+          "name": "GET /platform/empresas/:id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{platformToken}}" }],
+            "url": "{{bffBaseUrl}}/platform/empresas/{{empresaId}}"
+          }
+        },
+        {
+          "name": "PATCH /platform/empresas/:id (plan ESTANDAR)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planCodigo\": \"ESTANDAR\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/platform/empresas/{{empresaId}}"
+          }
+        },
+        {
+          "name": "PATCH /platform/empresas/:id/suscripcion (extend 30d)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extendDays\": 30\n}"
+            },
+            "url": "{{bffBaseUrl}}/platform/empresas/{{empresaId}}/suscripcion"
+          }
+        },
+        {
+          "name": "PATCH /platform/empresas/:id/suscripcion (grace 7d)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"graceDays\": 7\n}"
+            },
+            "url": "{{bffBaseUrl}}/platform/empresas/{{empresaId}}/suscripcion"
+          }
+        },
+        {
+          "name": "GET /platform/empresas/assistant-bindings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{platformToken}}" }],
+            "url": "{{bffBaseUrl}}/platform/empresas/assistant-bindings"
+          }
+        },
+        {
+          "name": "POST /platform/empresas/:id/assistant-bindings",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"externalId\": \"56900000001\",\n  \"defaultBranchId\": \"48d4ee18-5349-11f1-a915-00ff541b88ad\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/platform/empresas/{{empresaId}}/assistant-bindings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Planes",
+      "item": [
+        {
+          "name": "GET /platform/planes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{platformToken}}" }],
+            "url": "{{bffBaseUrl}}/platform/planes"
+          }
+        },
+        {
+          "name": "GET /platform/planes/catalog",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{platformToken}}" }],
+            "url": "{{bffBaseUrl}}/platform/planes/catalog"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assistant (simulador)",
+      "item": [
+        {
+          "name": "POST /platform/assistant/simulate (texto)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"56900000001\",\n  \"text\": \"hola\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/platform/assistant/simulate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs (core directo)",
+      "item": [
+        {
+          "name": "POST /empresas/platform/jobs/refresh-subscriptions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('job ok', () => pm.response.json().data.job === 'refresh-subscriptions');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-internal-key", "value": "{{keyInternal}}" }],
+            "url": "{{coreBaseUrl}}/empresas/platform/jobs/refresh-subscriptions"
+          }
+        }
+      ]
+    }
+  ]
+}

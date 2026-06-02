@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requirePlatformAuth } from '../../middlewares/requirePlatformAuth.js';
 import { extractCoreError } from '../../utils/extractCoreError.js';
 import { sendFail, sendOk } from '../../utils/response.js';
+import { registerPlatformAssistantEmpresaRoutes } from './assistantHandlers.js';
 
 const createEmpresaSchema = z.object({
   rut: z.string().min(1),
@@ -17,6 +18,14 @@ const createEmpresaSchema = z.object({
   adminEmail: z.string().email().optional(),
   adminPassword: z.string().min(8).optional(),
   adminFullName: z.string().optional(),
+  planId: z.string().uuid().optional(),
+  planCodigo: z.enum(['BASICO', 'ESTANDAR', 'FULL']).optional(),
+});
+
+const assistantBindingSchema = z.object({
+  externalId: z.string().min(8),
+  defaultBranchId: z.string().uuid().nullable().optional(),
+  adminNotifyPhone: z.string().min(8).nullable().optional(),
 });
 
 const updatePlatformSchema = z.object({
@@ -28,6 +37,18 @@ const updatePlatformSchema = z.object({
   urlLogo: z.string().nullable().optional(),
   slug: z.string().min(1).optional(),
   estado: z.enum(['ACTIVO', 'SUSPENDIDO', 'PENDIENTE_ONBOARDING']).optional(),
+  planId: z.string().uuid().optional(),
+  planCodigo: z.enum(['BASICO', 'ESTANDAR', 'FULL']).optional(),
+  assistantAdminPhone: z
+    .union([z.string().min(8), z.literal('')])
+    .nullable()
+    .optional()
+    .transform((v) => (v === '' ? null : v)),
+  transferBankName: z.string().nullable().optional(),
+  transferAccountType: z.string().nullable().optional(),
+  transferAccount: z.string().nullable().optional(),
+  transferHolderName: z.string().nullable().optional(),
+  transferRut: z.string().nullable().optional(),
 });
 
 const platformEmpresaRoutes = async (app: FastifyInstance) => {
@@ -36,6 +57,48 @@ const platformEmpresaRoutes = async (app: FastifyInstance) => {
   ).ApiCoreServicePlatformEmpresa();
 
   app.addHook('preHandler', requirePlatformAuth);
+
+  registerPlatformAssistantEmpresaRoutes(app);
+
+  app.patch('/:empresaId/suscripcion', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = z
+      .object({
+        extendDays: z.number().int().positive().optional(),
+        graceDays: z.number().int().positive().optional(),
+        cancel: z.boolean().optional(),
+        note: z.string().max(500).optional(),
+      })
+      .parse(request.body ?? {});
+
+    try {
+      const data = await core.patchSuscripcion(empresaId, body);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to update subscription'),
+        err.response?.status ?? 500
+      );
+    }
+  });
+
+  app.post('/:empresaId/assistant-bindings', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = assistantBindingSchema.parse(request.body);
+    try {
+      const data = await core.upsertAssistantBinding(empresaId, body);
+      return sendOk(reply, data, 201);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to save assistant binding'),
+        err.response?.status ?? 400
+      );
+    }
+  });
 
   app.get('/', async (_request, reply) => {
     try {

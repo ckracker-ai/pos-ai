@@ -13,6 +13,11 @@ const updateEmpresaSchema = z.object({
   correoFacturacion: z.string().nullable().optional(),
   urlLogo: z.string().nullable().optional(),
   slug: z.string().min(1).optional(),
+  transferBankName: z.string().nullable().optional(),
+  transferAccountType: z.string().nullable().optional(),
+  transferAccount: z.string().nullable().optional(),
+  transferHolderName: z.string().nullable().optional(),
+  transferRut: z.string().nullable().optional(),
 });
 
 const empresaRoutes = async (app: FastifyInstance) => {

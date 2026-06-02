@@ -74,6 +74,17 @@ Invoke-Smoke "Frontend responde (HTTP 200)" {
   if ($r.StatusCode -ne 200) { throw "status $($r.StatusCode)" }
 }
 
+Invoke-Smoke "Landing HTML (POS-AI)" {
+  $r = Invoke-WebRequest -Uri $FrontendUrl -UseBasicParsing
+  if ($r.Content -notmatch 'Punto de venta Inteligente') { throw 'landing tagline missing' }
+}
+
+Invoke-Smoke "GET /public/planes (BFF)" {
+  $r = Invoke-RestMethod -Uri "$ApiRoot/public/planes" -Method Get
+  if (-not $r.success) { throw $r.error }
+  if (-not $r.data.planes -or $r.data.planes.Count -lt 1) { throw 'planes empty' }
+}
+
 $admin = $null
 Invoke-Smoke "Login ADMIN" {
   $script:admin = Get-AuthSession -Email $AdminEmail -Password $AdminPassword

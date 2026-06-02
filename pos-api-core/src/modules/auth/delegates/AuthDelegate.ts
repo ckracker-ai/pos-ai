@@ -9,6 +9,8 @@ import { branchBelongsToEmpresa } from '../../../utils/tenantScope';
 import { readModelString } from '../../../utils/modelAttributes';
 import { assertEmpresaAllowsLogin } from '../../../utils/empresaAccess';
 import { Result, ok, fail } from '../../../types/result';
+import { assertCanAddActiveUser } from '../../saas/utils/planLimits';
+import { normalizePhoneE164 } from '../../assistant/delegates/AssistantDelegate';
 
 export interface RegisterInput {
   fullName: string;
@@ -17,6 +19,7 @@ export interface RegisterInput {
   roleId: string;
   branchId: string;
   empresaId?: string;
+  whatsappPhone?: string | null;
 }
 
 export interface LoginInput {
@@ -33,6 +36,7 @@ export interface UserPayload {
   empresaId: string;
   branchId: string;
   isActive: boolean;
+  whatsappPhone: string | null;
 }
 
 interface AuthTokenPayload {
@@ -80,6 +84,10 @@ class AuthDelegate {
       return fail('ROLE_NOT_FOUND: the provided roleId does not exist');
     }
 
+    const whatsappPhone = input.whatsappPhone
+      ? normalizePhoneE164(String(input.whatsappPhone))
+      : null;
+
     const existing = await UserService.findByEmailInEmpresa(normalizedEmail, empresaId);
     if (existing) {
       const existingPlain = typeof existing.toJSON === 'function' ? existing.toJSON() : existing;
@@ -89,6 +97,9 @@ class AuthDelegate {
         existingPlain.isActive === 1;
 
       if (!existingIsActive) {
+        const limit = await assertCanAddActiveUser(empresaId);
+        if (!limit.success) return limit;
+
         const passwordHash = await argon2.hash(input.password, ARGON2_OPTIONS);
         await existing.update({
           fullName: input.fullName,
@@ -98,12 +109,16 @@ class AuthDelegate {
           branchId: input.branchId,
           empresaId,
           isActive: true,
+          whatsappPhone,
         });
         return ok(this.toPayload(existing, role.name));
       }
 
       return fail('EMAIL_TAKEN: this email address is already registered');
     }
+
+    const limit = await assertCanAddActiveUser(empresaId);
+    if (!limit.success) return limit;
 
     const passwordHash = await argon2.hash(input.password, ARGON2_OPTIONS);
 
@@ -116,6 +131,7 @@ class AuthDelegate {
       branchId: input.branchId,
       empresaId,
       isActive: true,
+      whatsappPhone,
     });
 
     return ok(this.toPayload(user, role.name));
@@ -259,6 +275,11 @@ class AuthDelegate {
 
     if (!user) return fail('USER_NOT_FOUND');
 
+    if (!user.isActive) {
+      const limit = await assertCanAddActiveUser(String(readModelString(user, 'empresaId') ?? ''));
+      if (!limit.success) return limit;
+    }
+
     await user.update({ isActive: true });
     const roleName = String(
       (user as { role?: { name?: string } }).role?.name ?? 'UNKNOWN'
@@ -281,6 +302,10 @@ class AuthDelegate {
       empresaId: String(readModelString(user, 'empresaId') ?? plain.empresaId ?? ''),
       branchId: String(plain.branchId ?? ''),
       isActive: plain.isActive !== false,
+      whatsappPhone: (() => {
+        const raw = String(plain.whatsappPhone ?? plain.whatsapp_phone ?? '').replace(/\D/g, '');
+        return raw.length >= 8 ? raw : null;
+      })(),
     };
   }
 }

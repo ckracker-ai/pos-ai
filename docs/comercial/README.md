@@ -1,21 +1,38 @@
-# Propuesta comercial SVM ERP
+# Propuesta comercial POS-AI
+
+## Comenzar (PDF)
+
+| Archivo | Descripción |
+|---------|-------------|
+| **`../COMENZAR-POS-AI.md`** | Guía maestra: planes, módulos, WSP, comprobantes, pagos web |
+| **`COMENZAR-POS-AI.html`** | Misma guía — **Imprimir → Guardar como PDF** |
+
+## Plan SaaS (borrador)
+
+Ver **`PLAN-SAAS-POS-AI.md`**: Básico (10 módulos ERP), Estándar (+ asistente IA WhatsApp), Full (+ voz/teléfono + pagos online).
 
 ## Archivos
 
 | Archivo | Descripción |
 |---------|-------------|
-| `propuesta-svm-erp.pdf` | **Documento para presentar al cliente** (5 páginas) |
-| `propuesta-svm-erp.html` | Fuente editable (diseño, textos, precios) |
+| `PLAN-SAAS-POS-AI.md` | Matriz de planes y roadmap comercial ↔ producto |
+| `PLANES-BD.md` | Planes en base de datos |
+| `../assistant/SYSTEM-PROMPT.md` | Prompt del agente ventas (voz + WSP) |
+| `propuesta-svm-erp.pdf` | Legacy SVM |
+| `propuesta-svm-erp.html` | Legacy SVM (HTML) |
 
-## Regenerar el PDF
+## Regenerar PDF comercial
+
+**Recomendado (POS-AI):**
+
+```powershell
+start docs\comercial\COMENZAR-POS-AI.html
+# Chrome/Edge → Ctrl+P → Guardar como PDF
+```
+
+Legacy SVM:
 
 ```powershell
 cd d:\Proyectos\svm\node\docs\comercial
 npm run pdf
 ```
-
-Alternativa sin Node: abrir `propuesta-svm-erp.html` en Chrome/Edge → **Imprimir** → **Guardar como PDF**.
-
-## Personalizar
-
-Edite en el HTML: nombre de contacto, logo, promoción piloto y montos. Luego ejecute `npm run pdf`.

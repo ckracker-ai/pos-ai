@@ -10,18 +10,17 @@ export class ApiCoreServiceAuth extends ApiCoreBaseService {
     return response.data;
   }
 
-  async register(
-    fullName: string,
-    email: string,
-    password: string,
-    roleId: string,
-    branchId: string
-  ) {
-    const response = await this.client.post(
-      '/auth/register',
-      { fullName, email, password, roleId, branchId },
-      { headers: this.publicHeaders() }
-    );
+  async register(input: {
+    fullName: string;
+    email: string;
+    password: string;
+    roleId: string;
+    branchId: string;
+    whatsappPhone?: string | null;
+  }) {
+    const response = await this.client.post('/auth/register', input, {
+      headers: this.publicHeaders(),
+    });
     return response.data;
   }
 
@@ -34,7 +33,7 @@ export class ApiCoreServiceAuth extends ApiCoreBaseService {
 
   async updateUser(
     userId: string,
-    input: { fullName: string; email: string; roleId: string },
+    input: { fullName: string; email: string; roleId: string; whatsappPhone?: string | null },
     token: string,
     internalKey: string,
     branchId: string

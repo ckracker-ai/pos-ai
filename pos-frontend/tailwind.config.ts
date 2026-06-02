@@ -8,7 +8,18 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        serif: ['Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
+      },
       colors: {
+        brand: {
+          olive: '#4A533C',
+          linen: '#D1C7BD',
+          surface: '#F4F4F3',
+          muted: '#D8D8D3',
+          ink: '#3D4532',
+          'ink-muted': '#6B7362',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

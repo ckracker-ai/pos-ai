@@ -5,8 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { canAccessPath } from '@/core/config/role-access';
 
-const PUBLIC_ROUTES = ['/login'];
-
+/** Solo envuelve rutas en `app/(app)/*` — marketing y platform tienen layout propio. */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -21,10 +20,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isHydrated) return;
 
-    if (pathname.startsWith('/platform')) return;
-
-    if (PUBLIC_ROUTES.includes(pathname)) return;
-
     if (!isAuthenticated) {
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('auth-redirecting', '1');
@@ -33,17 +28,17 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (!canAccessPath(user?.role, pathname)) {
+    if (pathname && !canAccessPath(user?.role, pathname)) {
       router.push('/dashboard');
     }
   }, [isHydrated, isAuthenticated, pathname, router, user?.role]);
 
   if (!isHydrated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950">
+      <div className="flex min-h-screen items-center justify-center bg-brand-surface">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Cargando...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-brand-olive" />
+          <p className="text-brand-ink-muted">Cargando...</p>
         </div>
       </div>
     );

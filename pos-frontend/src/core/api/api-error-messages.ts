@@ -36,6 +36,9 @@ export type ApiErrorContext =
   | 'sales.create'
   | 'comandas.list'
   | 'comandas.update'
+  | 'comprobantes.list'
+  | 'comprobantes.confirm'
+  | 'comprobantes.reject'
   | 'reports.load'
   | 'generic';
 
@@ -81,6 +84,9 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'sales.create': 'No se pudo registrar la venta',
   'comandas.list': 'No se pudieron cargar las comandas',
   'comandas.update': 'No se pudo actualizar la comanda',
+  'comprobantes.list': 'No se pudieron cargar los comprobantes',
+  'comprobantes.confirm': 'No se pudo confirmar el pago',
+  'comprobantes.reject': 'No se pudo rechazar el comprobante',
   'reports.load': 'No se pudieron cargar los reportes',
   generic: 'No se pudo completar la operación',
 };
@@ -106,8 +112,12 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   EMPRESA_ACCESS_DENIED: 'No puedes acceder a los datos de otra empresa.',
   EMPRESA_SUSPENDED: 'La empresa está suspendida. Contacta al soporte de la plataforma.',
   EMPRESA_PENDING_ONBOARDING: 'La empresa aún no completó el onboarding.',
+  SUBSCRIPTION_EXPIRED:
+    'La suscripción de tu empresa venció. Contacta al soporte de la plataforma para renovar.',
+  SUBSCRIPTION_CANCELLED: 'La suscripción fue cancelada. Contacta al soporte de la plataforma.',
   SLUG_ALREADY_TAKEN: 'Ese identificador (slug) ya está en uso. Elige otro.',
   RUT_ALREADY_REGISTERED: 'Ese RUT ya está registrado en la plataforma.',
+  SUBSCRIPTION_ALREADY_ACTIVE: 'La suscripción ya está activa.',
   PRODUCT_NOT_FOUND: 'No encontramos el producto.',
   PRODUCT_CREATE_FAILED: 'No se pudo crear el producto. Revisa SKU, categoría y proveedor.',
   SUPPLIER_NOT_FOUND: 'No encontramos el proveedor.',
@@ -126,6 +136,8 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   ERROR_DELETING_PRODUCT: 'No se pudo eliminar el producto.',
   ERROR_FETCHING_SALES: 'No se pudieron cargar las ventas.',
   INSUFFICIENT_STOCK: 'No hay stock suficiente para completar la operación.',
+  PLAN_LIMIT_BRANCHES: 'Límite de sucursales del plan alcanzado. Mejora el plan en plataforma.',
+  PLAN_LIMIT_USERS: 'Límite de usuarios del plan alcanzado. Mejora el plan en plataforma.',
   SHRINKAGE_NOT_FOUND: 'No encontramos esa merma en la sucursal activa.',
   SHRINKAGE_NOT_PENDING: 'Esta merma ya fue aprobada o rechazada.',
   SHRINKAGE_BRANCH_MISMATCH:

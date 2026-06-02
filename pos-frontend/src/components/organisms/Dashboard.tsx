@@ -48,22 +48,18 @@ export function Dashboard() {
       <div className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-olive">
               {profile.label}
             </p>
-            <h2 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {profile.panelTitle}
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-              {profile.panelDescription}
-            </p>
+            <h2 className="mt-2 font-serif text-3xl font-semibold text-brand-ink">{profile.panelTitle}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-brand-ink-muted">{profile.panelDescription}</p>
           </div>
 
           {profile.canApproveShrinkages && (
             <button
               type="button"
               onClick={() => router.push('/mermas')}
-              className="relative rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+              className="relative rounded-xl border border-brand-linen bg-white px-3 py-2 text-sm text-brand-ink transition hover:border-brand-olive/30 hover:bg-brand-surface"
               aria-label="Mermas pendientes por autorizar"
               title="Mermas pendientes por autorizar"
             >
@@ -78,12 +74,12 @@ export function Dashboard() {
           )}
         </div>
 
-        <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-          Hola, <span className="font-semibold text-gray-900 dark:text-white">{user?.name || 'Usuario'}</span>
+        <p className="mt-4 text-sm text-brand-ink-muted">
+          Hola, <span className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</span>
           {' · '}
           Sucursal: <span className="font-semibold">{activeBranchName}</span>
           {canSwitchBranch && (
-            <span className="text-gray-500 dark:text-gray-500">
+            <span className="text-brand-ink-muted/80">
               {' '}
               (cambia la sucursal en el encabezado para ver otra)
             </span>
@@ -92,8 +88,8 @@ export function Dashboard() {
       </div>
 
       {dashboardModules.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900/50 p-8 text-center">
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className="rounded-xl border border-dashed border-brand-linen bg-white/80 p-8 text-center">
+          <p className="text-brand-ink-muted">
             No hay accesos rápidos en el panel para tu rol. Usa el menú lateral o contacta al administrador.
           </p>
         </div>
@@ -104,32 +100,32 @@ export function Dashboard() {
               key={module.key}
               type="button"
               onClick={() => router.push(module.path)}
-              className="text-left bg-white dark:bg-slate-900 rounded-lg shadow p-6 hover:shadow-lg transition border border-gray-200 dark:border-slate-800"
+              className="app-card rounded-2xl p-6 text-left transition"
             >
-              <div className="text-4xl mb-3">{module.icon}</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{module.title}</h3>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">{module.description}</p>
+              <div className="mb-3 text-4xl">{module.icon}</div>
+              <h3 className="mb-2 text-lg font-semibold text-brand-ink">{module.title}</h3>
+              <p className="text-sm text-brand-ink-muted">{module.description}</p>
             </button>
           ))}
         </div>
       )}
 
-      <div className="mt-10 rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+      <div className="app-card mt-10 rounded-2xl p-6">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-brand-ink-muted">
           Tu menú ({navModules.length} módulos)
         </h3>
         <ul className="mt-3 flex flex-wrap gap-2">
           {navModules.map((module) => (
             <li
               key={module.key}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-slate-800 px-3 py-1 text-xs text-gray-700 dark:text-slate-200"
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand-linen/60 bg-brand-surface px-3 py-1 text-xs text-brand-ink"
             >
               <span aria-hidden>{module.icon}</span>
               {module.title}
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-xs text-gray-500 dark:text-slate-500">
+        <p className="mt-4 text-xs text-brand-ink-muted">
           Los permisos se definen por rol en configuración central. Si agregas un rol nuevo en el sistema,
           asígnalo en los módulos correspondientes.
         </p>

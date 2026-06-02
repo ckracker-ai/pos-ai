@@ -2,6 +2,10 @@
 
 DROP TABLE IF EXISTS `schema_migrations`;
 
+DROP TABLE IF EXISTS `empresa_suscripciones`;
+DROP TABLE IF EXISTS `assistant_payment_proofs`;
+DROP TABLE IF EXISTS `assistant_channel_bindings`;
+DROP TABLE IF EXISTS `platform_users`;
 DROP TABLE IF EXISTS `audit_logs`;
 DROP TABLE IF EXISTS `sale_details`;
 DROP TABLE IF EXISTS `sales`;
@@ -14,11 +18,30 @@ DROP TABLE IF EXISTS `suppliers`;
 DROP TABLE IF EXISTS `branches`;
 DROP TABLE IF EXISTS `roles`;
 DROP TABLE IF EXISTS `empresas`;
+DROP TABLE IF EXISTS `saas_planes`;
 
 CREATE TABLE `schema_migrations` (
   `version` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `applied_at` datetime NOT NULL,
   PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `saas_planes` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `codigo` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nombre` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descripcion` text COLLATE utf8mb4_unicode_ci,
+  `valor` int NOT NULL DEFAULT 0 COMMENT 'Precio mensual referencia CLP (sin IVA)',
+  `metodo_pago` enum('TRANSFERENCIA','WEBPAY','MERCADO_PAGO','FLOW','MIXTO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'TRANSFERENCIA',
+  `max_sucursales` int NOT NULL DEFAULT 1,
+  `max_usuarios` int NOT NULL DEFAULT 5,
+  `features` json NOT NULL,
+  `orden` int NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_saas_planes_codigo` (`codigo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `empresas` (
@@ -34,12 +57,59 @@ CREATE TABLE `empresas` (
   `url_logo` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `slug` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `estado` enum('ACTIVO','SUSPENDIDO','PENDIENTE_ONBOARDING') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDIENTE_ONBOARDING',
+  `plan_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `assistant_admin_phone` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+    COMMENT 'WSP admin validación comprobantes E.164 sin +',
+  `transfer_bank_name` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_account_type` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+    COMMENT 'Cuenta vista, corriente, RUT, etc.',
+  `transfer_account` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_holder_name` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+    COMMENT 'Titular cuenta destino',
+  `transfer_rut` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_empresas_rut` (`rut_numero`,`rut_dv`),
   UNIQUE KEY `uq_empresas_slug` (`slug`),
-  KEY `idx_empresas_estado` (`estado`)
+  KEY `idx_empresas_estado` (`estado`),
+  KEY `idx_empresas_plan` (`plan_id`),
+  CONSTRAINT `fk_empresas_plan` FOREIGN KEY (`plan_id`) REFERENCES `saas_planes` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `platform_users` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `full_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_platform_users_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `empresa_suscripciones` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `plan_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `estado` enum('ACTIVA','GRACIA','VENCIDA','CANCELADA','PILOTO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PILOTO',
+  `origen` enum('PLATAFORMA','CHECKOUT','COMERCIAL') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PLATAFORMA',
+  `periodo` enum('MENSUAL','ANUAL') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'MENSUAL',
+  `inicio_en` datetime NOT NULL,
+  `proximo_cobro_en` datetime DEFAULT NULL,
+  `vence_en` datetime DEFAULT NULL,
+  `grace_hasta` datetime DEFAULT NULL,
+  `notas` text COLLATE utf8mb4_unicode_ci,
+  `external_customer_id` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `external_subscription_id` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_empresa_suscripcion_empresa` (`empresa_id`),
+  KEY `idx_suscripcion_estado_vence` (`estado`,`vence_en`),
+  CONSTRAINT `fk_suscripcion_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_suscripcion_plan` FOREIGN KEY (`plan_id`) REFERENCES `saas_planes` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `roles` (
@@ -127,6 +197,8 @@ CREATE TABLE `users` (
   `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `password` varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `whatsapp_phone` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+    COMMENT 'WSP vendedor sucursal — alertas comprobante',
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
@@ -230,6 +302,46 @@ CREATE TABLE `audit_logs` (
   PRIMARY KEY (`id`),
   KEY `idx_audit_logs_empresa_created` (`empresa_id`,`created_at`),
   CONSTRAINT `fk_audit_logs_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `assistant_channel_bindings` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `channel` enum('WHATSAPP','VOZ') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'WHATSAPP',
+  `external_id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Teléfono E.164 sin +',
+  `default_branch_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `session_branch_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_assistant_channel` (`channel`,`external_id`),
+  KEY `idx_assistant_empresa` (`empresa_id`),
+  CONSTRAINT `fk_assistant_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_assistant_default_branch` FOREIGN KEY (`default_branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_assistant_session_branch` FOREIGN KEY (`session_branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `assistant_payment_proofs` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sale_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `client_phone` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expected_total` decimal(10,2) NOT NULL,
+  `detected_amount` decimal(10,2) DEFAULT NULL,
+  `ai_match` tinyint(1) NOT NULL DEFAULT 0,
+  `vision_summary` text COLLATE utf8mb4_unicode_ci,
+  `proof_image_mime` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `proof_image_data` mediumtext COLLATE utf8mb4_unicode_ci DEFAULT NULL
+    COMMENT 'Base64 sin prefijo data-URL',
+  `status` enum('RECEIVED','NOTIFIED_ADMIN','ADMIN_CONFIRMED','REJECTED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'RECEIVED',
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_proof_empresa_sale` (`empresa_id`,`sale_id`),
+  KEY `idx_proof_client` (`empresa_id`,`client_phone`),
+  CONSTRAINT `fk_proof_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_proof_sale` FOREIGN KEY (`sale_id`) REFERENCES `sales` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DELIMITER ;;

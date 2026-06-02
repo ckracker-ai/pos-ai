@@ -9,7 +9,7 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import apiRoutes from './routes/index.js';
 
 const createApp = () => {
-  const app = fastify({ logger: true });
+  const app = fastify({ logger: true, bodyLimit: 6 * 1024 * 1024 });
 
   app.register(cors, {
     origin: true,

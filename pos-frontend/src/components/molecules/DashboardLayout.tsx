@@ -38,7 +38,7 @@ export function DashboardLayout({
   return (
     <div className="flex h-screen bg-background">
       {sidebar && (
-        <aside className="hidden md:flex md:w-72 md:flex-shrink-0 border-r border-slate-800 bg-slate-950 overflow-hidden">
+        <aside className="app-sidebar hidden md:flex md:w-72 md:flex-shrink-0 overflow-hidden border-r border-brand-linen/30">
           <div className="h-full w-full min-h-0">{sidebar}</div>
         </aside>
       )}
@@ -56,17 +56,17 @@ export function DashboardLayout({
             onClick={closeSidebar}
           />
           <div
-            className={`absolute left-0 top-0 bottom-0 flex w-[min(100%,20rem)] flex-col bg-slate-950 shadow-xl transform transition-transform duration-300 ${
+            className={`app-sidebar absolute left-0 top-0 bottom-0 flex w-[min(100%,20rem)] flex-col shadow-xl transform transition-transform duration-300 ${
               isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
-            <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-800 px-4 py-3">
-              <div className="text-base font-semibold text-white">Menú</div>
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-base font-semibold text-brand-linen">Menú</div>
               <button
                 ref={closeButtonRef}
                 onClick={closeSidebar}
                 aria-label="Cerrar menú"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-linen hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-linen/50"
               >
                 ✕
               </button>
@@ -81,12 +81,12 @@ export function DashboardLayout({
       )}
       <div className="flex-1 flex flex-col overflow-hidden">
         {header && (
-          <header className="border-b border-border bg-card">
+          <header className="border-b border-brand-linen/60 bg-white shadow-sm">
             {headerNode}
             <ActiveBranchBar />
           </header>
         )}
-        <main key={branchId} className="flex-1 overflow-auto">
+        <main key={branchId} className="app-surface-page flex-1 overflow-auto">
           {children}
         </main>
       </div>

@@ -1,4 +1,19 @@
-import { Branch, Category, Empresa, EmpresaEstado, KitchenOrder, Product, Supplier, User, UserRole } from '@/core/interfaces';
+import {
+  Branch,
+  Category,
+  Empresa,
+  EmpresaEstado,
+  EmpresaPlanSummary,
+  KitchenOrder,
+  Product,
+  SaasMetodoPago,
+  SaasPlan,
+  SaasPlanCodigo,
+  SaasPlanFeatures,
+  Supplier,
+  User,
+  UserRole,
+} from '@/core/interfaces';
 
 export function unwrapApiEnvelope(responseData: unknown): unknown {
   if (
@@ -69,6 +84,10 @@ export function normalizeUser(raw: Record<string, unknown>): User {
     name: String(raw.fullName ?? raw.name ?? ''),
     role: normalizeRoleName(roleName),
     branchId: raw.branchId ? String(raw.branchId) : undefined,
+    whatsappPhone: (() => {
+      const rawPhone = String(raw.whatsappPhone ?? raw.whatsapp_phone ?? '').replace(/\D/g, '');
+      return rawPhone.length >= 8 ? rawPhone : null;
+    })(),
     isActive: raw.isActive !== false,
     createdAt: String(raw.createdAt ?? new Date().toISOString()),
     updatedAt: String(raw.updatedAt ?? new Date().toISOString()),
@@ -162,6 +181,122 @@ export function normalizeBranch(raw: Record<string, unknown>): Branch {
 }
 
 const EMPRESA_ESTADOS: EmpresaEstado[] = ['ACTIVO', 'SUSPENDIDO', 'PENDIENTE_ONBOARDING'];
+const SAAS_PLAN_CODIGOS: SaasPlanCodigo[] = ['BASICO', 'ESTANDAR', 'FULL'];
+const SAAS_METODOS_PAGO: SaasMetodoPago[] = [
+  'TRANSFERENCIA',
+  'WEBPAY',
+  'MERCADO_PAGO',
+  'FLOW',
+  'MIXTO',
+];
+
+function normalizeMetodoPago(raw: unknown): SaasMetodoPago {
+  const value = String(raw ?? 'TRANSFERENCIA').toUpperCase();
+  return SAAS_METODOS_PAGO.includes(value as SaasMetodoPago)
+    ? (value as SaasMetodoPago)
+    : 'TRANSFERENCIA';
+}
+
+function normalizePlanValor(raw: Record<string, unknown>): number {
+  const v = raw.valor ?? raw.precioReferenciaClp ?? raw.precio_referencia_clp ?? 0;
+  return Number(v);
+}
+
+function normalizePlanActivo(raw: Record<string, unknown>): boolean {
+  if (raw.activo === true || raw.activo === 'true') return true;
+  if (raw.activo === false || raw.activo === 'false') return false;
+  return raw.isActive === true || raw.is_active === 1 || raw.is_active === true;
+}
+
+function normalizePlanFeatures(raw: unknown): SaasPlanFeatures {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      modulosCore: true,
+      assistantWhatsapp: false,
+      assistantVoz: false,
+      pagosOnline: false,
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    modulosCore: o.modulosCore !== false,
+    assistantWhatsapp: o.assistantWhatsapp === true,
+    assistantVoz: o.assistantVoz === true,
+    pagosOnline: o.pagosOnline === true,
+  };
+}
+
+function normalizeEmpresaPlan(raw: Record<string, unknown>): EmpresaPlanSummary {
+  const planRaw = (raw.plan as Record<string, unknown> | undefined) ?? {};
+  const codigoRaw = String(planRaw.codigo ?? raw.planCodigo ?? 'BASICO').toUpperCase();
+  const codigo = SAAS_PLAN_CODIGOS.includes(codigoRaw as SaasPlanCodigo)
+    ? (codigoRaw as SaasPlanCodigo)
+    : 'BASICO';
+
+  return {
+    id: String(planRaw.id ?? raw.planId ?? ''),
+    codigo,
+    nombre: String(planRaw.nombre ?? codigo),
+    descripcion: planRaw.descripcion != null ? String(planRaw.descripcion) : null,
+    valor: normalizePlanValor(planRaw),
+    metodoPago: normalizeMetodoPago(planRaw.metodoPago ?? planRaw.metodo_pago),
+    activo: normalizePlanActivo(planRaw),
+    maxSucursales: Number(planRaw.maxSucursales ?? planRaw.max_sucursales ?? 1),
+    maxUsuarios: Number(planRaw.maxUsuarios ?? planRaw.max_usuarios ?? 5),
+    features: normalizePlanFeatures(planRaw.features),
+  };
+}
+
+export function normalizeSaasPlan(raw: Record<string, unknown>): SaasPlan {
+  const codigoRaw = String(raw.codigo ?? 'BASICO').toUpperCase();
+  const codigo = SAAS_PLAN_CODIGOS.includes(codigoRaw as SaasPlanCodigo)
+    ? (codigoRaw as SaasPlanCodigo)
+    : 'BASICO';
+
+  return {
+    id: String(raw.id ?? ''),
+    codigo,
+    nombre: String(raw.nombre ?? codigo),
+    descripcion: raw.descripcion != null ? String(raw.descripcion) : null,
+    valor: normalizePlanValor(raw),
+    metodoPago: normalizeMetodoPago(raw.metodoPago ?? raw.metodo_pago),
+    activo: normalizePlanActivo(raw),
+    maxSucursales: Number(raw.maxSucursales ?? raw.max_sucursales ?? 1),
+    maxUsuarios: Number(raw.maxUsuarios ?? raw.max_usuarios ?? 5),
+    features: normalizePlanFeatures(raw.features),
+    orden: Number(raw.orden ?? 0),
+  };
+}
+
+function normalizeSuscripcion(raw: Record<string, unknown> | null | undefined) {
+  if (!raw || typeof raw !== 'object') return null;
+  const estadoRaw = String(raw.estado ?? 'PILOTO').toUpperCase();
+  const estados = ['ACTIVA', 'GRACIA', 'VENCIDA', 'CANCELADA', 'PILOTO'] as const;
+  return {
+    id: String(raw.id ?? ''),
+    estado: estados.includes(estadoRaw as (typeof estados)[number])
+      ? (estadoRaw as (typeof estados)[number])
+      : 'PILOTO',
+    origen: String(raw.origen ?? 'PLATAFORMA'),
+    periodo: String(raw.periodo ?? 'MENSUAL'),
+    inicioEn: String(raw.inicioEn ?? raw.inicio_en ?? ''),
+    proximoCobroEn:
+      raw.proximoCobroEn != null
+        ? String(raw.proximoCobroEn)
+        : raw.proximo_cobro_en != null
+          ? String(raw.proximo_cobro_en)
+          : null,
+    venceEn:
+      raw.venceEn != null ? String(raw.venceEn) : raw.vence_en != null ? String(raw.vence_en) : null,
+    graceHasta:
+      raw.graceHasta != null
+        ? String(raw.graceHasta)
+        : raw.grace_hasta != null
+          ? String(raw.grace_hasta)
+          : null,
+    notas: raw.notas != null ? String(raw.notas) : null,
+  };
+}
 
 export function normalizeEmpresa(raw: Record<string, unknown>): Empresa {
   const estadoRaw = String(raw.estado ?? 'ACTIVO').toUpperCase();
@@ -182,6 +317,48 @@ export function normalizeEmpresa(raw: Record<string, unknown>): Empresa {
     urlLogo: raw.urlLogo != null ? String(raw.urlLogo) : null,
     slug: String(raw.slug ?? ''),
     estado,
+    planId: String(raw.planId ?? raw.plan_id ?? ''),
+    plan: normalizeEmpresaPlan(raw),
+    assistantAdminPhone:
+      raw.assistantAdminPhone != null
+        ? String(raw.assistantAdminPhone)
+        : raw.assistant_admin_phone != null
+          ? String(raw.assistant_admin_phone)
+          : null,
+    transferBankName:
+      raw.transferBankName != null
+        ? String(raw.transferBankName)
+        : raw.transfer_bank_name != null
+          ? String(raw.transfer_bank_name)
+          : null,
+    transferAccountType:
+      raw.transferAccountType != null
+        ? String(raw.transferAccountType)
+        : raw.transfer_account_type != null
+          ? String(raw.transfer_account_type)
+          : null,
+    transferAccount:
+      raw.transferAccount != null
+        ? String(raw.transferAccount)
+        : raw.transfer_account != null
+          ? String(raw.transfer_account)
+          : null,
+    transferHolderName:
+      raw.transferHolderName != null
+        ? String(raw.transferHolderName)
+        : raw.transfer_holder_name != null
+          ? String(raw.transfer_holder_name)
+          : null,
+    transferRut:
+      raw.transferRut != null
+        ? String(raw.transferRut)
+        : raw.transfer_rut != null
+          ? String(raw.transfer_rut)
+          : null,
+    suscripcion: normalizeSuscripcion(
+      (raw.suscripcion as Record<string, unknown> | undefined) ??
+        (raw.subscription as Record<string, unknown> | undefined)
+    ),
     createdAt: String(raw.createdAt ?? new Date().toISOString()),
     updatedAt: String(raw.updatedAt ?? new Date().toISOString()),
   };
@@ -275,6 +452,62 @@ export function normalizeShrinkage(raw: Record<string, unknown>): ShrinkageRecor
     reason: String(raw.reason ?? ''),
     status: String(raw.status ?? 'PENDING'),
     createdAt: String(raw.createdAt ?? new Date().toISOString()),
+  };
+}
+
+export interface PaymentProofRecord {
+  id: string;
+  saleId: string;
+  clientPhone: string;
+  expectedTotal: number;
+  detectedAmount: number | null;
+  aiMatch: boolean;
+  visionSummary: string | null;
+  variant: string | null;
+  status: string;
+  createdAt: string;
+  saleStatus: string;
+  saleNotes: string | null;
+  branchName: string;
+  hasImage: boolean;
+  items: Array<{ productName: string; quantity: number; subtotal: number }>;
+}
+
+export function normalizePaymentProof(raw: Record<string, unknown>): PaymentProofRecord {
+  const itemsRaw = Array.isArray(raw.items) ? raw.items : [];
+  return {
+    id: String(raw.id ?? ''),
+    saleId: String(raw.saleId ?? raw.sale_id ?? ''),
+    clientPhone: String(raw.clientPhone ?? raw.client_phone ?? ''),
+    expectedTotal: Number(raw.expectedTotal ?? raw.expected_total ?? 0),
+    detectedAmount:
+      raw.detectedAmount != null || raw.detected_amount != null
+        ? Number(raw.detectedAmount ?? raw.detected_amount)
+        : null,
+    aiMatch: raw.aiMatch === true || raw.ai_match === true || raw.ai_match === 1,
+    visionSummary:
+      raw.visionSummary != null
+        ? String(raw.visionSummary)
+        : raw.vision_summary != null
+          ? String(raw.vision_summary)
+          : null,
+    variant: raw.variant != null ? String(raw.variant) : null,
+    status: String(raw.status ?? 'RECEIVED'),
+    createdAt: String(raw.createdAt ?? raw.created_at ?? new Date().toISOString()),
+    saleStatus: String(raw.saleStatus ?? raw.sale_status ?? '')
+      .trim()
+      .toUpperCase(),
+    saleNotes: raw.saleNotes != null ? String(raw.saleNotes) : null,
+    branchName: String(raw.branchName ?? raw.branch_name ?? ''),
+    hasImage: raw.hasImage === true || raw.has_image === true || raw.has_image === 1,
+    items: itemsRaw.map((line) => {
+      const row = line as Record<string, unknown>;
+      return {
+        productName: String(row.productName ?? row.product_name ?? 'Producto'),
+        quantity: Number(row.quantity ?? 0),
+        subtotal: Number(row.subtotal ?? 0),
+      };
+    }),
   };
 }
 

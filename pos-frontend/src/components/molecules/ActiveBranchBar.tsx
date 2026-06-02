@@ -15,14 +15,14 @@ export function ActiveBranchBar() {
   const canSwitchBranch = getRoleProfile(user?.role).canSwitchBranch;
 
   return (
-    <div className="border-b border-sky-500/20 bg-sky-500/10 px-4 py-2 text-center text-sm text-sky-900 dark:text-sky-100 sm:px-6">
-      <span className="text-sky-700/80 dark:text-sky-300/80">
+    <div className="border-b border-brand-linen/50 bg-brand-olive/8 px-4 py-2 text-center text-sm text-brand-ink sm:px-6">
+      <span className="text-brand-ink-muted">
         {canSwitchBranch ? 'Sucursal activa — ' : 'Tu sucursal — '}
       </span>
-      <span className="font-semibold" title={activeBranchName}>
+      <span className="font-semibold text-brand-olive" title={activeBranchName}>
         {activeBranchName}
       </span>
-      <span className="ml-2 hidden text-xs text-sky-700/70 dark:text-sky-400/70 sm:inline">
+      <span className="ml-2 hidden text-xs text-brand-ink-muted sm:inline">
         (productos, stock, ventas y reportes usan esta sucursal)
       </span>
     </div>

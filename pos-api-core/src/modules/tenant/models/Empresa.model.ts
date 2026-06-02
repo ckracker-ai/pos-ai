@@ -16,6 +16,7 @@ class Empresa extends Model {
   public urlLogo?: string | null;
   public slug!: string;
   public estado!: EmpresaEstado;
+  public planId!: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -82,6 +83,41 @@ Empresa.init(
       type: DataTypes.ENUM('ACTIVO', 'SUSPENDIDO', 'PENDIENTE_ONBOARDING'),
       allowNull: false,
       defaultValue: 'PENDIENTE_ONBOARDING',
+    },
+    planId: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      field: 'plan_id',
+    },
+    assistantAdminPhone: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      field: 'assistant_admin_phone',
+    },
+    transferBankName: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+      field: 'transfer_bank_name',
+    },
+    transferAccount: {
+      type: DataTypes.STRING(80),
+      allowNull: true,
+      field: 'transfer_account',
+    },
+    transferRut: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: 'transfer_rut',
+    },
+    transferAccountType: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+      field: 'transfer_account_type',
+    },
+    transferHolderName: {
+      type: DataTypes.STRING(160),
+      allowNull: true,
+      field: 'transfer_holder_name',
     },
   },
   {

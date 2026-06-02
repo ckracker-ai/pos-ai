@@ -2,6 +2,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { UniqueConstraintError } from 'sequelize';
 import sequelize from '../../../config/database';
 import Empresa, { EmpresaEstado } from '../models/Empresa.model';
+import SaasPlan from '../../saas/models/SaasPlan.model';
+import saasPlanDelegate from '../../saas/delegates/SaasPlanDelegate';
+import suscripcionDelegate, { SuscripcionSummary } from '../../saas/delegates/SuscripcionDelegate';
+import type { SuscripcionOrigen } from '../../saas/models/EmpresaSuscripcion.model';
+import type { CheckoutSummary } from '../../saas/types/checkout';
+import type { SuscripcionEstado } from '../../saas/models/EmpresaSuscripcion.model';
+import EmpresaSuscripcion from '../../saas/models/EmpresaSuscripcion.model';
+import type { SaasPlanFeatures } from '../../saas/constants/planCodes';
 import Branch from '../../branch/models/Branch.model';
 import Role from '../../auth/models/Role.model';
 import User from '../../auth/models/User.model';
@@ -11,6 +19,19 @@ import { readModelString } from '../../../utils/modelAttributes';
 import { isValidEmail } from '../../../utils/empresaAccess';
 import { Result, ok, fail } from '../../../types/result';
 import * as argon2 from 'argon2';
+
+export interface EmpresaPlanSummary {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  valor: number;
+  metodoPago: string;
+  activo: boolean;
+  maxSucursales: number;
+  maxUsuarios: number;
+  features: SaasPlanFeatures;
+}
 
 export interface EmpresaRecord {
   id: string;
@@ -25,6 +46,15 @@ export interface EmpresaRecord {
   urlLogo: string | null;
   slug: string;
   estado: EmpresaEstado;
+  planId: string;
+  plan: EmpresaPlanSummary;
+  assistantAdminPhone: string | null;
+  transferBankName: string | null;
+  transferAccountType: string | null;
+  transferAccount: string | null;
+  transferHolderName: string | null;
+  transferRut: string | null;
+  suscripcion: SuscripcionSummary | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +74,10 @@ export interface CreateEmpresaInput {
   adminEmail?: string;
   adminPassword?: string;
   adminFullName?: string;
+  planId?: string;
+  planCodigo?: string;
+  /** Origen de la fila en `empresa_suscripciones` (ej. registro web). */
+  suscripcionOrigen?: SuscripcionOrigen;
 }
 
 /** Campos editables por ADMIN del tenant (sin lifecycle). */
@@ -55,11 +89,24 @@ export interface UpdateEmpresaTenantInput {
   correoFacturacion?: string | null;
   urlLogo?: string | null;
   slug?: string;
+  /** Perfil bancario para transferencias WSP (validación IA). */
+  transferBankName?: string | null;
+  transferAccountType?: string | null;
+  transferAccount?: string | null;
+  transferHolderName?: string | null;
+  transferRut?: string | null;
 }
 
 /** Solo plataforma / onboarding interno (x-internal-key). */
 export interface UpdateEmpresaPlatformInput extends UpdateEmpresaTenantInput {
   estado?: EmpresaEstado;
+  planId?: string;
+  planCodigo?: string;
+  assistantAdminPhone?: string | null;
+}
+
+function normalizePhoneDigits(raw: string): string {
+  return raw.replace(/\D/g, '').replace(/^0+/, '');
 }
 
 const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
@@ -69,8 +116,42 @@ const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
   parallelism: 4,
 };
 
+const EMPRESA_PLAN_INCLUDE = [{ model: SaasPlan, as: 'plan', required: true }];
+
 class EmpresaDelegate {
-  private toRecord(row: Empresa): EmpresaRecord {
+  private planFromModel(plan: SaasPlan): EmpresaPlanSummary {
+    const plain =
+      typeof plan.toJSON === 'function'
+        ? (plan.toJSON() as Record<string, unknown>)
+        : (plan as unknown as Record<string, unknown>);
+    const featuresRaw = plain.features;
+    const features =
+      featuresRaw && typeof featuresRaw === 'object'
+        ? (featuresRaw as SaasPlanFeatures)
+        : {
+            modulosCore: true,
+            assistantWhatsapp: false,
+            assistantVoz: false,
+            pagosOnline: false,
+          };
+    const valorRaw =
+      plain.valor ?? plain.precioReferenciaClp ?? plain.precio_referencia_clp ?? 0;
+
+    return {
+      id: String(plain.id ?? plan.id ?? ''),
+      codigo: String(plain.codigo ?? ''),
+      nombre: String(plain.nombre ?? ''),
+      descripcion: (plain.descripcion as string | null | undefined) ?? null,
+      valor: Number(valorRaw),
+      metodoPago: String(plain.metodoPago ?? plain.metodo_pago ?? 'TRANSFERENCIA'),
+      activo: plain.isActive === true || plain.is_active === 1 || plain.is_active === true,
+      maxSucursales: Number(plain.maxSucursales ?? plain.max_sucursales ?? 1),
+      maxUsuarios: Number(plain.maxUsuarios ?? plain.max_usuarios ?? 5),
+      features,
+    };
+  }
+
+  private toRecord(row: Empresa, suscripcion?: SuscripcionSummary | null): EmpresaRecord {
     const plain =
       typeof row.toJSON === 'function'
         ? (row.toJSON() as Record<string, unknown>)
@@ -89,9 +170,40 @@ class EmpresaDelegate {
       urlLogo: (plain.urlLogo as string | null | undefined) ?? null,
       slug: String(plain.slug ?? row.slug ?? ''),
       estado: String(plain.estado ?? row.estado ?? 'PENDIENTE_ONBOARDING') as EmpresaEstado,
+      planId: String(plain.planId ?? plain.plan_id ?? row.planId ?? ''),
+      plan: this.planFromModel((row.get('plan') as SaasPlan) ?? ({} as SaasPlan)),
+      assistantAdminPhone: (plain.assistantAdminPhone as string | null | undefined) ??
+        (plain.assistant_admin_phone as string | null | undefined) ??
+        null,
+      transferBankName: (plain.transferBankName as string | null | undefined) ??
+        (plain.transfer_bank_name as string | null | undefined) ??
+        null,
+      transferAccountType: (plain.transferAccountType as string | null | undefined) ??
+        (plain.transfer_account_type as string | null | undefined) ??
+        null,
+      transferAccount: (plain.transferAccount as string | null | undefined) ??
+        (plain.transfer_account as string | null | undefined) ??
+        null,
+      transferHolderName: (plain.transferHolderName as string | null | undefined) ??
+        (plain.transfer_holder_name as string | null | undefined) ??
+        null,
+      transferRut: (plain.transferRut as string | null | undefined) ??
+        (plain.transfer_rut as string | null | undefined) ??
+        null,
+      suscripcion: suscripcion ?? null,
       createdAt: plain.createdAt as Date,
       updatedAt: plain.updatedAt as Date,
     };
+  }
+
+  private async reloadWithPlan(row: Empresa): Promise<Empresa> {
+    await row.reload({ include: EMPRESA_PLAN_INCLUDE });
+    return row;
+  }
+
+  private async loadSuscripcion(empresaId: string): Promise<SuscripcionSummary | null> {
+    const row = await suscripcionDelegate.findByEmpresaId(empresaId);
+    return row ? suscripcionDelegate.toSummary(row) : null;
   }
 
   async findById(id: string, scopedEmpresaId?: string): Promise<Result<EmpresaRecord>> {
@@ -99,21 +211,34 @@ class EmpresaDelegate {
       return fail('EMPRESA_ACCESS_DENIED');
     }
 
-    const row = await Empresa.findByPk(id);
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
     if (!row) return fail('EMPRESA_NOT_FOUND');
-    return ok(this.toRecord(row));
+    const sub = await this.loadSuscripcion(id);
+    return ok(this.toRecord(row, sub));
   }
 
   async listForTenant(empresaId: string): Promise<Result<EmpresaRecord[]>> {
-    const row = await Empresa.findByPk(empresaId);
+    const row = await Empresa.findByPk(empresaId, { include: EMPRESA_PLAN_INCLUDE });
     if (!row) return fail('EMPRESA_NOT_FOUND');
-    return ok([this.toRecord(row)]);
+    const sub = await this.loadSuscripcion(empresaId);
+    return ok([this.toRecord(row, sub)]);
   }
 
   /** Listado global — solo plataforma (x-internal-key). */
   async listForPlatform(): Promise<Result<EmpresaRecord[]>> {
-    const rows = await Empresa.findAll({ order: [['createdAt', 'DESC']] });
-    return ok(rows.map((row) => this.toRecord(row)));
+    const rows = await Empresa.findAll({
+      include: EMPRESA_PLAN_INCLUDE,
+      order: [['createdAt', 'DESC']],
+    });
+    const subs = await EmpresaSuscripcion.findAll();
+    const subByEmpresa = new Map(
+      subs.map((s) => [String(s.getDataValue('empresaId') ?? ''), suscripcionDelegate.toSummary(s)])
+    );
+    return ok(
+      rows.map((row) =>
+        this.toRecord(row, subByEmpresa.get(String(row.getDataValue('id') ?? '')) ?? null)
+      )
+    );
   }
 
   async create(
@@ -160,6 +285,12 @@ class EmpresaDelegate {
       ? 'ACTIVO'
       : (input.estado ?? 'PENDIENTE_ONBOARDING');
 
+    const planResolved = await saasPlanDelegate.resolvePlanId({
+      planId: input.planId,
+      planCodigo: input.planCodigo,
+    });
+    if (!planResolved.success) return planResolved;
+
     const transaction = await sequelize.transaction();
     try {
       const slug = await uniqueSlug(slugCandidate, async (candidate) => {
@@ -181,6 +312,7 @@ class EmpresaDelegate {
           urlLogo: input.urlLogo?.trim() || null,
           slug,
           estado: initialEstado,
+          planId: planResolved.value,
         },
         { transaction }
       );
@@ -210,13 +342,13 @@ class EmpresaDelegate {
           return fail('ROLE_NOT_FOUND: ADMIN role missing');
         }
 
-        const taken = await User.findOne({
-          where: { email: adminEmail!, empresaId },
+        const takenGlobal = await User.findOne({
+          where: { email: adminEmail! },
           transaction,
         });
-        if (taken) {
+        if (takenGlobal) {
           await transaction.rollback();
-          return fail('EMAIL_TAKEN: admin email already registered in this empresa');
+          return fail('EMAIL_TAKEN: admin email already registered');
         }
 
         const passwordHash = await argon2.hash(adminPassword!, ARGON2_OPTIONS);
@@ -238,7 +370,14 @@ class EmpresaDelegate {
       }
 
       await transaction.commit();
-      return ok({ empresa: this.toRecord(empresa), branch, adminUserId });
+      await this.reloadWithPlan(empresa);
+      await suscripcionDelegate.ensureForEmpresa(empresaId, planResolved.value, {
+        estado: initialEstado === 'ACTIVO' ? 'PILOTO' : 'VENCIDA',
+        origen: input.suscripcionOrigen ?? 'PLATAFORMA',
+        diasVigencia: wantsAdmin ? 90 : 30,
+      });
+      const sub = await this.loadSuscripcion(empresaId);
+      return ok({ empresa: this.toRecord(empresa, sub), branch, adminUserId });
     } catch (error) {
       await transaction.rollback();
       if (error instanceof UniqueConstraintError) {
@@ -248,12 +387,20 @@ class EmpresaDelegate {
     }
   }
 
+  private readRowString(row: Empresa, key: string): string | null {
+    const raw = row.getDataValue(key);
+    if (raw == null || raw === '') return null;
+    return String(raw).trim() || null;
+  }
+
   private async applyPatch(
     row: Empresa,
     input: UpdateEmpresaTenantInput | UpdateEmpresaPlatformInput,
     allowEstado: boolean
   ): Promise<Result<EmpresaRecord>> {
     const patch: Record<string, unknown> = {};
+    const normOptional = (v: string | null | undefined): string | null =>
+      v == null ? null : v.trim() || null;
 
     if (input.razonSocial !== undefined) {
       const value = input.razonSocial.trim();
@@ -278,6 +425,50 @@ class EmpresaDelegate {
       patch.estado = input.estado;
     }
 
+    if (allowEstado && ('planId' in input || 'planCodigo' in input)) {
+      const platformInput = input as UpdateEmpresaPlatformInput;
+      if (platformInput.planId !== undefined || platformInput.planCodigo !== undefined) {
+        const planResolved = await saasPlanDelegate.resolvePlanId({
+          planId: platformInput.planId,
+          planCodigo: platformInput.planCodigo,
+        });
+        if (!planResolved.success) return planResolved;
+        patch.planId = planResolved.value;
+      }
+    }
+
+    if (allowEstado && 'assistantAdminPhone' in input) {
+      const phone = (input as UpdateEmpresaPlatformInput).assistantAdminPhone;
+      const next =
+        phone !== undefined && phone !== null && phone !== ''
+          ? normalizePhoneDigits(String(phone))
+          : null;
+      const cur = this.readRowString(row, 'assistantAdminPhone');
+      if (next !== cur) patch.assistantAdminPhone = next;
+    }
+    if ('transferBankName' in input) {
+      const next = normOptional(input.transferBankName);
+      if (next !== this.readRowString(row, 'transferBankName')) patch.transferBankName = next;
+    }
+    if ('transferAccountType' in input) {
+      const next = normOptional(input.transferAccountType);
+      if (next !== this.readRowString(row, 'transferAccountType')) {
+        patch.transferAccountType = next;
+      }
+    }
+    if ('transferAccount' in input) {
+      const next = normOptional(input.transferAccount);
+      if (next !== this.readRowString(row, 'transferAccount')) patch.transferAccount = next;
+    }
+    if ('transferHolderName' in input) {
+      const next = normOptional(input.transferHolderName);
+      if (next !== this.readRowString(row, 'transferHolderName')) patch.transferHolderName = next;
+    }
+    if ('transferRut' in input) {
+      const next = normOptional(input.transferRut);
+      if (next !== this.readRowString(row, 'transferRut')) patch.transferRut = next;
+    }
+
     if (input.slug !== undefined) {
       const slug = slugify(input.slug);
       if (!slug) return fail('VALIDATION_ERROR: invalid slug');
@@ -287,13 +478,23 @@ class EmpresaDelegate {
     }
 
     if (Object.keys(patch).length === 0) {
+      if (allowEstado) {
+        const sub = await this.loadSuscripcion(String(row.getDataValue('id') ?? ''));
+        return ok(this.toRecord(row, sub));
+      }
       return fail('VALIDATION_ERROR: no fields to update');
     }
 
+    const planChanged = typeof patch.planId === 'string';
+
     try {
       await row.update(patch);
-      await row.reload();
-      return ok(this.toRecord(row));
+      await this.reloadWithPlan(row);
+      if (planChanged) {
+        await suscripcionDelegate.syncPlanChange(String(row.getDataValue('id') ?? ''), String(patch.planId));
+      }
+      const sub = await this.loadSuscripcion(String(row.getDataValue('id') ?? ''));
+      return ok(this.toRecord(row, sub));
     } catch (error) {
       if (error instanceof UniqueConstraintError) {
         return fail('EMPRESA_DUPLICATE: slug already exists');
@@ -309,32 +510,97 @@ class EmpresaDelegate {
   ): Promise<Result<EmpresaRecord>> {
     if (id !== scopedEmpresaId) return fail('EMPRESA_ACCESS_DENIED');
 
-    const row = await Empresa.findByPk(id);
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
     if (!row) return fail('EMPRESA_NOT_FOUND');
 
     return this.applyPatch(row, input, false);
   }
 
   async updatePlatform(id: string, input: UpdateEmpresaPlatformInput): Promise<Result<EmpresaRecord>> {
-    const row = await Empresa.findByPk(id);
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
     if (!row) return fail('EMPRESA_NOT_FOUND');
     return this.applyPatch(row, input, true);
   }
 
   async suspendPlatform(id: string): Promise<Result<EmpresaRecord>> {
-    const row = await Empresa.findByPk(id);
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
     if (!row) return fail('EMPRESA_NOT_FOUND');
     await row.update({ estado: 'SUSPENDIDO' });
-    await row.reload();
-    return ok(this.toRecord(row));
+    await this.reloadWithPlan(row);
+    const sub = await this.loadSuscripcion(id);
+    return ok(this.toRecord(row, sub));
   }
 
   async activatePlatform(id: string): Promise<Result<EmpresaRecord>> {
-    const row = await Empresa.findByPk(id);
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
     if (!row) return fail('EMPRESA_NOT_FOUND');
     await row.update({ estado: 'ACTIVO' });
-    await row.reload();
-    return ok(this.toRecord(row));
+    await suscripcionDelegate.extendVigencia(id, 30);
+    await this.reloadWithPlan(row);
+    const sub = await this.loadSuscripcion(id);
+    return ok(this.toRecord(row, sub));
+  }
+
+  async patchSuscripcionPlatform(
+    empresaId: string,
+    input: { extendDays?: number; graceDays?: number; cancel?: boolean; note?: string }
+  ): Promise<Result<SuscripcionSummary>> {
+    if (input.cancel) {
+      return suscripcionDelegate.cancel(empresaId, input.note ?? null);
+    }
+    if (input.graceDays != null) {
+      return suscripcionDelegate.setGracePeriod(empresaId, input.graceDays);
+    }
+    if (input.extendDays != null) {
+      return suscripcionDelegate.extendVigencia(empresaId, input.extendDays);
+    }
+    return fail('VALIDATION_ERROR: extendDays, graceDays or cancel required');
+  }
+
+  async getCheckoutSummary(empresaId: string): Promise<Result<CheckoutSummary>> {
+    const row = await Empresa.findByPk(empresaId, { include: EMPRESA_PLAN_INCLUDE });
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+
+    const sub = await suscripcionDelegate.findByEmpresaId(empresaId);
+    const estado = String(sub?.getDataValue('estado') ?? 'PILOTO') as SuscripcionEstado;
+    const canPay = estado === 'PILOTO' || estado === 'GRACIA' || estado === 'VENCIDA';
+
+    const plan = row.get('plan') as SaasPlan | undefined;
+    const planSummary = plan ? this.planFromModel(plan) : null;
+    const neto = planSummary?.valor ?? 0;
+    const iva = Math.round(neto * 0.19);
+    const total = neto + iva;
+
+    return ok({
+      empresaId,
+      razonSocial: String(row.getDataValue('razonSocial') ?? ''),
+      planCodigo: planSummary?.codigo ?? 'BASICO',
+      planNombre: planSummary?.nombre ?? 'Plan',
+      netoClp: neto,
+      ivaClp: iva,
+      totalClp: total,
+      suscripcionEstado: estado,
+      canPay,
+    });
+  }
+
+  async confirmCheckoutPayment(
+    empresaId: string,
+    input: { provider: string; reference: string; extendDays?: number }
+  ): Promise<Result<{ suscripcion: SuscripcionSummary; empresa: EmpresaRecord }>> {
+    const summary = await this.getCheckoutSummary(empresaId);
+    if (!summary.success) return summary;
+    if (!summary.value.canPay) {
+      return fail('SUBSCRIPTION_ALREADY_ACTIVE');
+    }
+
+    const paid = await suscripcionDelegate.confirmSubscriptionPayment(empresaId, input);
+    if (!paid.success) return paid;
+
+    const empresa = await this.findById(empresaId);
+    if (!empresa.success) return empresa;
+
+    return ok({ suscripcion: paid.value, empresa: empresa.value });
   }
 }
 

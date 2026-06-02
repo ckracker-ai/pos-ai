@@ -3,6 +3,8 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePlatformAuthStore } from '@/core/context/platform-auth';
+import { PosAiLogo } from '@/components/atoms/PosAiLogo';
+import { LoginShell } from '@/components/organisms/LoginShell';
 
 export default function PlatformLoginPage() {
   const router = useRouter();
@@ -17,63 +19,81 @@ export default function PlatformLoginPage() {
     e.preventDefault();
     try {
       await login({ email, password });
-      router.replace('/platform/empresas');
+      router.replace('/platform/dashboard');
     } catch {
       // error in store
     }
   };
 
+  const inputClass =
+    'w-full rounded-lg border border-brand-linen bg-white px-3 py-2.5 text-brand-ink outline-none transition focus:border-brand-olive focus:ring-2 focus:ring-brand-olive/25';
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
-        <h1 className="text-xl font-bold text-white">POS-AI Plataforma</h1>
-        <p className="mt-1 text-sm text-slate-400">Super-admin — gestion de empresas tenant</p>
-        <p className="mt-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-200">
-          Dev: <strong>platform@pos-ai.local</strong> / <strong>PlatformAdmin2026!</strong>
-          <br />
-          (No uses este usuario en el login de sucursal /login)
-        </p>
-
-        {error && (
-          <p className="mt-4 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-slate-300">Correo</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
-              required
-            />
+    <LoginShell>
+      <div className="w-full max-w-md">
+        <div className="login-card rounded-2xl bg-white/95 p-8 backdrop-blur-sm">
+          <div className="mb-6 flex flex-col items-center text-center">
+            <PosAiLogo width={200} priority className="mb-3" />
+            <h1 className="text-lg font-semibold text-brand-olive">Plataforma</h1>
+            <p className="mt-1 text-sm text-brand-ink-muted">Super-admin — gestión de empresas tenant</p>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-slate-300">Contrasena</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {isLoading ? 'Ingresando...' : 'Ingresar'}
-          </button>
-        </form>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
-          <a href="/login" className="text-indigo-400 hover:underline">
-            Login tenant (sucursal / POS)
-          </a>
-        </p>
+          <p className="rounded-lg border border-brand-linen bg-brand-surface/80 px-3 py-2 text-xs text-brand-ink-muted">
+            Dev: <strong className="text-brand-ink">platform@pos-ai.local</strong> /{' '}
+            <strong className="text-brand-ink">PlatformAdmin2026!</strong>
+            <br />
+            (No uses este usuario en el login de sucursal /login)
+          </p>
+
+          {error && (
+            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-brand-ink">Correo</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-brand-ink">Contraseña</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full rounded-lg bg-brand-olive py-2.5 text-sm font-semibold text-white transition hover:bg-[#3d4532] disabled:opacity-60"
+            >
+              {isLoading ? 'Ingresando...' : 'Ingresar'}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-xs text-brand-ink-muted">
+            <a href="/" className="font-medium text-brand-olive hover:underline">
+              Volver al inicio
+            </a>
+            <span className="mx-2 text-brand-linen">·</span>
+            <a href="/login" className="font-medium text-brand-olive hover:underline">
+              Login tenant
+            </a>
+          </p>
+        </div>
       </div>
-    </div>
+    </LoginShell>
   );
 }

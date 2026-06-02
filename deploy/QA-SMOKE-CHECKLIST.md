@@ -58,7 +58,16 @@ npx newman run pos-api-core/pos-api-core.postman_collection.json \
   --env-var "keyInternal=supersecretkey"
 ```
 
-Ver también `pos-api-core/QA-EMPRESAS-v1.4.md`.
+**Postman / Newman (BFF plataforma):**
+
+```bash
+npx newman run pos-api-bff/pos-api-bff-platform.postman_collection.json \
+  --env-var "bffBaseUrl=http://localhost:2020/pos/proxy" \
+  --env-var "coreBaseUrl=http://localhost:1010" \
+  --env-var "keyInternal=supersecretkey"
+```
+
+Ver también `pos-api-core/QA-EMPRESAS-v1.4.md` y `pos-api-bff/QA-PLATFORM-v1.5.md`.
 
 ## 3. Regresión manual por rol
 

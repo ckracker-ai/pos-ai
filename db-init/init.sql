@@ -19,6 +19,7 @@ ALTER DATABASE `pos-ai-db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 SOURCE /docker-entrypoint-initdb.d/schema/v1.3-core.sql;
 SOURCE /docker-entrypoint-initdb.d/schema/v1.3-seed.sql;
+SOURCE /docker-entrypoint-initdb.d/schema/v1.6.1-seed.sql;
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

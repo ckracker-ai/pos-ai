@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { useState } from 'react';
 import { BranchSelector } from '@/components/molecules/BranchSelector';
+import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 
 export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const router = useRouter();
@@ -27,7 +29,7 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   };
 
   return (
-    <nav className="bg-white dark:bg-slate-900 shadow">
+    <nav className="bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 gap-3">
           {/* Mobile toggle + Logo */}
@@ -36,13 +38,19 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
               onClick={() => onToggleSidebar?.()}
               aria-label="Abrir menú"
               aria-controls="mobile-sidebar"
-              className="mr-3 inline-flex items-center justify-center rounded-md p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition md:hidden focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="mr-3 inline-flex items-center justify-center rounded-md p-2 text-brand-ink transition hover:bg-brand-surface focus:outline-none focus:ring-2 focus:ring-brand-olive/40 md:hidden"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-2xl font-bold text-blue-600">SVM</h1>
+            <Link
+              href="/dashboard"
+              aria-label="POS-AI inicio"
+              className="flex h-10 w-12 shrink-0 items-center justify-center overflow-hidden sm:h-11 sm:w-14"
+            >
+              <PosAiLogo height={64} width={58} />
+            </Link>
           </div>
 
           <BranchSelector />
@@ -50,9 +58,9 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
           <div className="flex items-center relative ml-2 sm:ml-4">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="flex items-center space-x-2 px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+              className="flex items-center space-x-2 rounded-md px-3 py-2 text-brand-ink transition hover:bg-brand-surface"
             >
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-olive font-semibold text-white">
                 {user?.name?.charAt(0).toUpperCase()}
               </div>
               <span className="hidden sm:inline-block">{user?.name}</span>
@@ -73,24 +81,18 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
 
             {/* Dropdown Menu */}
             {isOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg py-1 top-16">
-                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {user?.name}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {getRoleLabel(user?.role || '')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {user?.email}
-                  </p>
+              <div className="absolute right-0 top-16 mt-2 w-48 rounded-lg border border-brand-linen/60 bg-white py-1 shadow-lg">
+                <div className="border-b border-brand-linen/40 px-4 py-2">
+                  <p className="text-sm font-semibold text-brand-ink">{user?.name}</p>
+                  <p className="text-xs text-brand-ink-muted">{getRoleLabel(user?.role || '')}</p>
+                  <p className="text-xs text-brand-ink-muted">{user?.email}</p>
                 </div>
                 <button
                   onClick={() => {
                     setIsOpen(false);
                     router.push('/manual');
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-sky-600 hover:bg-gray-100 dark:hover:bg-slate-700 transition"
+                  className="w-full px-4 py-2 text-left text-sm text-brand-olive transition hover:bg-brand-surface"
                 >
                   ❓ Ayuda y manual
                 </button>
@@ -99,7 +101,7 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                     setIsOpen(false);
                     handleLogout();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-slate-700 transition"
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
                 >
                   Cerrar Sesión
                 </button>

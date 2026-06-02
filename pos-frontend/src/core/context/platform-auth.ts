@@ -107,9 +107,23 @@ export async function platformFetch<T>(
     },
   });
 
-  const payload = await response.json();
+  const payload = (await response.json()) as {
+    success?: boolean;
+    error?: string | null;
+    message?: string;
+    code?: number;
+  };
   if (!response.ok || payload.success === false) {
-    throw new Error(payload.error ?? `HTTP ${response.status}`);
+    const detail =
+      (typeof payload.error === 'string' && payload.error.trim()) ||
+      (typeof payload.message === 'string' && payload.message.trim()) ||
+      `HTTP ${response.status}`;
+    if (response.status === 404 && /not found/i.test(detail)) {
+      throw new Error(
+        'Ruta no encontrada en el BFF (404). Reconstruye servicios: docker compose build pos-api-bff pos-api-core pos-api-assistant && docker compose up -d'
+      );
+    }
+    throw new Error(detail);
   }
   return payload as T;
 }
