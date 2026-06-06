@@ -12,8 +12,15 @@ import Empresa from '../modules/tenant/models/Empresa.model';
 import SaasPlan from '../modules/saas/models/SaasPlan.model';
 import AssistantChannelBinding from '../modules/assistant/models/AssistantChannelBinding.model';
 import EmpresaSuscripcion from '../modules/saas/models/EmpresaSuscripcion.model';
+import Region from '../modules/territory/models/Region.model';
+import Comuna from '../modules/territory/models/Comuna.model';
+import SaleDeliveryEvent from '../modules/delivery/models/SaleDeliveryEvent.model';
+import LegalDocument from '../modules/legal/models/LegalDocument.model';
+import LegalAcceptance from '../modules/legal/models/LegalAcceptance.model';
 
 export function defineAssociations(): void {
+  LegalDocument.hasMany(LegalAcceptance, { foreignKey: 'documentId', as: 'acceptances' });
+  LegalAcceptance.belongsTo(LegalDocument, { foreignKey: 'documentId', as: 'document' });
   SaasPlan.hasMany(Empresa, { foreignKey: 'planId', as: 'empresas' });
   Empresa.belongsTo(SaasPlan, { foreignKey: 'planId', as: 'plan' });
 
@@ -24,6 +31,12 @@ export function defineAssociations(): void {
   Empresa.hasMany(AssistantChannelBinding, { foreignKey: 'empresaId', as: 'assistantBindings' });
   AssistantChannelBinding.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
 
+  Region.hasMany(Comuna, { foreignKey: 'regionId', sourceKey: 'codigoCut', as: 'comunas' });
+  Comuna.belongsTo(Region, { foreignKey: 'regionId', targetKey: 'codigoCut', as: 'region' });
+
+  Comuna.hasMany(Branch, { foreignKey: 'comunaId', sourceKey: 'codigoCut', as: 'branches' });
+  Branch.belongsTo(Comuna, { foreignKey: 'comunaId', targetKey: 'codigoCut', as: 'comuna' });
+
   Empresa.hasMany(Branch, { foreignKey: 'empresaId', as: 'branches' });
   Branch.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
 
@@ -32,6 +45,8 @@ export function defineAssociations(): void {
 
   Empresa.hasMany(Category, { foreignKey: 'empresaId', as: 'categories' });
   Category.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+  Category.hasMany(Category, { foreignKey: 'parentId', as: 'children' });
+  Category.belongsTo(Category, { foreignKey: 'parentId', as: 'parent' });
 
   Empresa.hasMany(Supplier, { foreignKey: 'empresaId', as: 'suppliers' });
   Supplier.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
@@ -77,6 +92,9 @@ export function defineAssociations(): void {
 
   Sale.hasMany(SaleDetail, { foreignKey: 'saleId', as: 'details', onDelete: 'CASCADE' });
   SaleDetail.belongsTo(Sale, { foreignKey: 'saleId', as: 'sale' });
+
+  Sale.hasMany(SaleDeliveryEvent, { foreignKey: 'saleId', as: 'deliveryEvents' });
+  SaleDeliveryEvent.belongsTo(Sale, { foreignKey: 'saleId', as: 'sale' });
 
   Product.hasMany(SaleDetail, { foreignKey: 'productId', as: 'saleDetails' });
   SaleDetail.belongsTo(Product, { foreignKey: 'productId', as: 'product' });

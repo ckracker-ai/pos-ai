@@ -16,6 +16,8 @@ export type ApiErrorContext =
   | 'branches.restore'
   | 'empresas.load'
   | 'empresas.save'
+  | 'empresas.formalizacion'
+  | 'empresas.formalizar'
   | 'categories.list'
   | 'categories.save'
   | 'categories.delete'
@@ -66,6 +68,8 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'branches.restore': 'No se pudo restaurar la sucursal',
   'empresas.load': 'No se pudo cargar el perfil de la empresa',
   'empresas.save': 'No se pudo guardar el perfil de la empresa',
+  'empresas.formalizacion': 'No se pudo guardar el progreso de formalización',
+  'empresas.formalizar': 'No se pudo formalizar el negocio',
   'categories.list': 'No se pudieron cargar las categorías',
   'categories.save': 'No se pudo guardar la categoría',
   'categories.delete': 'No se pudo eliminar la categoría',
@@ -117,11 +121,16 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   SUBSCRIPTION_CANCELLED: 'La suscripción fue cancelada. Contacta al soporte de la plataforma.',
   SLUG_ALREADY_TAKEN: 'Ese identificador (slug) ya está en uso. Elige otro.',
   RUT_ALREADY_REGISTERED: 'Ese RUT ya está registrado en la plataforma.',
+  INFORMAL_RUT_ALLOCATION_FAILED: 'No se pudo asignar un identificador interno. Intenta de nuevo o contacta soporte.',
+  TRIBUTARIO_FORMAL_REQUIRED: 'Formaliza tu negocio (RUT) antes de contratar plan Estándar o Full.',
   SUBSCRIPTION_ALREADY_ACTIVE: 'La suscripción ya está activa.',
   PRODUCT_NOT_FOUND: 'No encontramos el producto.',
   PRODUCT_CREATE_FAILED: 'No se pudo crear el producto. Revisa SKU, categoría y proveedor.',
   SUPPLIER_NOT_FOUND: 'No encontramos el proveedor.',
   CATEGORY_NOT_FOUND: 'No encontramos la categoría.',
+  CATEGORY_NOT_LEAF:
+    'El producto debe asignarse a una subcategoría (categoría hoja). Elige una subcategoría en el formulario o créala en Categorías.',
+  CATEGORY_INACTIVE: 'La categoría seleccionada está inactiva. Elige otra o reactívala en Categorías.',
   SALE_NOT_FOUND: 'No encontramos la venta.',
   STOCK_RECORD_NOT_FOUND: 'Este producto aún no tiene stock en la sucursal activa.',
   ERROR_UPDATING_PASSWORD: 'No se pudo actualizar la contraseña.',

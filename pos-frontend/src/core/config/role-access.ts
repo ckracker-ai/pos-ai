@@ -176,6 +176,17 @@ export const APP_MODULES: readonly AppModule[] = [
     navSection: 'navigation',
   },
   {
+    key: 'delivery',
+    title: 'Envíos',
+    description: 'Seguimiento de pedidos con delivery',
+    icon: '📦',
+    path: '/delivery',
+    allowed: ['admin', 'auditor', 'seller', 'comanda'],
+    showOnDashboard: true,
+    showInNav: true,
+    navSection: 'navigation',
+  },
+  {
     key: 'comprobantes',
     title: 'Comprobantes WSP',
     description: 'Validar pagos por transferencia (WhatsApp)',

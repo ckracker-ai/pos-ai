@@ -23,13 +23,28 @@ export async function paymentWebhookRoutes(app: FastifyInstance) {
     }
 
     try {
-      const data = await coreClient.confirmOnlinePayment(body.empresa_id, body.sale_id, {
-        provider: body.provider,
-        reference: body.reference,
+      const reference = body.reference ?? `wsp-${body.sale_id}`;
+      const ledger = await coreClient.processPaymentInbound({
+        provider: body.provider ?? 'SANDBOX',
+        externalId: reference,
+        reference,
+        status: 'APPROVED',
+        empresa_id: body.empresa_id,
+        sale_id: body.sale_id,
+        metadata: {
+          kind: 'SALE_WSP',
+          empresaId: body.empresa_id,
+          pedidoId: body.sale_id,
+        },
       });
 
+      const data = ledger.data;
       const phone = String(data.client_phone ?? '').replace(/\D/g, '');
       const message = String(data.client_message ?? '').trim();
+
+      if (ledger.duplicate) {
+        return reply.send({ success: true, duplicate: true, data });
+      }
 
       if (phone.length >= 8 && message) {
         if (isMetaSendConfigured()) {
@@ -39,7 +54,7 @@ export async function paymentWebhookRoutes(app: FastifyInstance) {
         }
       }
 
-      return reply.send({ success: true, data });
+      return reply.send({ success: true, duplicate: false, data });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'PAYMENT_CONFIRM_FAILED';
       return reply.status(400).send({ success: false, error: message });

@@ -213,8 +213,8 @@ export default function SuppliersPage() {
       <AppPageContent>
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Proveedores</p>
-              <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de proveedores</h1>
+              <p className="app-eyebrow">Proveedores</p>
+              <h1 className="mt-3 text-3xl font-semibold text-[#3D4532]">Mantenedor de proveedores</h1>
               {errorMessage && (
                 <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                   {errorMessage}
@@ -225,24 +225,24 @@ export default function SuppliersPage() {
                   {successMessage}
                 </p>
               )}
-              {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando proveedores...</p>}
+              {isLoading && <p className="mt-3 text-sm text-brand-ink-muted">Cargando proveedores...</p>}
             </div>
             <button
               onClick={openCreate}
               disabled={isActionLocked}
-              className="rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
             >
               + Nuevo proveedor
             </button>
           </div>
 
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6">
+          <section className="app-card rounded-3xl p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex flex-wrap gap-3">
-                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-4 py-2 text-sm text-[#4A533C]">
                   Total: {suppliers.length}
                 </span>
-                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-4 py-2 text-sm text-[#4A533C]">
                   Activos: {activeCount}
                 </span>
               </div>
@@ -263,9 +263,9 @@ export default function SuppliersPage() {
               />
             </div>
 
-            <div className="overflow-x-auto rounded-3xl border border-slate-800">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400">
+            <div className="app-table-wrap">
+              <table className="app-table min-w-full text-left text-sm">
+                <thead>
                   <tr>
                     <th className="px-6 py-4">Nombre</th>
                     <th className="px-6 py-4">Email</th>
@@ -275,20 +275,20 @@ export default function SuppliersPage() {
                     <th className="px-6 py-4">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                      <td colSpan={6} className="px-6 py-8 text-center text-brand-ink-muted">
                         No hay proveedores registrados.
                       </td>
                     </tr>
                   ) : (
                     filtered.map((supplier) => (
-                      <tr key={supplier.id} className="hover:bg-slate-950/80">
-                        <td className="px-6 py-5 font-semibold text-white">{supplier.name}</td>
-                        <td className="px-6 py-5 text-slate-300">{supplier.contactEmail || '—'}</td>
-                        <td className="px-6 py-5 text-slate-300">{supplier.contactPhone || '—'}</td>
-                        <td className="px-6 py-5 text-slate-300">{supplier.address || '—'}</td>
+                      <tr key={supplier.id}>
+                        <td className="px-6 py-5 font-semibold text-[#3D4532]">{supplier.name}</td>
+                        <td className="px-6 py-5 text-brand-ink-muted">{supplier.contactEmail || '—'}</td>
+                        <td className="px-6 py-5 text-brand-ink-muted">{supplier.contactPhone || '—'}</td>
+                        <td className="px-6 py-5 text-brand-ink-muted">{supplier.address || '—'}</td>
                         <td className="px-6 py-5">
                           <StatusBadge active={supplier.isActive} />
                         </td>
@@ -319,19 +319,19 @@ export default function SuppliersPage() {
       </AppPageContent>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-lg rounded-[2rem] border border-slate-800 bg-slate-950 p-8">
-            <h2 className="text-xl font-semibold text-white">
+        <div className="app-modal-overlay">
+          <div className="app-modal-panel w-full max-w-lg rounded-[2rem] p-8">
+            <h2 className="text-xl font-semibold text-[#3D4532]">
               {editingSupplier ? 'Modificar proveedor' : 'Nuevo proveedor'}
             </h2>
             <div className="mt-6 space-y-4">
               {(['name', 'contactEmail', 'contactPhone', 'address'] as const).map((field) => (
-                <label key={field} className="block text-sm text-slate-300">
+                <label key={field} className="block text-sm text-brand-ink-muted">
                   {field === 'name' ? 'Nombre' : field === 'contactEmail' ? 'Email' : field === 'contactPhone' ? 'Teléfono' : 'Dirección'}
                   <input
                     value={form[field]}
                     onChange={(e) => setForm((c) => ({ ...c, [field]: e.target.value }))}
-                    className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                    className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                   />
                 </label>
               ))}
@@ -340,7 +340,7 @@ export default function SuppliersPage() {
               <button
                 onClick={() => setShowModal(false)}
                 disabled={isActionLocked}
-                className="rounded-3xl border border-slate-700 px-5 py-2 text-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-secondary rounded-3xl px-5 py-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -357,7 +357,7 @@ export default function SuppliersPage() {
                   )
                 }
                 disabled={isActionLocked}
-                className="rounded-3xl bg-sky-600 px-5 py-2 text-white font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-primary rounded-3xl px-5 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Guardar
               </button>

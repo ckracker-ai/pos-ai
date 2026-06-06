@@ -333,34 +333,26 @@ export default function UsersPage() {
       <AppPageContent>
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Usuarios</p>
-              <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de usuarios</h1>
-              <p className="mt-2 max-w-2xl text-slate-400">
+              <p className="app-eyebrow">Usuarios</p>
+              <h1 className="app-heading-page">Mantenedor de usuarios</h1>
+              <p className="mt-2 max-w-2xl app-text-muted">
                 Desactiva a quien ya no trabaja en la empresa con el botón Desactivar en cada fila.
                 No se borra el registro: ventas y reportes históricos conservan su nombre. Usa el filtro
                 Inactivos para ver o restaurar cuentas.
               </p>
               {!canManageUserLifecycle && (
-                <p className="mt-2 text-sm text-amber-300/90">
+                <p className="mt-2 text-sm text-amber-800">
                   Modo consulta: solo el administrador puede crear, editar, desactivar o restaurar usuarios.
                 </p>
               )}
               {currentUser && (
-                <p className="mt-3 text-sm text-slate-500">
+                <p className="mt-3 text-sm text-[#6b7280]">
                   Sesión: {currentUser.name} ({roleLabels[currentUser.role] ?? currentUser.role})
                 </p>
               )}
-              {errorMessage && (
-                <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {errorMessage}
-                </p>
-              )}
-              {successMessage && (
-                <p className="mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  {successMessage}
-                </p>
-              )}
-              {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando usuarios desde BFF...</p>}
+              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
+              {successMessage && <p className="mt-3 app-alert-success">{successMessage}</p>}
+              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando usuarios desde BFF...</p>}
             </div>
             {canManageUserLifecycle && (
               <button
@@ -380,23 +372,23 @@ export default function UsersPage() {
                   setShowModal(true);
                 }}
                 disabled={isActionLocked}
-                className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Nuevo Usuario
               </button>
             )}
           </div>
 
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
+          <section className="app-card rounded-3xl p-6 shadow-lg">
             <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex flex-wrap gap-3">
-                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-4 py-2 text-sm text-[#4A533C]">
                   Total: {users.length}
                 </span>
-                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-4 py-2 text-sm text-[#4A533C]">
                   Activos: {activeUserCount}
                 </span>
-                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-4 py-2 text-sm text-[#4A533C]">
                   Inactivos: {inactiveUserCount}
                 </span>
               </div>
@@ -407,9 +399,9 @@ export default function UsersPage() {
               />
             </div>
 
-            <div className="rounded-3xl border border-slate-800 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400">
+            <div className="app-table-wrap overflow-x-auto">
+              <table className="app-table min-w-full text-left text-sm">
+                <thead>
                   <tr>
                     <th className="px-6 py-4">Usuario</th>
                     <th className="px-6 py-4">Rol</th>
@@ -419,27 +411,27 @@ export default function UsersPage() {
                     <th className="px-6 py-4">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 bg-slate-900">
+                <tbody>
                   {!isLoading && filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                      <td colSpan={6} className="px-6 py-8 text-center text-brand-ink-muted">
                         No hay usuarios con el filtro seleccionado.
                       </td>
                     </tr>
                   ) : (
                     filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-950/80 transition">
+                      <tr key={user.id} className="transition">
                         <td className="px-6 py-5">
-                          <p className="font-semibold text-white">{user.name}</p>
-                          <p className="text-xs text-slate-500">{user.email}</p>
+                          <p className="font-semibold text-[#3D4532]">{user.name}</p>
+                          <p className="text-xs text-brand-ink-muted">{user.email}</p>
                         </td>
                         <td className="px-6 py-5">
-                          <span className="inline-flex rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                          <span className="inline-flex rounded-full border border-[rgba(74,83,60,0.2)] bg-[rgba(74,83,60,0.08)] px-3 py-1 text-xs uppercase tracking-[0.2em] text-[#4A533C]">
                             {roleLabels[user.role] ?? user.role}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-slate-300">{user.branchName}</td>
-                        <td className="px-6 py-5 font-mono text-xs text-slate-400">
+                        <td className="px-6 py-5 text-brand-ink-muted">{user.branchName}</td>
+                        <td className="px-6 py-5 font-mono text-xs text-brand-ink-muted/80">
                           {user.whatsappPhone ? `+${user.whatsappPhone}` : '—'}
                         </td>
                         <td className="px-6 py-5">
@@ -455,7 +447,7 @@ export default function UsersPage() {
                                 setErrorMessage(null);
                                 setSuccessMessage(null);
                               }}
-                              className="mb-2 rounded-full border border-amber-400/70 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="mb-2 rounded-full border border-[rgba(176,138,76,0.5)] bg-[rgba(176,138,76,0.08)] px-3 py-1 text-xs font-semibold text-[#8C6A2B] hover:bg-[rgba(176,138,76,0.14)] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Reset clave
                             </button>
@@ -509,45 +501,45 @@ export default function UsersPage() {
       </AppPageContent>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-2xl rounded-[2rem] bg-slate-950 border border-slate-800 p-8 shadow-2xl">
-            <h2 className="text-2xl font-semibold text-white">
+        <div className="app-modal-overlay">
+          <div className="app-modal-panel w-full max-w-2xl rounded-[2rem] p-8 shadow-2xl">
+            <h2 className="text-2xl font-semibold text-[#3D4532]">
               {editingUser ? 'Modificar usuario' : 'Nuevo usuario'}
             </h2>
             <div className="mt-6 grid gap-6 md:grid-cols-2">
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Nombre completo
                 <input
                   value={form.name}
                   onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Correo
                 <input
                   value={form.email}
                   onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
               {!editingUser && (
-                <label className="block text-sm text-slate-300 md:col-span-2">
+                <label className="block text-sm text-brand-ink-muted md:col-span-2">
                   Contraseña
                   <input
                     type="password"
                     value={form.password}
                     onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))}
-                    className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                    className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                   />
                 </label>
               )}
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Rol
                 <select
                   value={form.roleId}
                   onChange={(e) => setForm((c) => ({ ...c, roleId: e.target.value }))}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  className="app-select mt-2 w-full rounded-3xl px-4 py-3"
                 >
                   {roles.map((role) => (
                     <option key={role.id} value={role.id}>
@@ -556,26 +548,26 @@ export default function UsersPage() {
                   ))}
                 </select>
               </label>
-              <label className="block text-sm text-slate-300 md:col-span-2">
+              <label className="block text-sm text-brand-ink-muted md:col-span-2">
                 WhatsApp alertas comprobante
                 <input
                   type="tel"
                   value={form.whatsappPhone}
                   onChange={(e) => setForm((c) => ({ ...c, whatsappPhone: e.target.value }))}
                   placeholder="56900000003 (E.164 sin +)"
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 font-mono text-white"
+                  className="app-input app-input-mono mt-2 w-full rounded-3xl px-4 py-3"
                 />
-                <span className="mt-1 block text-xs text-slate-500">
+                <span className="mt-1 block text-xs text-brand-ink-muted">
                   Vendedor o admin de sucursal: recibe aviso cuando llega un comprobante por WSP.
                 </span>
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Sucursal {editingUser ? '(solo lectura)' : ''}
                 <select
                   value={form.branchId}
                   onChange={(e) => setForm((c) => ({ ...c, branchId: e.target.value }))}
                   disabled={!!editingUser}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  className="app-select mt-2 w-full rounded-3xl px-4 py-3"
                 >
                   {assignableBranches.map((branch) => (
                     <option key={branch.id} value={branch.id}>
@@ -584,18 +576,18 @@ export default function UsersPage() {
                   ))}
                 </select>
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-200 md:col-span-2">
+              <label className="flex items-center gap-3 rounded-2xl border border-[rgba(74,83,60,0.22)] bg-[rgba(74,83,60,0.06)] px-4 py-3 text-sm text-[#3D4532] md:col-span-2">
                 <input
                   type="checkbox"
                   checked={form.isActive}
                   onChange={(e) => setForm((c) => ({ ...c, isActive: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-sky-500"
+                  className="h-4 w-4 rounded border-[rgba(74,83,60,0.3)] bg-white text-[#4A533C]"
                 />
                 Usuario activo
               </label>
             </div>
             <div className="mt-8 flex justify-end gap-3">
-              <button onClick={() => setShowModal(false)} className="rounded-3xl border border-slate-700 px-6 py-3 text-slate-300">
+              <button onClick={() => setShowModal(false)} className="app-btn-secondary rounded-3xl px-6 py-3">
                 Cancelar
               </button>
               <button
@@ -611,7 +603,7 @@ export default function UsersPage() {
                   )
                 }
                 disabled={isActionLocked}
-                className="rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Guardar
               </button>

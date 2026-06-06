@@ -57,8 +57,28 @@ export function parseChileanPesos(raw: unknown): number | null {
 }
 
 export function parseAmountFromCaption(caption: string): number | null {
-  const lower = caption.toLowerCase();
-  if (!/(vale|pago|transfer|comprobante|abono|deposit)/i.test(lower) && !/\d/.test(caption)) {
+  const trimmed = caption.trim();
+  if (!trimmed) return null;
+  // Import dinámico evitado: regla local para no acoplar vision → agent en runtime circular
+  if (
+    /^(pedido|agregar|quiero|buscar|stock|sucursales|confirmar|cancelar|mi\s+pedido)\b/i.test(
+      trimmed
+    ) ||
+    /^\d+\s*[x×]\s*\d+$/i.test(trimmed) ||
+    /^(\d+\s*[x×]\s*\d+|\d+\s+\d+)(\s*,\s*(\d+\s*[x×]\s*\d+|\d+\s+\d+))*$/i.test(trimmed)
+  ) {
+    return null;
+  }
+  const lower = trimmed.toLowerCase();
+  const hasPaymentCue = /(vale|pago|transfer|comprobante|abono|deposit|clp|\$)/i.test(lower);
+  if (!hasPaymentCue) {
+    const digitsOnly = trimmed.replace(/\s/g, '');
+    if (/^\d{4,}$/.test(digitsOnly)) {
+      return parseChileanPesos(digitsOnly);
+    }
+    return null;
+  }
+  if (!/\d/.test(trimmed)) {
     return null;
   }
   const m = caption.match(/(?:\$|clp)?\s*(\d{1,3}(?:\.\d{3})+|\d{4,}|\d+)/i);

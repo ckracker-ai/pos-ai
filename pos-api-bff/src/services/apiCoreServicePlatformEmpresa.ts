@@ -3,8 +3,11 @@ import { ApiCoreBaseService } from './apiCoreBaseService.js';
 import type { UpdateEmpresaTenantInput } from './apiCoreServiceEmpresa.js';
 
 export type CreateEmpresaPlatformInput = {
-  rut: string;
+  modoRegistro?: 'FORMAL' | 'INFORMAL';
+  rut?: string;
   razonSocial: string;
+  rubroNegocio?: string;
+  telefonoNegocio?: string;
   nombreFantasia?: string;
   giroSii?: string;
   direccionComercial?: string;

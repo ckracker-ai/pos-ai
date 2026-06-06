@@ -13,7 +13,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.post('/consolidate-duplicates', requireSeller, async (req: AuthenticatedRequest, res) => {
-  const result = await assistantDelegate.consolidateDuplicatePaymentProofsForBranch(
+  const result = await assistantDelegate.cleanupPaymentProofsForBranch(
     getEffectiveEmpresaId(req),
     req.user!.branchId
   );

@@ -10,12 +10,18 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "db:sync": "ts-node src/db/sync.ts",
+    "security:reencrypt-transfer": "node dist/db/reencryptTransferFields.js",
     "docker:build": "docker build -t pos-api-core .",
     "docker:run": "docker run --env-file .env -p 1010:1010 pos-api-core",
     "compose:build": "docker compose build",
     "compose:up": "docker compose up --build",
     "compose:down": "docker compose down",
-    "compose:logs": "docker compose logs --follow"
+    "compose:logs": "docker compose logs --follow",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:catalog": "tsx --test test/category-catalog.test.ts",
+    "test:territory": "tsx --test test/territory-search.test.ts",
+    "test:payments": "tsx --test test/payment-webhook-parser.test.ts test/payment-sandbox-token.test.ts test/payment-webpay-auth.test.ts",
+    "test:delivery": "tsx --test test/delivery-transitions.test.ts"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",
@@ -37,6 +43,7 @@
     "@types/node": "^20.12.12",
     "@types/uuid": "^9.0.8",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.4.5"
   }
 }

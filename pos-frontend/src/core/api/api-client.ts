@@ -218,6 +218,10 @@ export const api = {
     getApiClient().get('/pos/proxy/catalog/products', { ...config, params: { q: query } }),
   getCategories: (config?: AxiosRequestConfig) =>
     getApiClient().get('/pos/proxy/catalog/categories', config),
+  getCategoryTree: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/catalog/categories/tree', config),
+  getCategoryLeaves: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/catalog/categories/leaves', config),
   createCategory: (data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().post('/pos/proxy/catalog/categories', data, config),
   updateCategory: (id: string, data: unknown, config?: AxiosRequestConfig) =>
@@ -256,6 +260,26 @@ export const api = {
   adjustStock: (data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().patch('/pos/proxy/inventory/stock/adjust', data, config),
 
+  // POS IA — intérprete lenguaje natural → carrito
+  interpretPosCommand: (
+    data: {
+      userText: string;
+      stocks: Array<{
+        id: string;
+        nombre: string;
+        sku: string;
+        precio: number;
+        stock_actual: number;
+      }>;
+      cart: Array<{
+        id_producto: string;
+        cantidad: number;
+        precio_unitario: number;
+      }>;
+    },
+    config?: AxiosRequestConfig
+  ) => getApiClient().post('/pos/proxy/pos/interpret', data, config),
+
   // Sales
   createSale: (data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().post('/pos/proxy/sales/sales', data, config),
@@ -287,6 +311,13 @@ export const api = {
     getApiClient().post(`/pos/proxy/branch/${id}/restore`, {}, config),
   branchAction: (data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().post('/pos/proxy/branch/branchAction', data, config),
+
+  getTerritoryRegions: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/territory/regions', config),
+  getTerritoryComunas: (regionId: string, config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/territory/comunas', { ...config, params: { regionId } }),
+  searchTerritoryComunas: (q: string, config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/territory/comunas/search', { ...config, params: { q } }),
 
   // Shrinkage
   getShrinkage: (config?: AxiosRequestConfig) =>
@@ -323,6 +354,13 @@ export const api = {
     getApiClient().get('/pos/proxy/empresas/me', config),
   updateEmpresa: (id: string, data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().patch(`/pos/proxy/empresas/${id}`, data, config),
+  updateEmpresaFormalizacionProgreso: (
+    id: string,
+    data: unknown,
+    config?: AxiosRequestConfig
+  ) => getApiClient().patch(`/pos/proxy/empresas/${id}/formalizacion-progreso`, data, config),
+  formalizarEmpresa: (id: string, data: unknown, config?: AxiosRequestConfig) =>
+    getApiClient().post(`/pos/proxy/empresas/${id}/formalizar`, data, config),
 
   // Comprobantes WSP (plan Estándar)
   getPaymentProofs: (status: 'pending' | 'all' = 'pending', config?: AxiosRequestConfig) =>

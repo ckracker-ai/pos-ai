@@ -40,7 +40,7 @@
 
 **Add-ons** (no inflar el plan base): sucursal extra ~$8.990–$12.990/mes; usuario extra ~$2.990–$4.990; DTE/facturación electrónica aparte cuando exista el módulo.
 
-**Límites que protegen margen sin asustar:** Básico 1 sucursal + 5 usuarios; Estándar 2–3 sucursales + 10 usuarios; Full 5 sucursales + 15 usuarios (ampliar con add-on).
+**Límites PYME (acordado 2026-06):** Básico 1 sucursal + 3 usuarios (Admin, Vendedor, Comanda); Estándar y Full 3 sucursales + 6 usuarios (Admin, Auditor, Vendedor, Comanda por sucursal). Ampliar con add-on. Informales sin RUT: ver `PYME-INFORMAL-MODULO.md`.
 
 ---
 

@@ -18,6 +18,11 @@ const saleCreateSchema = z.object({
   total: z.coerce.number(),
   discount: z.coerce.number().optional(),
   status: z.string().optional(),
+  requiresDelivery: z.boolean().optional(),
+  deliveryCustomerName: z.string().optional(),
+  deliveryPhone: z.string().optional(),
+  deliveryAddress: z.string().optional(),
+  deliveryAmount: z.coerce.number().nonnegative().optional(),
   notes: z.string().optional(),
   details: z.array(saleDetailSchema).min(1),
 });
@@ -149,6 +154,52 @@ const salesRoutes = async (app: FastifyInstance) => {
       const statusCode = e?.response?.status ?? 400;
       const error = e?.response?.data?.error ?? 'Failed to update sale';
       return sendFail(reply, error, statusCode);
+    }
+  });
+
+  app.get('/deliveries/pending', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+    try {
+      const data = await salesCore.listPendingDeliveries(ctx.token, ctx.internalKey, ctx.branchId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(reply, extractCoreError(e, 'Failed to list deliveries'), err.response?.status ?? 500);
+    }
+  });
+
+  app.patch('/sales/:id/delivery-status', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = (request.body ?? {}) as { status?: string; note?: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+    if (!body.status) return sendFail(reply, 'VALIDATION_ERROR: status required', 422);
+    try {
+      const data = await salesCore.patchDeliveryStatus(
+        id,
+        { status: body.status, note: body.note },
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId
+      );
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(reply, extractCoreError(e, 'Failed to update delivery status'), err.response?.status ?? 400);
+    }
+  });
+
+  app.get('/sales/:id/delivery-timeline', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+    try {
+      const data = await salesCore.getDeliveryTimeline(id, ctx.token, ctx.internalKey, ctx.branchId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(reply, extractCoreError(e, 'Failed to load delivery timeline'), err.response?.status ?? 404);
     }
   });
 

@@ -22,6 +22,7 @@ const sequelize = new Sequelize(
     },
     dialectOptions: {
       decimalNumbers: true,
+      charset: 'utf8mb4',
     },
   }
 );

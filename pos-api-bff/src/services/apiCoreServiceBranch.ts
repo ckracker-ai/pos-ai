@@ -16,7 +16,13 @@ export class ApiCoreServiceBranch extends ApiCoreBaseService {
   }
 
   async createBranch(
-    input: { name: string; address?: string },
+    input: {
+      name: string;
+      address?: string;
+      phone?: string;
+      comunaId?: string;
+      codigoPostal?: string;
+    },
     token: string,
     internalKey?: string,
     branchId?: string
@@ -33,6 +39,8 @@ export class ApiCoreServiceBranch extends ApiCoreBaseService {
       name?: string;
       address?: string;
       phone?: string;
+      comunaId?: string;
+      codigoPostal?: string;
       isActive?: boolean;
     },
     token: string,

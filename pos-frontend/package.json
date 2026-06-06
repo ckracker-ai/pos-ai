@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start -p 8010",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:pos-assist": "tsx --test test/pos-sale-assist.test.ts",
+    "test:pos-ai": "tsx --test test/pos-ai-apply.test.ts test/pos-ai-rules-client.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",
@@ -33,6 +36,7 @@
   },
   "devDependencies": {
     "eslint": "^8.54.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^14.0.0",
+    "tsx": "^4.19.0"
   }
 }

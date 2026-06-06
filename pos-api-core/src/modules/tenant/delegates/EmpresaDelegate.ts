@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { UniqueConstraintError } from 'sequelize';
 import sequelize from '../../../config/database';
-import Empresa, { EmpresaEstado } from '../models/Empresa.model';
+import Empresa, { EmpresaEstado, EmpresaEstadoTributario } from '../models/Empresa.model';
 import SaasPlan from '../../saas/models/SaasPlan.model';
 import saasPlanDelegate from '../../saas/delegates/SaasPlanDelegate';
 import suscripcionDelegate, { SuscripcionSummary } from '../../saas/delegates/SuscripcionDelegate';
@@ -14,10 +14,21 @@ import Branch from '../../branch/models/Branch.model';
 import Role from '../../auth/models/Role.model';
 import User from '../../auth/models/User.model';
 import { parseRut } from '../../../utils/rutChile';
+import { allocateInformalRutPlaceholder, isInformalRutNumero } from '../../../utils/informalRut';
+import {
+  type FormalizacionProgreso,
+  formalizacionProgressPercent,
+  isEmpresaFormal,
+  parseFormalizacionProgreso,
+  planRequiresFormal,
+} from '../utils/tributarioStatus';
 import { slugify, uniqueSlug } from '../../../utils/slug';
 import { readModelString } from '../../../utils/modelAttributes';
 import { isValidEmail } from '../../../utils/empresaAccess';
+import { decryptField, encryptField } from '../../../utils/cryptoField';
 import { Result, ok, fail } from '../../../types/result';
+import type { SaasPlanCodigo } from '../../saas/constants/planCodes';
+import { getPlanDescription, getPlanDisplayName } from '../../saas/utils/planDisplay';
 import * as argon2 from 'argon2';
 
 export interface EmpresaPlanSummary {
@@ -46,6 +57,12 @@ export interface EmpresaRecord {
   urlLogo: string | null;
   slug: string;
   estado: EmpresaEstado;
+  estadoTributario: EmpresaEstadoTributario;
+  rubroNegocio: string | null;
+  telefonoNegocio: string | null;
+  formalizacionProgreso: FormalizacionProgreso;
+  formalizacionPorcentaje: number;
+  esNegocioEnMarcha: boolean;
   planId: string;
   plan: EmpresaPlanSummary;
   assistantAdminPhone: string | null;
@@ -60,8 +77,11 @@ export interface EmpresaRecord {
 }
 
 export interface CreateEmpresaInput {
-  rut: string;
+  modoRegistro?: 'FORMAL' | 'INFORMAL';
+  rut?: string;
   razonSocial: string;
+  rubroNegocio?: string;
+  telefonoNegocio?: string;
   nombreFantasia?: string;
   giroSii?: string;
   direccionComercial?: string;
@@ -119,6 +139,20 @@ const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
 const EMPRESA_PLAN_INCLUDE = [{ model: SaasPlan, as: 'plan', required: true }];
 
 class EmpresaDelegate {
+  private readonly sensitiveTransferKeys = new Set([
+    'transferBankName',
+    'transferAccountType',
+    'transferAccount',
+    'transferHolderName',
+    'transferRut',
+  ]);
+
+  private decryptSensitiveMaybe(key: string, value: string | null): string | null {
+    if (!value) return null;
+    if (!this.sensitiveTransferKeys.has(key)) return value;
+    return decryptField(value);
+  }
+
   private planFromModel(plan: SaasPlan): EmpresaPlanSummary {
     const plain =
       typeof plan.toJSON === 'function'
@@ -137,11 +171,13 @@ class EmpresaDelegate {
     const valorRaw =
       plain.valor ?? plain.precioReferenciaClp ?? plain.precio_referencia_clp ?? 0;
 
+    const codigo = String(plain.codigo ?? '') as SaasPlanCodigo;
+
     return {
       id: String(plain.id ?? plan.id ?? ''),
-      codigo: String(plain.codigo ?? ''),
-      nombre: String(plain.nombre ?? ''),
-      descripcion: (plain.descripcion as string | null | undefined) ?? null,
+      codigo,
+      nombre: getPlanDisplayName(codigo, String(plain.nombre ?? '')),
+      descripcion: getPlanDescription(codigo, (plain.descripcion as string | null | undefined) ?? null),
       valor: Number(valorRaw),
       metodoPago: String(plain.metodoPago ?? plain.metodo_pago ?? 'TRANSFERENCIA'),
       activo: plain.isActive === true || plain.is_active === 1 || plain.is_active === true,
@@ -170,26 +206,55 @@ class EmpresaDelegate {
       urlLogo: (plain.urlLogo as string | null | undefined) ?? null,
       slug: String(plain.slug ?? row.slug ?? ''),
       estado: String(plain.estado ?? row.estado ?? 'PENDIENTE_ONBOARDING') as EmpresaEstado,
+      estadoTributario: String(
+        plain.estadoTributario ?? plain.estado_tributario ?? 'FORMAL'
+      ).toUpperCase() as EmpresaEstadoTributario,
+      rubroNegocio: (plain.rubroNegocio as string | null | undefined) ?? null,
+      telefonoNegocio: (plain.telefonoNegocio as string | null | undefined) ?? null,
+      formalizacionProgreso: parseFormalizacionProgreso(
+        plain.formalizacionProgreso ?? plain.formalizacion_progreso
+      ),
+      formalizacionPorcentaje: formalizacionProgressPercent(
+        parseFormalizacionProgreso(plain.formalizacionProgreso ?? plain.formalizacion_progreso)
+      ),
+      esNegocioEnMarcha: !isEmpresaFormal(
+        String(plain.estadoTributario ?? plain.estado_tributario ?? 'FORMAL')
+      ),
       planId: String(plain.planId ?? plain.plan_id ?? row.planId ?? ''),
       plan: this.planFromModel((row.get('plan') as SaasPlan) ?? ({} as SaasPlan)),
       assistantAdminPhone: (plain.assistantAdminPhone as string | null | undefined) ??
         (plain.assistant_admin_phone as string | null | undefined) ??
         null,
-      transferBankName: (plain.transferBankName as string | null | undefined) ??
-        (plain.transfer_bank_name as string | null | undefined) ??
-        null,
-      transferAccountType: (plain.transferAccountType as string | null | undefined) ??
-        (plain.transfer_account_type as string | null | undefined) ??
-        null,
-      transferAccount: (plain.transferAccount as string | null | undefined) ??
-        (plain.transfer_account as string | null | undefined) ??
-        null,
-      transferHolderName: (plain.transferHolderName as string | null | undefined) ??
-        (plain.transfer_holder_name as string | null | undefined) ??
-        null,
-      transferRut: (plain.transferRut as string | null | undefined) ??
-        (plain.transfer_rut as string | null | undefined) ??
-        null,
+      transferBankName: this.decryptSensitiveMaybe(
+        'transferBankName',
+        ((plain.transferBankName as string | null | undefined) ??
+          (plain.transfer_bank_name as string | null | undefined) ??
+          null) as string | null
+      ),
+      transferAccountType: this.decryptSensitiveMaybe(
+        'transferAccountType',
+        ((plain.transferAccountType as string | null | undefined) ??
+          (plain.transfer_account_type as string | null | undefined) ??
+          null) as string | null
+      ),
+      transferAccount: this.decryptSensitiveMaybe(
+        'transferAccount',
+        ((plain.transferAccount as string | null | undefined) ??
+          (plain.transfer_account as string | null | undefined) ??
+          null) as string | null
+      ),
+      transferHolderName: this.decryptSensitiveMaybe(
+        'transferHolderName',
+        ((plain.transferHolderName as string | null | undefined) ??
+          (plain.transfer_holder_name as string | null | undefined) ??
+          null) as string | null
+      ),
+      transferRut: this.decryptSensitiveMaybe(
+        'transferRut',
+        ((plain.transferRut as string | null | undefined) ??
+          (plain.transfer_rut as string | null | undefined) ??
+          null) as string | null
+      ),
       suscripcion: suscripcion ?? null,
       createdAt: plain.createdAt as Date,
       updatedAt: plain.updatedAt as Date,
@@ -244,8 +309,23 @@ class EmpresaDelegate {
   async create(
     input: CreateEmpresaInput
   ): Promise<Result<{ empresa: EmpresaRecord; branch?: Branch; adminUserId?: string }>> {
-    const rut = parseRut(input.rut);
-    if (!rut) return fail('VALIDATION_ERROR: invalid RUT');
+    const modoInformal = input.modoRegistro === 'INFORMAL';
+    let rut: Awaited<ReturnType<typeof parseRut>>;
+    let estadoTributario: EmpresaEstadoTributario = 'FORMAL';
+
+    if (modoInformal) {
+      try {
+        rut = await allocateInformalRutPlaceholder();
+      } catch {
+        return fail('INFORMAL_RUT_ALLOCATION_FAILED');
+      }
+      estadoTributario = 'INFORMAL';
+      input.planCodigo = 'BASICO';
+      input.planId = undefined;
+    } else {
+      rut = parseRut(input.rut ?? '');
+      if (!rut) return fail('VALIDATION_ERROR: invalid RUT');
+    }
 
     const razonSocial = input.razonSocial?.trim();
     if (!razonSocial) return fail('VALIDATION_ERROR: razonSocial is required');
@@ -276,10 +356,12 @@ class EmpresaDelegate {
     const slugCandidate = slugify(slugBase);
     if (!slugCandidate) return fail('VALIDATION_ERROR: slug could not be generated');
 
-    const existingRut = await Empresa.findOne({
-      where: { rutNumero: rut.rutNumero, rutDv: rut.rutDv },
-    });
-    if (existingRut) return fail('RUT_ALREADY_REGISTERED');
+    if (!modoInformal) {
+      const existingRut = await Empresa.findOne({
+        where: { rutNumero: rut.rutNumero, rutDv: rut.rutDv },
+      });
+      if (existingRut) return fail('RUT_ALREADY_REGISTERED');
+    }
 
     const initialEstado: EmpresaEstado = wantsAdmin
       ? 'ACTIVO'
@@ -312,6 +394,12 @@ class EmpresaDelegate {
           urlLogo: input.urlLogo?.trim() || null,
           slug,
           estado: initialEstado,
+          estadoTributario,
+          rubroNegocio: input.rubroNegocio?.trim() || null,
+          telefonoNegocio: input.telefonoNegocio?.trim() || null,
+          formalizacionProgreso: modoInformal
+            ? { diagnostico: null, pasos: { sii: false, municipalidad: false, cuentaBancaria: false, capturaRut: false } }
+            : null,
           planId: planResolved.value,
         },
         { transaction }
@@ -390,7 +478,8 @@ class EmpresaDelegate {
   private readRowString(row: Empresa, key: string): string | null {
     const raw = row.getDataValue(key);
     if (raw == null || raw === '') return null;
-    return String(raw).trim() || null;
+    const current = String(raw).trim() || null;
+    return this.decryptSensitiveMaybe(key, current);
   }
 
   private async applyPatch(
@@ -433,6 +522,16 @@ class EmpresaDelegate {
           planCodigo: platformInput.planCodigo,
         });
         if (!planResolved.success) return planResolved;
+
+        const targetPlan = await SaasPlan.findByPk(planResolved.value);
+        const targetCodigo = String(targetPlan?.getDataValue('codigo') ?? '');
+        const estadoTrib = String(row.getDataValue('estadoTributario') ?? 'FORMAL');
+        if (!isEmpresaFormal(estadoTrib) && planRequiresFormal(targetCodigo)) {
+          return fail(
+            'TRIBUTARIO_FORMAL_REQUIRED: formaliza tu negocio (RUT) antes de plan Estándar o Full'
+          );
+        }
+
         patch.planId = planResolved.value;
       }
     }
@@ -448,25 +547,27 @@ class EmpresaDelegate {
     }
     if ('transferBankName' in input) {
       const next = normOptional(input.transferBankName);
-      if (next !== this.readRowString(row, 'transferBankName')) patch.transferBankName = next;
+      if (next !== this.readRowString(row, 'transferBankName')) patch.transferBankName = encryptField(next);
     }
     if ('transferAccountType' in input) {
       const next = normOptional(input.transferAccountType);
       if (next !== this.readRowString(row, 'transferAccountType')) {
-        patch.transferAccountType = next;
+        patch.transferAccountType = encryptField(next);
       }
     }
     if ('transferAccount' in input) {
       const next = normOptional(input.transferAccount);
-      if (next !== this.readRowString(row, 'transferAccount')) patch.transferAccount = next;
+      if (next !== this.readRowString(row, 'transferAccount')) patch.transferAccount = encryptField(next);
     }
     if ('transferHolderName' in input) {
       const next = normOptional(input.transferHolderName);
-      if (next !== this.readRowString(row, 'transferHolderName')) patch.transferHolderName = next;
+      if (next !== this.readRowString(row, 'transferHolderName')) {
+        patch.transferHolderName = encryptField(next);
+      }
     }
     if ('transferRut' in input) {
       const next = normOptional(input.transferRut);
-      if (next !== this.readRowString(row, 'transferRut')) patch.transferRut = next;
+      if (next !== this.readRowString(row, 'transferRut')) patch.transferRut = encryptField(next);
     }
 
     if (input.slug !== undefined) {
@@ -582,6 +683,95 @@ class EmpresaDelegate {
       suscripcionEstado: estado,
       canPay,
     });
+  }
+
+  async updateFormalizacionProgreso(
+    id: string,
+    scopedEmpresaId: string,
+    input: FormalizacionProgreso & { estadoTributario?: 'EN_TRAMITE' }
+  ): Promise<Result<EmpresaRecord>> {
+    if (id !== scopedEmpresaId) return fail('EMPRESA_ACCESS_DENIED');
+
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+
+    const currentTrib = String(row.getDataValue('estadoTributario') ?? 'FORMAL');
+    if (isEmpresaFormal(currentTrib)) {
+      return fail('VALIDATION_ERROR: empresa already formal');
+    }
+
+    const merged = parseFormalizacionProgreso(row.getDataValue('formalizacionProgreso'));
+    const next: FormalizacionProgreso = {
+      diagnostico: input.diagnostico ?? merged.diagnostico ?? null,
+      pasos: {
+        ...merged.pasos,
+        ...input.pasos,
+      },
+    };
+
+    const patch: Record<string, unknown> = {
+      formalizacionProgreso: next,
+    };
+
+    if (input.estadoTributario === 'EN_TRAMITE' && currentTrib === 'INFORMAL') {
+      patch.estadoTributario = 'EN_TRAMITE';
+    }
+
+    await row.update(patch);
+    await this.reloadWithPlan(row);
+    const sub = await this.loadSuscripcion(id);
+    return ok(this.toRecord(row, sub));
+  }
+
+  async formalizarEmpresa(
+    id: string,
+    scopedEmpresaId: string,
+    input: { rut: string; razonSocial?: string; giroSii?: string | null }
+  ): Promise<Result<EmpresaRecord>> {
+    if (id !== scopedEmpresaId) return fail('EMPRESA_ACCESS_DENIED');
+
+    const row = await Empresa.findByPk(id, { include: EMPRESA_PLAN_INCLUDE });
+    if (!row) return fail('EMPRESA_NOT_FOUND');
+
+    const currentTrib = String(row.getDataValue('estadoTributario') ?? 'FORMAL');
+    if (isEmpresaFormal(currentTrib)) {
+      return fail('VALIDATION_ERROR: empresa already formal');
+    }
+
+    const rut = parseRut(input.rut);
+    if (!rut) return fail('VALIDATION_ERROR: invalid RUT');
+    if (isInformalRutNumero(rut.rutNumero)) {
+      return fail('VALIDATION_ERROR: invalid RUT');
+    }
+
+    const existingRut = await Empresa.findOne({
+      where: { rutNumero: rut.rutNumero, rutDv: rut.rutDv },
+    });
+    if (existingRut && String(existingRut.id) !== String(row.id)) {
+      return fail('RUT_ALREADY_REGISTERED');
+    }
+
+    const razonSocial = input.razonSocial?.trim() || String(row.getDataValue('razonSocial') ?? '');
+    if (!razonSocial) return fail('VALIDATION_ERROR: razonSocial is required');
+
+    const prevProgress = parseFormalizacionProgreso(row.getDataValue('formalizacionProgreso'));
+
+    await row.update({
+      rutEmpresa: rut.rutEmpresa,
+      rutNumero: rut.rutNumero,
+      rutDv: rut.rutDv,
+      razonSocial,
+      giroSii: input.giroSii?.trim() || row.getDataValue('giroSii'),
+      estadoTributario: 'FORMAL',
+      formalizacionProgreso: {
+        ...prevProgress,
+        pasos: { ...prevProgress.pasos, capturaRut: true },
+      },
+    });
+
+    await this.reloadWithPlan(row);
+    const sub = await this.loadSuscripcion(id);
+    return ok(this.toRecord(row, sub));
   }
 
   async confirmCheckoutPayment(

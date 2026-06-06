@@ -14,6 +14,7 @@ import {
   User,
   UserRole,
 } from '@/core/interfaces';
+import { getPlanDescription, getPlanDisplayName } from '@/core/constants/saas-plan';
 
 export function unwrapApiEnvelope(responseData: unknown): unknown {
   if (
@@ -110,9 +111,12 @@ function readProductScalar(
 }
 
 export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Product {
-  const category = raw.category as { name?: string } | undefined;
+  const category = raw.category as { id?: string; name?: string } | undefined;
   const categoryName =
     typeof raw.category === 'string' ? raw.category : String(category?.name ?? '');
+  const categoryIdRaw = readProductScalar(raw, 'categoryId', 'category_id') ?? category?.id;
+  const categoryId =
+    categoryIdRaw != null && categoryIdRaw !== '' ? String(categoryIdRaw) : undefined;
 
   const embeddedStock = readProductScalar(raw, 'stock', 'stock');
   const resolvedStock =
@@ -138,6 +142,7 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
     stock: resolvedStock,
     sku: String(readProductScalar(raw, 'sku', 'sku') ?? ''),
     category: categoryName,
+    categoryId,
     isActive: isActiveRaw !== false && isActiveRaw !== 0 && isActiveRaw !== '0',
     inBranch: Boolean(
       raw.stockRecordId ??
@@ -169,14 +174,36 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
 }
 
 export function normalizeBranch(raw: Record<string, unknown>): Branch {
+  const comunaNombre = String(raw.comunaNombre ?? raw.comuna_nombre ?? '');
+  const regionNombre = String(raw.regionNombre ?? raw.region_nombre ?? '');
+  const cityFallback = comunaNombre
+    ? regionNombre
+      ? `${comunaNombre}, ${regionNombre}`
+      : comunaNombre
+    : String(raw.city ?? '');
   return {
     id: String(raw.id ?? ''),
     name: String(raw.name ?? ''),
     code: String(raw.code ?? ''),
     address: String(raw.address ?? ''),
-    city: String(raw.city ?? ''),
+    city: cityFallback,
+    comunaId: raw.comunaId != null ? String(raw.comunaId) : raw.comuna_id != null ? String(raw.comuna_id) : null,
+    codigoPostal:
+      raw.codigoPostal != null
+        ? String(raw.codigoPostal)
+        : raw.codigo_postal != null
+          ? String(raw.codigo_postal)
+          : null,
+    comunaNombre: comunaNombre || null,
+    regionId:
+      raw.regionId != null
+        ? String(raw.regionId)
+        : raw.region_id != null
+          ? String(raw.region_id)
+          : null,
+    regionNombre: regionNombre || null,
     phone: String(raw.phone ?? ''),
-    isActive: raw.isActive !== false,
+    isActive: raw.isActive !== false && raw.is_active !== false,
   };
 }
 
@@ -233,11 +260,14 @@ function normalizeEmpresaPlan(raw: Record<string, unknown>): EmpresaPlanSummary 
     ? (codigoRaw as SaasPlanCodigo)
     : 'BASICO';
 
+  const nombreRaw = String(planRaw.nombre ?? codigo);
+  const descripcionRaw = planRaw.descripcion != null ? String(planRaw.descripcion) : null;
+
   return {
     id: String(planRaw.id ?? raw.planId ?? ''),
     codigo,
-    nombre: String(planRaw.nombre ?? codigo),
-    descripcion: planRaw.descripcion != null ? String(planRaw.descripcion) : null,
+    nombre: getPlanDisplayName({ codigo, nombre: nombreRaw }),
+    descripcion: getPlanDescription(codigo, descripcionRaw),
     valor: normalizePlanValor(planRaw),
     metodoPago: normalizeMetodoPago(planRaw.metodoPago ?? planRaw.metodo_pago),
     activo: normalizePlanActivo(planRaw),
@@ -252,12 +282,14 @@ export function normalizeSaasPlan(raw: Record<string, unknown>): SaasPlan {
   const codigo = SAAS_PLAN_CODIGOS.includes(codigoRaw as SaasPlanCodigo)
     ? (codigoRaw as SaasPlanCodigo)
     : 'BASICO';
+  const nombreRaw = String(raw.nombre ?? codigo);
+  const descripcionRaw = raw.descripcion != null ? String(raw.descripcion) : null;
 
   return {
     id: String(raw.id ?? ''),
     codigo,
-    nombre: String(raw.nombre ?? codigo),
-    descripcion: raw.descripcion != null ? String(raw.descripcion) : null,
+    nombre: getPlanDisplayName({ codigo, nombre: nombreRaw }),
+    descripcion: getPlanDescription(codigo, descripcionRaw),
     valor: normalizePlanValor(raw),
     metodoPago: normalizeMetodoPago(raw.metodoPago ?? raw.metodo_pago),
     activo: normalizePlanActivo(raw),
@@ -317,6 +349,30 @@ export function normalizeEmpresa(raw: Record<string, unknown>): Empresa {
     urlLogo: raw.urlLogo != null ? String(raw.urlLogo) : null,
     slug: String(raw.slug ?? ''),
     estado,
+    estadoTributario: (() => {
+      const t = String(raw.estadoTributario ?? raw.estado_tributario ?? 'FORMAL').toUpperCase();
+      return t === 'INFORMAL' || t === 'EN_TRAMITE' || t === 'FORMAL' ? t : 'FORMAL';
+    })() as import('@/core/interfaces').EmpresaEstadoTributario,
+    rubroNegocio:
+      raw.rubroNegocio != null
+        ? String(raw.rubroNegocio)
+        : raw.rubro_negocio != null
+          ? String(raw.rubro_negocio)
+          : null,
+    telefonoNegocio:
+      raw.telefonoNegocio != null
+        ? String(raw.telefonoNegocio)
+        : raw.telefono_negocio != null
+          ? String(raw.telefono_negocio)
+          : null,
+    formalizacionProgreso: (raw.formalizacionProgreso ?? raw.formalizacion_progreso ?? null) as
+      | import('@/core/interfaces').FormalizacionProgreso
+      | null,
+    formalizacionPorcentaje: Number(raw.formalizacionPorcentaje ?? raw.formalizacion_porcentaje ?? 0),
+    esNegocioEnMarcha:
+      raw.esNegocioEnMarcha != null
+        ? Boolean(raw.esNegocioEnMarcha)
+        : String(raw.estadoTributario ?? raw.estado_tributario ?? 'FORMAL').toUpperCase() !== 'FORMAL',
     planId: String(raw.planId ?? raw.plan_id ?? ''),
     plan: normalizeEmpresaPlan(raw),
     assistantAdminPhone:
@@ -378,14 +434,55 @@ export function normalizeSupplier(raw: Record<string, unknown>): Supplier {
 }
 
 export function normalizeCategory(raw: Record<string, unknown>): Category {
+  const parentIdRaw = raw.parentId ?? raw.parent_id;
   return {
     id: String(raw.id ?? ''),
     name: String(raw.name ?? ''),
+    slug: raw.slug != null ? String(raw.slug) : undefined,
     description: raw.description ? String(raw.description) : undefined,
-    isActive: raw.isActive !== false,
-    createdAt: String(raw.createdAt ?? new Date().toISOString()),
-    updatedAt: String(raw.updatedAt ?? new Date().toISOString()),
+    parentId: parentIdRaw != null && parentIdRaw !== '' ? String(parentIdRaw) : null,
+    parentName:
+      raw.parentName != null
+        ? String(raw.parentName)
+        : raw.parent_name != null
+          ? String(raw.parent_name)
+          : null,
+    isActive: raw.isActive !== false && raw.is_active !== false,
+    createdAt: String(raw.createdAt ?? raw.created_at ?? new Date().toISOString()),
+    updatedAt: String(raw.updatedAt ?? raw.updated_at ?? new Date().toISOString()),
   };
+}
+
+export type CategoryTreeNode = Category & { children?: CategoryTreeNode[] };
+
+export function normalizeCategoryTreeNode(raw: Record<string, unknown>): CategoryTreeNode {
+  const childrenRaw = raw.children;
+  const children = Array.isArray(childrenRaw)
+    ? childrenRaw
+        .filter((c): c is Record<string, unknown> => Boolean(c) && typeof c === 'object')
+        .map((c) => normalizeCategoryTreeNode(c))
+    : [];
+  return { ...normalizeCategory(raw), children };
+}
+
+export function flattenCategoryTree(
+  nodes: CategoryTreeNode[],
+  depth = 0,
+  parentName: string | null = null
+): Category[] {
+  const out: Category[] = [];
+  for (const node of nodes) {
+    const { children, ...rest } = node;
+    out.push({
+      ...rest,
+      depth,
+      parentName: parentName ?? rest.parentName ?? null,
+    });
+    if (children?.length) {
+      out.push(...flattenCategoryTree(children, depth + 1, rest.name));
+    }
+  }
+  return out;
 }
 
 export function mergeProductsWithInventory(

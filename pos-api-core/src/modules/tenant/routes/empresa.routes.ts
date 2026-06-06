@@ -27,6 +27,7 @@ const mapErrorStatus = (error: string): number => {
   if (error === 'SUBSCRIPTION_ALREADY_ACTIVE') return 409;
   if (error === 'ASSISTANT_PHONE_IN_USE') return 409;
   if (error.startsWith('ASSISTANT_PLAN_REQUIRED')) return 403;
+  if (error.startsWith('TRIBUTARIO_FORMAL_REQUIRED')) return 403;
   if (error.startsWith('PLAN_LIMIT_')) return 403;
   return 400;
 };
@@ -190,6 +191,31 @@ router.patch('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
     req.params.id,
     getEffectiveEmpresaId(req),
     req.body ?? {}
+  );
+  if (result.success) return sendOk(res, { empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.patch('/:id/formalizacion-progreso', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const result = await empresaDelegate.updateFormalizacionProgreso(
+    req.params.id,
+    getEffectiveEmpresaId(req),
+    req.body ?? {}
+  );
+  if (result.success) return sendOk(res, { empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/:id/formalizar', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const body = req.body ?? {};
+  const result = await empresaDelegate.formalizarEmpresa(
+    req.params.id,
+    getEffectiveEmpresaId(req),
+    {
+      rut: String(body.rut ?? ''),
+      razonSocial: body.razonSocial != null ? String(body.razonSocial) : undefined,
+      giroSii: body.giroSii != null ? String(body.giroSii) : null,
+    }
   );
   if (result.success) return sendOk(res, { empresa: result.value });
   return sendFail(res, result.error, mapErrorStatus(result.error));

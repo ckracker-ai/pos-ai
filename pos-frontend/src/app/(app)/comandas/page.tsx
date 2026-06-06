@@ -71,34 +71,32 @@ export default function ComandasPage() {
       <AppPageContent>
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Cocina</p>
-              <h1 className="mt-3 text-3xl font-semibold text-white">Comandas en vivo</h1>
-              <p className="mt-2 max-w-2xl text-slate-400">
+              <p className="app-eyebrow">Cocina</p>
+              <h1 className="app-heading-page">Comandas en vivo</h1>
+              <p className="mt-2 max-w-2xl app-text-muted">
                 Pedidos pendientes de preparación. Se actualiza automáticamente cada {POLL_MS / 1000}s.
               </p>
               {branchLoadError && (
-                <p className="mt-2 text-xs text-amber-300">{branchLoadError}</p>
+                <p className="mt-2 text-xs text-[#8C6A2B]">{branchLoadError}</p>
               )}
               {isFetching && !isLoading && (
-                <p className="mt-2 text-xs text-sky-400">Actualizando...</p>
+                <p className="mt-2 text-xs text-[#4A533C]">Actualizando...</p>
               )}
             </div>
-            <span className="inline-flex rounded-full bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-200">
+            <span className="inline-flex rounded-full border border-[rgba(176,138,76,0.5)] bg-[rgba(176,138,76,0.1)] px-4 py-2 text-sm font-semibold text-[#8C6A2B]">
               Pendientes: {isLoading ? '…' : sortedOrders.length}
             </span>
           </div>
 
           {(errorMessage || loadErrorMessage) && (
-            <p className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-              {errorMessage ?? loadErrorMessage}
-            </p>
+            <p className="mb-6 app-alert-error">{errorMessage ?? loadErrorMessage}</p>
           )}
 
           {isLoading ? (
-            <p className="text-slate-400">Cargando comandas...</p>
+            <p className="app-text-muted">Cargando comandas...</p>
           ) : isError ? null : sortedOrders.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-700 p-12 text-center text-slate-500">
-              No hay comandas pendientes en <strong className="text-slate-300">{activeBranchName}</strong>.
+            <div className="app-panel rounded-3xl border border-dashed p-12 text-center text-[#6b7280]">
+              No hay comandas pendientes en <strong className="text-[#3d4532]">{activeBranchName}</strong>.
               Las nuevas ventas del POS en esta sucursal aparecerán aquí.
             </div>
           ) : (
@@ -106,41 +104,41 @@ export default function ComandasPage() {
               {sortedOrders.map((order) => (
                 <article
                   key={order.id}
-                  className="rounded-3xl border border-amber-500/30 bg-slate-900/90 p-6 shadow-lg"
+                  className="app-card rounded-3xl border border-[rgba(176,138,76,0.28)] p-6 shadow-lg"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.25em] text-amber-400">Comanda</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">{order.displayReference}</h2>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="text-xs uppercase tracking-[0.25em] text-[#8C6A2B]">Comanda</p>
+                      <h2 className="mt-2 text-lg font-semibold text-[#3D4532]">{order.displayReference}</h2>
+                      <p className="mt-1 text-xs text-[#6b7280]">
                         {new Date(order.createdAt).toLocaleString('es-CO', {
                           dateStyle: 'short',
                           timeStyle: 'short',
                         })}
                       </p>
                     </div>
-                    <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-200">
+                    <span className="rounded-full border border-[rgba(176,138,76,0.45)] bg-[rgba(176,138,76,0.1)] px-3 py-1 text-xs font-semibold text-[#8C6A2B]">
                       PENDIENTE
                     </span>
                   </div>
 
                   {order.customerNotes && (
-                    <p className="mt-4 rounded-2xl bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
+                    <p className="mt-4 rounded-2xl border border-[rgba(209,199,189,0.8)] bg-[rgba(74,83,60,0.05)] px-4 py-3 text-sm app-text-muted">
                       {order.customerNotes}
                     </p>
                   )}
 
                   <ul className="mt-5 space-y-3">
                     {order.items.length === 0 ? (
-                      <li className="text-sm text-slate-500">Sin líneas de detalle en la venta.</li>
+                      <li className="text-sm text-[#6b7280]">Sin líneas de detalle en la venta.</li>
                     ) : (
                       order.items.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3"
+                          className="flex items-center justify-between rounded-2xl border border-[rgba(209,199,189,0.8)] bg-white px-4 py-3"
                         >
-                          <span className="font-medium text-white">{item.productName}</span>
-                          <span className="rounded-full bg-slate-800 px-3 py-1 text-sm font-semibold text-amber-200">
+                          <span className="font-medium text-[#3D4532]">{item.productName}</span>
+                          <span className="rounded-full border border-[rgba(74,83,60,0.2)] bg-[rgba(74,83,60,0.08)] px-3 py-1 text-sm font-semibold text-[#4A533C]">
                             ×{item.quantity}
                           </span>
                         </li>
@@ -151,7 +149,7 @@ export default function ComandasPage() {
                   <button
                     type="button"
                     onClick={() => handleMarkReady(order.id)}
-                    className="mt-6 w-full rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition"
+                    className="app-btn-primary mt-6 w-full rounded-3xl px-4 py-3 text-sm font-semibold transition"
                   >
                     Marcar como entregado
                   </button>

@@ -66,6 +66,57 @@ const empresaRoutes = async (app: FastifyInstance) => {
     }
   });
 
+  const formalizacionSchema = z.object({
+    diagnostico: z.enum(['ocasional', 'sustento']).nullable().optional(),
+    pasos: z
+      .object({
+        sii: z.boolean().optional(),
+        municipalidad: z.boolean().optional(),
+        cuentaBancaria: z.boolean().optional(),
+        capturaRut: z.boolean().optional(),
+      })
+      .optional(),
+    estadoTributario: z.literal('EN_TRAMITE').optional(),
+  });
+
+  const formalizarSchema = z.object({
+    rut: z.string().min(8).max(20),
+    razonSocial: z.string().min(2).max(200).optional(),
+    giroSii: z.string().nullable().optional(),
+  });
+
+  app.patch('/:id/formalizacion-progreso', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    const body = formalizacionSchema.parse(request.body);
+
+    try {
+      const data = await empresaCore.updateFormalizacionProgreso(id, body, ctx.token, ctx.internalKey, ctx.branchId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(reply, extractCoreError(e, 'Failed to update formalizacion'), err.response?.status ?? 400);
+    }
+  });
+
+  app.post('/:id/formalizar', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    const body = formalizarSchema.parse(request.body);
+
+    try {
+      const data = await empresaCore.formalizarEmpresa(id, body, ctx.token, ctx.internalKey, ctx.branchId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(reply, extractCoreError(e, 'Failed to formalizar empresa'), err.response?.status ?? 400);
+    }
+  });
+
   app.patch('/:id', { preHandler: [requireSeller] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const ctx = requireCoreRequestContext(reply, request);

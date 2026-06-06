@@ -44,4 +44,30 @@ export class ApiCoreServiceEmpresa extends ApiCoreBaseService {
     });
     return response.data;
   }
+
+  async updateFormalizacionProgreso(
+    id: string,
+    input: Record<string, unknown>,
+    token: string,
+    internalKey: string,
+    branchId: string
+  ) {
+    const response = await this.client.patch(`/empresas/${id}/formalizacion-progreso`, input, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
+  async formalizarEmpresa(
+    id: string,
+    input: { rut: string; razonSocial?: string; giroSii?: string | null },
+    token: string,
+    internalKey: string,
+    branchId: string
+  ) {
+    const response = await this.client.post(`/empresas/${id}/formalizar`, input, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
 }

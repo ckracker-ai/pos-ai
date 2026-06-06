@@ -1,6 +1,8 @@
 import { Op } from 'sequelize';
 import Empresa from '../../tenant/models/Empresa.model';
 import SaasPlan from '../models/SaasPlan.model';
+import type { SaasPlanCodigo } from '../constants/planCodes';
+import { getPlanDisplayName } from './planDisplay';
 import Branch from '../../branch/models/Branch.model';
 import User from '../../auth/models/User.model';
 import AssistantChannelBinding from '../../assistant/models/AssistantChannelBinding.model';
@@ -83,8 +85,8 @@ export async function countPlatformStats(): Promise<
     else pendientes += 1;
 
     const plan = row.get('plan') as SaasPlan | undefined;
-    const codigo = String(plan?.getDataValue('codigo') ?? '—');
-    const nombre = String(plan?.getDataValue('nombre') ?? codigo);
+    const codigo = String(plan?.getDataValue('codigo') ?? '—') as SaasPlanCodigo;
+    const nombre = getPlanDisplayName(codigo, String(plan?.getDataValue('nombre') ?? codigo));
     const prev = planCounts.get(codigo);
     planCounts.set(codigo, { codigo, nombre, count: (prev?.count ?? 0) + 1 });
   }

@@ -96,7 +96,8 @@ Invoke-RestMethod -Uri "http://localhost:3030/webhooks/whatsapp" -Method POST -C
 
 ## Límites actuales
 
-- No deduplica comprobantes repetidos (mismo screenshot varias veces).
+- Un comprobante activo por pedido (reenvío actualiza la imagen sin repetir WSP al admin).
+- Notificación WSP: solo al **teléfono admin** del comercio (`assistant_admin_phone` o admin de sucursal), **una vez por pedido**.
 - No confirma pedido automáticamente aunque `TRANSFER_OK`.
 - Sin `OPENAI_API_KEY`: solo caption manual y revisión humana.
 - PDF nativo no se analiza; se pide screenshot.

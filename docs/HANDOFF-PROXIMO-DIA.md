@@ -1,7 +1,7 @@
 # Handoff — próximo día de trabajo
 
-**Fecha base:** 2026-06-01 · Repo: `d:\Proyectos\POS-AI`  
-**Última ejecución handoff:** UI base (`v1.8a-ui`) + docs pasarela + WSP sucursal.
+**Fecha base:** 2026-06-02 · Repo: `d:\Proyectos\POS-AI`  
+**Última ejecución handoff:** **S0 + S1 cerrados** · smoke S0/S1 · TDD catálogo + carrito WSP.
 
 ---
 
@@ -9,22 +9,22 @@
 
 ```
 Retoma POS-AI según docs/HANDOFF-PROXIMO-DIA.md y SPRINT-PLAN.md.
-Prioridad del día: (1) diseño unificado estilo landing en tenant + plataforma,
-(2) documento de alcance SDK pasarela v1.8, (3) spike diseño WSP por sucursal.
-Arranca con docker compose ps, luego ejecuta el sprint que indique el usuario si cambia el orden.
+S0–S5 + S4 cerrados. Prioridad: WSP P2 (mensajes/estilos) o S6 ERP AI.
+Smoke: .\scripts\qa-smoke.ps1 -IncludeS0 -IncludeS1
+Migración S1 si BD nueva: .\scripts\migrate-v1.9-categories.ps1
 ```
 
 ---
 
-## Lo que quedó listo hoy
+## Lo que quedó listo (S0 cerrado)
 
 | Área | Estado |
 |------|--------|
-| Landing futurista | Hero con imagen 3D, sección IA, colores corporativos |
-| Logo | PNG limpio + `PosAiLogo` con `height` / recorte navbar |
-| Registro / checkout sandbox | `/registro`, `/checkout`, webhooks suscripción |
-| Perfil empresa tenant | Pestañas + transferencia editable (IA) |
-| Route groups | Marketing sin `RouteGuard`; app con guard |
+| WSP + comprobantes | E2E, admin sin re-spam, carrito multi-búsqueda (`WSP-CARRITO-MULTI-BUSQUEDA.md`) |
+| Delivery ventas | API + POS + columna reportes |
+| Territorio / sucursales | Regiones/comunas + CRUD UI (CUT completo → **S2**) |
+| Seguridad mínima | Cifrado transfer, recifrado, `timingSafeEqual`, warn secrets |
+| Smoke S0 | `.\scripts\qa-smoke.ps1 -IncludeS0` |
 
 **URLs:** `http://localhost:8010/` · tenant login `/login` · plataforma `/platform/login`
 
@@ -37,8 +37,11 @@ Arranca con docker compose ps, luego ejecuta el sprint que indique el usuario si
 ```powershell
 cd d:\Proyectos\POS-AI
 docker compose up -d
+.\scripts\qa-smoke.ps1 -IncludeS0
 # Si BD nueva:
+.\scripts\migrate-v1.8-territory.ps1
 .\scripts\migrate-v1.7-assistant.ps1
+.\scripts\migrate-v1.9-categories.ps1
 ```
 
 ---

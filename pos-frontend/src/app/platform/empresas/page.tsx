@@ -11,6 +11,7 @@ import {
   METODO_PAGO_LABELS,
   PLAN_DISPLAY_NAMES,
 } from '@/core/constants/saas-plan';
+import { WspTransferPreview } from '@/components/molecules/WspTransferPreview';
 
 const ESTADO_LABELS: Record<EmpresaEstado, string> = {
   ACTIVO: 'Activa',
@@ -74,6 +75,7 @@ export default function PlatformEmpresasPage() {
   const [transferAccount, setTransferAccount] = useState('');
   const [transferHolderName, setTransferHolderName] = useState('');
   const [transferRut, setTransferRut] = useState('');
+  const [showSensitiveTransfer, setShowSensitiveTransfer] = useState(false);
   const [savingWsp, setSavingWsp] = useState(false);
   const wspFormEmpresaRef = useRef<string>('');
 
@@ -409,7 +411,7 @@ export default function PlatformEmpresasPage() {
                           : [{ codigo: e.plan?.codigo ?? 'BASICO', nombre: e.plan?.nombre ?? 'Plan', activo: true } as SaasPlan]
                         ).map((p) => (
                           <option key={p.codigo} value={p.codigo}>
-                            {p.nombre}
+                            {getPlanDisplayName(p)}
                           </option>
                         ))}
                       </select>
@@ -497,7 +499,8 @@ export default function PlatformEmpresasPage() {
           <h2 className="text-base font-semibold text-brand-ink">Canal WhatsApp (plan Estándar / Full)</h2>
           <p className="mt-1 text-xs text-brand-ink-muted">
             Cliente WSP, admin validación y datos de transferencia (la IA compara comprobantes contra
-            estos datos).
+            estos datos). El tenant también puede editarlos en{' '}
+            <span className="font-medium text-brand-ink">/empresas → Transferencia (IA)</span>.
           </p>
           <form onSubmit={handleSaveWsp} className="mt-4 space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -561,6 +564,15 @@ export default function PlatformEmpresasPage() {
                   className="app-input"
                 />
               </div>
+              <div className="sm:col-span-2 lg:col-span-3 -mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSensitiveTransfer((v) => !v)}
+                  className="rounded-md border border-brand-linen bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-vanilla"
+                >
+                  {showSensitiveTransfer ? 'Ocultar datos sensibles' : 'Ver datos sensibles'}
+                </button>
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-brand-ink-muted">Tipo cuenta</label>
                 <select
@@ -577,7 +589,7 @@ export default function PlatformEmpresasPage() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-brand-ink-muted">N° cuenta</label>
                 <input
-                  type="text"
+                  type={showSensitiveTransfer ? 'text' : 'password'}
                   value={transferAccount}
                   onChange={(ev) => setTransferAccount(ev.target.value)}
                   placeholder="12345678"
@@ -587,7 +599,7 @@ export default function PlatformEmpresasPage() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-brand-ink-muted">Titular</label>
                 <input
-                  type="text"
+                  type={showSensitiveTransfer ? 'text' : 'password'}
                   value={transferHolderName}
                   onChange={(ev) => setTransferHolderName(ev.target.value)}
                   placeholder="Razón social o nombre fantasía"
@@ -597,7 +609,7 @@ export default function PlatformEmpresasPage() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-brand-ink-muted">RUT titular</label>
                 <input
-                  type="text"
+                  type={showSensitiveTransfer ? 'text' : 'password'}
                   value={transferRut}
                   onChange={(ev) => setTransferRut(ev.target.value)}
                   placeholder="76.123.456-7"
@@ -605,6 +617,15 @@ export default function PlatformEmpresasPage() {
                 />
               </div>
             </div>
+            <WspTransferPreview
+              fields={{
+                transferBankName,
+                transferAccountType,
+                transferAccount,
+                transferHolderName,
+                transferRut,
+              }}
+            />
             <button
               type="submit"
               disabled={savingWsp}

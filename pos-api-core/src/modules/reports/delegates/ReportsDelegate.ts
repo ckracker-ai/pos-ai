@@ -40,6 +40,9 @@ export interface SaleReportRow {
   discount: number;
   status: string;
   notes: string | null;
+  requiresDelivery: boolean;
+  deliveryAmount: number;
+  deliveryAddress: string | null;
 }
 
 export interface InventoryReportRow {
@@ -51,6 +54,10 @@ export interface InventoryReportRow {
   quantity: number;
   minStock: number;
   price: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryPrincipalId: string | null;
+  categoryPrincipalName: string | null;
 }
 
 export interface ShrinkageReportSummary {
@@ -248,6 +255,9 @@ class ReportsDelegate {
            s.discount,
            s.status,
            s.notes,
+           s.requires_delivery,
+           s.delivery_amount,
+           s.delivery_address,
            s.created_at,
            b.name AS branch_name
          FROM sales s
@@ -287,6 +297,12 @@ class ReportsDelegate {
           discount: Number(readRowValue(row, 'discount') ?? 0),
           status: String(readRowValue(row, 'status') ?? ''),
           notes: (readRowValue(row, 'notes') ?? null) as string | null,
+          requiresDelivery: Boolean(
+            readRowValue(row, 'requires_delivery', 'requiresDelivery')
+          ),
+          deliveryAmount: Number(readRowValue(row, 'delivery_amount', 'deliveryAmount') ?? 0),
+          deliveryAddress: (readRowValue(row, 'delivery_address', 'deliveryAddress') ??
+            null) as string | null,
         };
       });
 
@@ -314,9 +330,16 @@ class ReportsDelegate {
            p.name AS product_name,
            p.sku AS product_sku,
            p.price AS product_price,
+           p.category_id,
+           c.name AS category_name,
+           c.parent_id AS category_parent_id,
+           COALESCE(pc.name, c.name) AS category_principal_name,
+           COALESCE(pc.id, c.id) AS category_principal_id,
            b.name AS branch_name
          FROM inventory_stock s
          LEFT JOIN products p ON p.id = s.product_id AND p.empresa_id = :empresaId
+         LEFT JOIN categories c ON c.id = p.category_id AND c.empresa_id = :empresaId
+         LEFT JOIN categories pc ON pc.id = c.parent_id AND pc.empresa_id = :empresaId
          LEFT JOIN branches b ON b.id = s.branch_id AND b.empresa_id = :empresaId
          ${branchClause}
          ORDER BY s.quantity ASC`,
@@ -335,6 +358,20 @@ class ReportsDelegate {
         quantity: Number(readRowValue(row, 'quantity') ?? 0),
         minStock: Number(readRowValue(row, 'min_stock', 'minStock') ?? 0),
         price: Number(readRowValue(row, 'product_price', 'price') ?? 0),
+        categoryId: (readRowValue(row, 'category_id', 'categoryId') ?? null) as string | null,
+        categoryName: (readRowValue(row, 'category_name', 'categoryName') ?? null) as
+          | string
+          | null,
+        categoryPrincipalId: (readRowValue(
+          row,
+          'category_principal_id',
+          'categoryPrincipalId'
+        ) ?? null) as string | null,
+        categoryPrincipalName: (readRowValue(
+          row,
+          'category_principal_name',
+          'categoryPrincipalName'
+        ) ?? null) as string | null,
       }));
 
       return ok(rows);

@@ -1,4 +1,5 @@
 import type { SaasPlan, SaasPlanCodigo } from '@/core/interfaces';
+import { PLAN_PYME_COPY } from './plan-pyme-matrix';
 import { formatPlanValor } from './saas-plan';
 
 export type LandingPlan = {
@@ -9,54 +10,46 @@ export type LandingPlan = {
   valorLabel: string;
   sucursales: string;
   usuarios: string;
+  roles: string;
   features: string[];
   destacado?: boolean;
 };
 
 const MARKETING: Record<
   SaasPlanCodigo,
-  Omit<LandingPlan, 'codigo' | 'valor' | 'valorLabel' | 'sucursales' | 'usuarios'>
+  Omit<LandingPlan, 'codigo' | 'valor' | 'valorLabel' | 'sucursales' | 'usuarios' | 'roles'>
 > = {
   BASICO: {
     nombre: 'Básico',
-    tagline: 'Opera tu negocio en tienda con un solo sistema',
+    tagline: 'Un local ordenado: caja, cocina y stock en un solo lugar',
     features: [
-      'Punto de venta y comandas',
-      'Catálogo, proveedores y categorías',
-      'Reportes, mermas y multi-sucursal base',
-      'Usuarios, roles y perfil de empresa',
+      'Punto de venta, comandas y catálogo',
+      'Reportes, mermas y perfil de empresa',
+      'Roles: Admin, Vendedor y Comanda',
     ],
   },
   ESTANDAR: {
     nombre: 'Estándar',
-    tagline: 'WhatsApp conectado a tu caja e inventario',
+    tagline: 'Hasta 3 sucursales con WhatsApp IA conectado a tu inventario',
     destacado: true,
     features: [
       'Todo lo del plan Básico',
-      'Asistente IA por WhatsApp',
-      'Pedidos, transferencia y comprobantes',
+      'Admin, Auditor, Vendedor y Comanda por sucursal',
+      'Asistente IA WhatsApp (pedidos y comprobantes)',
       'Notificaciones a vendedor y admin',
     ],
   },
   FULL: {
     nombre: 'Full',
-    tagline: 'Vende y cobra desde cualquier canal',
+    tagline: 'Vende y cobra en todos los canales — con RUT formalizado',
     features: [
       'Todo lo del plan Estándar',
-      'Asistente voz / teléfono (roadmap)',
-      'Medios de pago online integrados',
-      'Operación omnicanal unificada',
+      'Asistente IA telefónica (roadmap)',
+      'Pasarela de pago online por empresa (automatizable)',
+      'Cobro al cliente final desde WhatsApp / POS',
     ],
   },
 };
-
-function sucursalesLabel(max: number): string {
-  return max <= 1 ? '1 sucursal' : `Hasta ${max} sucursales`;
-}
-
-function usuariosLabel(max: number): string {
-  return `Hasta ${max} usuarios`;
-}
 
 export function buildLandingPlansFromApi(planes: SaasPlan[]): LandingPlan[] {
   const order: SaasPlanCodigo[] = ['BASICO', 'ESTANDAR', 'FULL'];
@@ -67,15 +60,18 @@ export function buildLandingPlansFromApi(planes: SaasPlan[]): LandingPlan[] {
     .map((codigo) => {
       const api = byCodigo.get(codigo)!;
       const m = MARKETING[codigo];
-      const valor = api.valor > 0 ? api.valor : FALLBACK_LANDING_PLANS.find((p) => p.codigo === codigo)!.valor;
+      const copy = PLAN_PYME_COPY[codigo];
+      const fallback = FALLBACK_LANDING_PLANS.find((p) => p.codigo === codigo)!;
+      const valor = api.valor > 0 ? api.valor : fallback.valor;
       return {
         codigo,
         nombre: api.nombre?.replace(/^POS-AI\s+/i, '') || m.nombre,
         tagline: api.descripcion?.trim() || m.tagline,
         valor,
         valorLabel: formatPlanValor(valor),
-        sucursales: sucursalesLabel(api.maxSucursales),
-        usuarios: usuariosLabel(api.maxUsuarios),
+        sucursales: copy.sucursalesLine,
+        usuarios: copy.usuariosLine,
+        roles: copy.rolesLine,
         features: m.features,
         destacado: m.destacado,
       };
@@ -86,16 +82,16 @@ export function buildLandingPlansFromApi(planes: SaasPlan[]): LandingPlan[] {
 export const FALLBACK_LANDING_PLANS: LandingPlan[] = (['BASICO', 'ESTANDAR', 'FULL'] as SaasPlanCodigo[]).map(
   (codigo) => {
     const m = MARKETING[codigo];
+    const copy = PLAN_PYME_COPY[codigo];
     const valor = codigo === 'BASICO' ? 24990 : codigo === 'ESTANDAR' ? 44990 : 69990;
-    const maxSuc = codigo === 'BASICO' ? 1 : codigo === 'ESTANDAR' ? 3 : 5;
-    const maxUsr = codigo === 'BASICO' ? 5 : codigo === 'ESTANDAR' ? 10 : 15;
     return {
       codigo,
       ...m,
       valor,
       valorLabel: formatPlanValor(valor),
-      sucursales: sucursalesLabel(maxSuc),
-      usuarios: usuariosLabel(maxUsr),
+      sucursales: copy.sucursalesLine,
+      usuarios: copy.usuariosLine,
+      roles: copy.rolesLine,
     };
   }
 );

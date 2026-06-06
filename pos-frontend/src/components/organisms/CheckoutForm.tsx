@@ -32,6 +32,7 @@ export function CheckoutForm() {
   const [checkout, setCheckout] = useState<CheckoutData | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState('');
   const [paid, setPaid] = useState(false);
 
@@ -70,6 +71,35 @@ export function CheckoutForm() {
   useEffect(() => {
     loadCheckout();
   }, [loadCheckout]);
+
+  const handlePasarelaSandbox = async () => {
+    if (!checkout?.canPay) return;
+    setRedirecting(true);
+    setError('');
+    try {
+      const res = await fetch(posProxyPath('public/checkout/create-session'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresaId: checkout.empresaId, provider: 'WEBPAY' }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setError(String(json.error ?? 'No se pudo iniciar la pasarela'));
+        return;
+      }
+      const session = (json.data as { session?: { redirectUrl?: string } })?.session;
+      const url = session?.redirectUrl;
+      if (!url) {
+        setError('Sesión de pago sin URL de retorno');
+        return;
+      }
+      window.location.href = url;
+    } catch {
+      setError('Error al conectar con la pasarela sandbox.');
+    } finally {
+      setRedirecting(false);
+    }
+  };
 
   const handleSimulatePay = async () => {
     if (!checkout?.canPay) return;
@@ -164,14 +194,24 @@ export function CheckoutForm() {
             ) : null}
 
             {checkout.canPay ? (
-              <button
-                type="button"
-                disabled={paying}
-                onClick={handleSimulatePay}
-                className="w-full rounded-lg bg-brand-olive py-3 text-sm font-semibold text-white transition hover:bg-[#3d4532] disabled:opacity-60"
-              >
-                {paying ? 'Procesando…' : 'Simular pago aprobado (Webpay sandbox)'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={redirecting || paying}
+                  onClick={handlePasarelaSandbox}
+                  className="w-full rounded-lg bg-brand-olive py-3 text-sm font-semibold text-white transition hover:bg-[#3d4532] disabled:opacity-60"
+                >
+                  {redirecting ? 'Redirigiendo a Webpay…' : 'Pagar con Webpay (sandbox)'}
+                </button>
+                <button
+                  type="button"
+                  disabled={paying || redirecting}
+                  onClick={handleSimulatePay}
+                  className="w-full rounded-lg border border-brand-olive py-3 text-sm font-semibold text-brand-olive transition hover:bg-brand-surface disabled:opacity-60"
+                >
+                  {paying ? 'Procesando…' : 'Simular pago directo (sin redirect)'}
+                </button>
+              </>
             ) : null}
 
             <Link

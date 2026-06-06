@@ -5,6 +5,7 @@ import Category from '../models/Category.model';
 import Product from '../models/Product.model';
 import Supplier from '../models/Supplier.model';
 import catalogProductDelegate from '../delegates/CatalogProductDelegate';
+import categoryDelegate from '../delegates/CategoryDelegate';
 import { getEffectiveBranchId } from '../../../utils/branchContext';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 
@@ -13,15 +14,28 @@ const router = Router();
 // All catalog routes require authentication
 router.use(authenticateToken);
 
-// Categories - Vendedor can create, view, update and delete
+// Categories — jerárquicas (principal / subcategoría)
+router.get('/categories/tree', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const empresaId = getEffectiveEmpresaId(req);
+  const activeOnly = String(req.query.activeOnly ?? '') === 'true';
+  const result = await categoryDelegate.getTree(empresaId, activeOnly);
+  if (!result.success) return sendFail(res, result.error, 400);
+  return sendOk(res, { tree: result.value });
+});
+
+router.get('/categories/leaves', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const empresaId = getEffectiveEmpresaId(req);
+  const activeOnly = String(req.query.activeOnly ?? 'true') !== 'false';
+  const result = await categoryDelegate.getLeaves(empresaId, activeOnly);
+  if (!result.success) return sendFail(res, result.error, 400);
+  return sendOk(res, { categories: result.value });
+});
+
 router.get('/categories', requireSeller, async (req: AuthenticatedRequest, res) => {
-  try {
-    const empresaId = getEffectiveEmpresaId(req);
-    const categories = await Category.findAll({ where: { empresaId } });
-    return sendOk(res, { categories });
-  } catch {
-    return sendFail(res, 'ERROR_FETCHING_CATEGORIES', 500);
-  }
+  const empresaId = getEffectiveEmpresaId(req);
+  const result = await categoryDelegate.listFlat(empresaId);
+  if (!result.success) return sendFail(res, result.error, 500);
+  return sendOk(res, { categories: result.value });
 });
 
 router.get('/categories/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
@@ -35,115 +49,78 @@ router.get('/categories/:id', requireSeller, async (req: AuthenticatedRequest, r
   }
 });
 
-const validateCategoryCreatePayload = (body: unknown): { valid: true; payload: Record<string, unknown> } | { valid: false } => {
-  const b = body as { name?: unknown } | undefined;
-  const nameRaw = b?.name;
-  if (typeof nameRaw !== 'string') return { valid: false };
-  const name = nameRaw.trim();
-  if (!name) return { valid: false };
-  return { valid: true, payload: { ...b, name } };
+const parseCategoryBody = (body: unknown) => {
+  const b = (body ?? {}) as {
+    name?: string;
+    description?: string | null;
+    parentId?: string | null;
+    slug?: string | null;
+    isActive?: boolean;
+  };
+  return b;
 };
 
-// POST /categoriesAction (crear)
-router.post('/categoriesAction', requireSeller, async (req: AuthenticatedRequest, res) => {
-  // Debug (temporal) para verificar cómo llega el payload
-  // eslint-disable-next-line no-console
-  console.error('[Catalog][Debug] /categoriesAction body=', req.body);
-
-  const validation = validateCategoryCreatePayload(req.body);
-  if (!validation.valid) return sendFail(res, 'VALIDATION_ERROR: Category.name is required', 422);
-
-  try {
-    const empresaId = getEffectiveEmpresaId(req);
-    const category = await Category.create({ ...validation.payload, empresaId });
-    return sendOk(res, { category }, 201);
-  } catch (err) {
-    console.error('[Catalog] ERROR_CREATING_CATEGORY (/categoriesAction)', err);
-    throw err;
+const statusForCategoryError = (error: string): number => {
+  if (error.startsWith('VALIDATION_ERROR')) return 422;
+  if (error === 'CATEGORY_NOT_FOUND' || error === 'PARENT_CATEGORY_NOT_FOUND') return 404;
+  if (
+    error === 'CATEGORY_PARENT_CYCLE' ||
+    error === 'CATEGORY_MAX_DEPTH_EXCEEDED' ||
+    error === 'CATEGORY_NOT_LEAF'
+  ) {
+    return 400;
   }
+  return 400;
+};
+
+router.post('/categoriesAction', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const empresaId = getEffectiveEmpresaId(req);
+  const body = parseCategoryBody(req.body);
+  if (!body.name?.trim()) return sendFail(res, 'VALIDATION_ERROR: Category.name is required', 422);
+  const result = await categoryDelegate.create(empresaId, {
+    name: body.name,
+    description: body.description,
+    parentId: body.parentId,
+    slug: body.slug,
+  });
+  if (!result.success) return sendFail(res, result.error, statusForCategoryError(result.error));
+  return sendOk(res, { category: result.value }, 201);
 });
 
-
-
-// PATCH /categories/:id (update parcial)
 router.patch('/categories/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
-  try {
-    const empresaId = getEffectiveEmpresaId(req);
-    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
-    if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
-
-    const body = (req.body ?? {}) as {
-      name?: string;
-      description?: string | null;
-      isActive?: boolean;
-    };
-
-    const patch: Record<string, unknown> = {};
-    if (body.name !== undefined) patch.name = body.name;
-    if (body.description !== undefined) patch.description = body.description;
-    if (body.isActive !== undefined) patch.isActive = body.isActive;
-
-    if (Object.keys(patch).length === 0) {
-      return sendFail(res, 'VALIDATION_ERROR: no fields to update', 422);
-    }
-
-    await category.update(patch);
-    await category.reload();
-
-    return sendOk(res, { category });
-  } catch (err) {
-    console.error('[Catalog] PATCH category failed', err);
-    return sendFail(res, 'ERROR_UPDATING_CATEGORY', 400);
-  }
+  const empresaId = getEffectiveEmpresaId(req);
+  const body = parseCategoryBody(req.body);
+  const result = await categoryDelegate.update(empresaId, req.params.id, body);
+  if (!result.success) return sendFail(res, result.error, statusForCategoryError(result.error));
+  return sendOk(res, { category: result.value });
 });
 
 router.post('/categories/:id/restore', requireSeller, async (req: AuthenticatedRequest, res) => {
-  try {
-    const empresaId = getEffectiveEmpresaId(req);
-    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
-    if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
-
-    await category.update({ isActive: true });
-    await category.reload();
-
-    return sendOk(res, { category });
-  } catch (err) {
-    console.error('[Catalog] POST restore category failed', err);
-    return sendFail(res, 'ERROR_UPDATING_CATEGORY', 400);
-  }
+  const empresaId = getEffectiveEmpresaId(req);
+  const result = await categoryDelegate.restore(empresaId, req.params.id);
+  if (!result.success) return sendFail(res, result.error, statusForCategoryError(result.error));
+  return sendOk(res, { category: result.value });
 });
 
-// DELETE /categories/:id — desactivación lógica (soft delete)
 router.delete('/categories/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
-  try {
-    const empresaId = getEffectiveEmpresaId(req);
-    const category = await Category.findOne({ where: { id: req.params.id, empresaId } });
-    if (!category) return sendFail(res, 'CATEGORY_NOT_FOUND', 404);
-
-    await category.update({ isActive: false });
-    return sendOk(res, { deactivated: true, category });
-  } catch {
-    return sendFail(res, 'ERROR_DELETING_CATEGORY', 400);
-  }
+  const empresaId = getEffectiveEmpresaId(req);
+  const result = await categoryDelegate.deactivate(empresaId, req.params.id);
+  if (!result.success) return sendFail(res, result.error, statusForCategoryError(result.error));
+  return sendOk(res, { deactivated: true, category: result.value.category });
 });
 
-// Backward compatibility (creación previa bajo /categories)
 router.post('/categories', requireSeller, async (req: AuthenticatedRequest, res) => {
-  // Debug (temporal) para verificar cómo llega el payload
-  // eslint-disable-next-line no-console
-  console.error('[Catalog][Debug] /categories body=', req.body);
-
-  const validation = validateCategoryCreatePayload(req.body);
-  if (!validation.valid) return sendFail(res, 'VALIDATION_ERROR: Category.name is required', 422);
-
-  try {
-    const empresaId = getEffectiveEmpresaId(req);
-    const category = await Category.create({ ...validation.payload, empresaId });
-    return sendOk(res, { category }, 201);
-  } catch (err) {
-    console.error('[Catalog] ERROR_CREATING_CATEGORY (/categories)', err);
-    throw err;
-  }
+  const empresaId = getEffectiveEmpresaId(req);
+  const body = parseCategoryBody(req.body);
+  if (!body.name?.trim()) return sendFail(res, 'VALIDATION_ERROR: Category.name is required', 422);
+  const result = await categoryDelegate.create(empresaId, {
+    name: body.name,
+    description: body.description,
+    parentId: body.parentId,
+    slug: body.slug,
+  });
+  if (!result.success) return sendFail(res, result.error, statusForCategoryError(result.error));
+  return sendOk(res, { category: result.value }, 201);
 });
 
 

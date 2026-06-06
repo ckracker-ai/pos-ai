@@ -6,8 +6,14 @@ import { z } from 'zod';
 
 const categorySchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
+  parentId: z.string().uuid().nullable().optional(),
+  slug: z.string().min(1).max(120).optional().nullable(),
   isActive: z.boolean().optional(),
+});
+
+const categoryCreateSchema = categorySchema.extend({
+  name: z.string().min(1),
 });
 
 const supplierCreateSchema = z.object({
@@ -46,6 +52,45 @@ const catalogRoutes = async (app: FastifyInstance) => {
   const supplierCore = new (await import('../services/apiCoreServiceSupplier.js')).ApiCoreServiceSupplier();
   const productCore = new (await import('../services/apiCoreServiceProduct.js')).ApiCoreServiceProduct();
 
+  app.get('/categories/tree', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    const activeOnly = String((request.query as { activeOnly?: string }).activeOnly ?? '') === 'true';
+
+    try {
+      const data = await categoryCore.getCatalogCategoryTree(
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId,
+        activeOnly
+      );
+      return sendOk(reply, data);
+    } catch (e: any) {
+      const statusCode = e?.response?.status ?? 500;
+      const error = e?.response?.data?.error ?? 'Failed to fetch category tree';
+      return sendFail(reply, error, statusCode);
+    }
+  });
+
+  app.get('/categories/leaves', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    try {
+      const data = await categoryCore.getCatalogCategoryLeaves(
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId
+      );
+      return sendOk(reply, data);
+    } catch (e: any) {
+      const statusCode = e?.response?.status ?? 500;
+      const error = e?.response?.data?.error ?? 'Failed to fetch category leaves';
+      return sendFail(reply, error, statusCode);
+    }
+  });
+
   app.get('/categories', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
@@ -71,7 +116,7 @@ const catalogRoutes = async (app: FastifyInstance) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
 
-    const body = categorySchema.parse(request.body);
+    const body = categoryCreateSchema.parse(request.body);
 
     try {
       const data = await categoryCore.createCatalogCategory(body, ctx.token, ctx.internalKey, ctx.branchId);

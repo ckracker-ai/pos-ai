@@ -80,13 +80,14 @@ pos-api-core/src/modules/payments/
 
 ## Checklist implementación v1.8b
 
-- [ ] Elegir proveedor sandbox (negocio)
-- [ ] Variables env: `PAYMENT_PROVIDER`, keys sandbox, `PAYMENT_WEBHOOK_SECRET`
-- [ ] Adapter `createCheckout` + `parseWebhook`
-- [ ] Idempotencia por `externalId` en BD
-- [ ] Postman colección webhooks
-- [ ] E2E: registro → checkout → webhook → login tenant activo
-- [ ] E2E Full: pedido WSP → link → webhook → pedido `PAID`
+- [x] Proveedor dev `SANDBOX` (`PAYMENT_PROVIDER=SANDBOX`)
+- [x] Variables env: `PAYMENT_*`, `PAYMENT_GATEWAY_WEBHOOK_SECRET`, `PAYMENT_WEBHOOK_HMAC_SECRET`
+- [x] Adapter `createCheckout` (sesión) + webhook unificado BFF
+- [x] Idempotencia por `externalId` en BD (`payment_events`, v1.10 — S5 MVP)
+- [x] Adapter Webpay sandbox (`WEBPAY_MODE=simulate|integration`) — ver `WEBPAY-SANDBOX.md`
+- [x] Postman colección webhooks — `pos-api-bff/pos-api-bff-payments.postman_collection.json`
+- [x] E2E: registro → checkout → confirm — `scripts/test-s5-checkout-e2e.ps1`
+- [x] E2E Full: webhook venta — `scripts/test-s5-sale-wsp-webhook.ps1` (requiere pedido PENDING previo)
 
 ---
 

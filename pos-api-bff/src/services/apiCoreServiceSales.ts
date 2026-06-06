@@ -70,6 +70,33 @@ export class ApiCoreServiceSales extends ApiCoreBaseService {
     return response.data;
   }
 
+  async listPendingDeliveries(token: string, internalKey: string, branchId: string) {
+    const response = await this.client.get('/sales/deliveries/pending', {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
+  async patchDeliveryStatus(
+    saleId: string,
+    payload: { status: string; note?: string | null },
+    token: string,
+    internalKey: string,
+    branchId: string
+  ) {
+    const response = await this.client.patch(`/sales/sales/${saleId}/delivery-status`, payload, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
+  async getDeliveryTimeline(saleId: string, token: string, internalKey: string, branchId: string) {
+    const response = await this.client.get(`/sales/sales/${saleId}/delivery-timeline`, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
   async validateStock(
     branchId: string,
     productId: string,

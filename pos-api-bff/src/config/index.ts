@@ -13,6 +13,16 @@ const config = {
     process.env.SUBSCRIPTION_WEBHOOK_SECRET ??
     process.env.INTERNAL_API_KEY ??
     'supersecretkey',
+  paymentGatewayWebhookSecret:
+    process.env.PAYMENT_GATEWAY_WEBHOOK_SECRET ??
+    process.env.SUBSCRIPTION_WEBHOOK_SECRET ??
+    process.env.INTERNAL_API_KEY ??
+    'supersecretkey',
+  paymentWebhookHmacSecret:
+    process.env.PAYMENT_WEBHOOK_HMAC_SECRET ??
+    process.env.SUBSCRIPTION_WEBHOOK_SECRET ??
+    '',
+  frontendPublicUrl: process.env.FRONTEND_PUBLIC_URL ?? 'http://localhost:8010',
 };
 
 export default config;

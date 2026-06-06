@@ -102,11 +102,17 @@ export default function ComprobantesPage() {
       if (!showAll) {
         try {
           const cleanRes = await api.consolidatePaymentProofDuplicates();
-          const clean = unwrapApiEnvelope(cleanRes.data) as { removedProofs?: number };
-          if ((clean.removedProofs ?? 0) > 0) {
-            notifySuccess(
-              `Se eliminaron ${clean.removedProofs} comprobante(s) duplicado(s) y sus imágenes repetidas.`
-            );
+          const clean = unwrapApiEnvelope(cleanRes.data) as {
+            removedProofs?: number;
+            archivedStale?: number;
+          };
+          const removed = clean.removedProofs ?? 0;
+          const archived = clean.archivedStale ?? 0;
+          if (removed > 0 || archived > 0) {
+            const parts: string[] = [];
+            if (removed > 0) parts.push(`${removed} duplicado(s) eliminado(s)`);
+            if (archived > 0) parts.push(`${archived} registro(s) antiguo(s) archivado(s)`);
+            notifySuccess(`Limpieza: ${parts.join(' · ')}.`);
           }
         } catch {
           /* listado también consolida en servidor */
@@ -234,12 +240,20 @@ export default function ComprobantesPage() {
               onClick={async () => {
                 try {
                   const cleanRes = await api.consolidatePaymentProofDuplicates();
-                  const clean = unwrapApiEnvelope(cleanRes.data) as { removedProofs?: number };
-                  notifySuccess(
-                    clean.removedProofs
-                      ? `Eliminados ${clean.removedProofs} duplicado(s) con imagen.`
-                      : 'No había duplicados en esta sucursal.'
-                  );
+                  const clean = unwrapApiEnvelope(cleanRes.data) as {
+                    removedProofs?: number;
+                    archivedStale?: number;
+                  };
+                  const removed = clean.removedProofs ?? 0;
+                  const archived = clean.archivedStale ?? 0;
+                  if (removed === 0 && archived === 0) {
+                    notifySuccess('No había duplicados ni registros antiguos en esta sucursal.');
+                  } else {
+                    const parts: string[] = [];
+                    if (removed > 0) parts.push(`${removed} duplicado(s) eliminado(s)`);
+                    if (archived > 0) parts.push(`${archived} archivado(s)`);
+                    notifySuccess(`Limpieza: ${parts.join(' · ')}.`);
+                  }
                   await loadProofs();
                 } catch (err) {
                   notifyApiError('comprobantes.list', err);
@@ -314,7 +328,7 @@ export default function ComprobantesPage() {
                       <span
                         className={`rounded-full px-2 py-0.5 ${
                           saleClosed
-                            ? 'bg-slate-200 text-slate-700'
+                            ? 'bg-brand-linen/50 text-brand-ink'
                             : 'bg-brand-olive/15 text-brand-olive'
                         }`}
                       >
@@ -339,7 +353,7 @@ export default function ComprobantesPage() {
                         type="button"
                         disabled={busyId === proof.id}
                         onClick={() => setConfirmModal({ open: true, proof })}
-                        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                        className="app-btn-primary disabled:opacity-50"
                       >
                         Confirmar pago
                       </button>
@@ -360,7 +374,7 @@ export default function ComprobantesPage() {
                       type="button"
                       disabled={busyId === proof.id}
                       onClick={() => openDismissModal(proof.id)}
-                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="app-btn-secondary disabled:opacity-50"
                     >
                       Descartar
                     </button>
@@ -449,7 +463,7 @@ export default function ComprobantesPage() {
                 type="button"
                 disabled={busyId != null}
                 onClick={() => void handleReject()}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+                className="app-btn-danger disabled:opacity-50"
               >
                 Rechazar
               </button>

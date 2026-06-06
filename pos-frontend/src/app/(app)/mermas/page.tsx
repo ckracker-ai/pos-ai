@@ -270,23 +270,19 @@ export default function MermasPage() {
       <AppPageContent>
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Mermas</p>
-              <h1 className="mt-3 text-3xl font-semibold text-white">Registro de mermas</h1>
-              <p className="mt-2 text-slate-400">Sucursal activa: {activeBranchName}</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="app-eyebrow">Mermas</p>
+              <h1 className="app-heading-page">Registro de mermas</h1>
+              <p className="mt-2 app-text-muted">Sucursal activa: {activeBranchName}</p>
+              <p className="mt-1 text-sm text-[#6b7280]">
                 Las mermas quedan pendientes hasta que un administrador las apruebe y descuente stock.
               </p>
-              {errorMessage && (
-                <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {errorMessage}
-                </p>
-              )}
+              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
               {successMessage && (
-                <p className="mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                <p className="mt-3 rounded-2xl border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.1)] px-4 py-3 text-sm text-[#4A533C]">
                   {successMessage}
                 </p>
               )}
-              {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando mermas...</p>}
+              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando mermas...</p>}
             </div>
             <button
               onClick={() => {
@@ -295,15 +291,15 @@ export default function MermasPage() {
                 setForm((c) => ({ ...c, quantity: '1' }));
                 setShowModal(true);
               }}
-              className="rounded-3xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+              className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold"
             >
               + Registrar merma
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900/90">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-950/80 text-slate-400">
+          <div className="app-table-wrap overflow-x-auto">
+            <table className="app-table min-w-full text-left text-sm">
+              <thead>
                 <tr>
                   <th className="px-6 py-4">Fecha</th>
                   <th className="px-6 py-4">Producto</th>
@@ -313,26 +309,26 @@ export default function MermasPage() {
                   {canApprove && <th className="px-6 py-4">Acciones</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody>
                 {mermas.length === 0 ? (
                   <tr>
-                    <td colSpan={canApprove ? 6 : 5} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={canApprove ? 6 : 5} className="px-6 py-8 text-center text-brand-ink-muted">
                       No hay mermas registradas.
                     </td>
                   </tr>
                 ) : (
                   mermas.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-950/80">
-                      <td className="px-6 py-5 text-slate-300">
+                    <tr key={m.id}>
+                      <td className="px-6 py-5 text-brand-ink-muted">
                         {new Date(m.createdAt).toLocaleString('es-CO')}
                       </td>
-                      <td className="px-6 py-5 text-white">
+                      <td className="px-6 py-5 text-[#3D4532]">
                         {m.productName ?? productNameById.get(m.productId) ?? 'Producto desconocido'}
                       </td>
-                      <td className="px-6 py-5 text-slate-300">
+                      <td className="px-6 py-5 text-brand-ink-muted">
                         {m.quantity > 0 ? m.quantity : <span className="text-rose-300">0 (inválida)</span>}
                       </td>
-                      <td className="px-6 py-5 text-slate-300">{m.reason}</td>
+                      <td className="px-6 py-5 text-brand-ink-muted">{m.reason}</td>
                       <td className="px-6 py-5">
                         <StatusBadge
                           active={m.status === 'APPROVED'}
@@ -357,20 +353,20 @@ export default function MermasPage() {
                                     () => handleApprove(m.id)
                                   )
                                 }
-                                className="rounded-2xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="rounded-2xl border border-[rgba(74,83,60,0.26)] bg-[#4A533C] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#3D4532] disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Aprobar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setRejectModal({ open: true, shrinkageId: m.id, note: '' })}
-                                className="rounded-2xl border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+                                className="rounded-2xl border border-[rgba(176,138,76,0.45)] px-3 py-1.5 text-xs text-[#8C6A2B] hover:bg-[rgba(176,138,76,0.1)]"
                               >
                                 Rechazar
                               </button>
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-500">—</span>
+                            <span className="text-xs text-brand-ink-muted">—</span>
                           )}
                         </td>
                       )}
@@ -383,28 +379,28 @@ export default function MermasPage() {
       </AppPageContent>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-lg rounded-[2rem] border border-slate-800 bg-slate-950 p-8">
-            <h2 className="text-xl font-semibold text-white">Nueva merma</h2>
-            <p className="mt-2 text-sm text-slate-400">
+        <div className="app-modal-overlay">
+          <div className="app-modal-panel w-full max-w-lg rounded-[2rem] p-8">
+            <h2 className="text-xl font-semibold text-[#3D4532]">Nueva merma</h2>
+            <p className="mt-2 text-sm text-brand-ink-muted">
               El inventario no se descuenta hasta la aprobación del administrador.
             </p>
             <div className="mt-6 space-y-4">
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Motivo
                 <input
                   value={form.reason}
                   onChange={(e) => setForm((c) => ({ ...c, reason: e.target.value }))}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                   placeholder="Producto defectuoso, vencido, etc."
                 />
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Producto
                 <select
                   value={form.productId}
                   onChange={(e) => setForm((c) => ({ ...c, productId: e.target.value }))}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  className="app-select mt-2 w-full rounded-3xl px-4 py-3"
                 >
                   {productsInBranch.length === 0 ? (
                     <option value="">Sin productos con stock en sucursal</option>
@@ -417,7 +413,7 @@ export default function MermasPage() {
                   )}
                 </select>
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Cantidad a dar de baja
                 <input
                   type="text"
@@ -428,17 +424,17 @@ export default function MermasPage() {
                     const next = validateQuantityField(e.target.value);
                     setForm((c) => ({ ...c, quantity: next === '' ? '' : next }));
                   }}
-                  className={`mt-2 w-full rounded-3xl border bg-slate-900 px-4 py-3 text-white ${
+                  className={`mt-2 w-full rounded-3xl border bg-white px-4 py-3 text-[#3D4532] ${
                     quantityError
                       ? 'border-rose-500/60 focus:border-rose-400'
-                      : 'border-slate-800 focus:border-amber-400'
+                      : 'border-[rgba(209,199,189,0.9)] focus:border-[#4A533C]'
                   } outline-none`}
                 />
                 {quantityError && (
                   <p className="mt-2 text-xs text-rose-300">{quantityError}</p>
                 )}
                 {selectedProduct && (
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-brand-ink-muted">
                     Disponible en sucursal: {selectedProduct.stock ?? 0}
                   </p>
                 )}
@@ -449,7 +445,7 @@ export default function MermasPage() {
                 type="button"
                 onClick={() => setShowModal(false)}
                 disabled={isSubmitting}
-                className="rounded-3xl border border-slate-700 px-5 py-2 text-slate-300 disabled:opacity-50"
+                className="app-btn-secondary rounded-3xl px-5 py-2 disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -457,7 +453,7 @@ export default function MermasPage() {
                 type="button"
                 onClick={requestRegister}
                 disabled={isSubmitting || !canRegister}
-                className="rounded-3xl bg-amber-500 px-5 py-2 font-semibold text-slate-950 disabled:opacity-50"
+                className="app-btn-primary rounded-3xl px-5 py-2 font-semibold disabled:opacity-50"
               >
                 {isSubmitting ? 'Registrando…' : 'Registrar pendiente'}
               </button>
@@ -476,16 +472,16 @@ export default function MermasPage() {
         onConfirm={handleConfirmAction}
       />
       {rejectModal.open && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-lg rounded-[2rem] border border-slate-800 bg-slate-950 p-8">
-            <h3 className="text-xl font-semibold text-white">Rechazar merma</h3>
-            <p className="mt-2 text-sm text-slate-400">Puedes registrar un motivo de rechazo (opcional).</p>
-            <label className="mt-5 block text-sm text-slate-300">
+        <div className="app-modal-overlay !z-[70]">
+          <div className="app-modal-panel w-full max-w-lg rounded-[2rem] p-8">
+            <h3 className="text-xl font-semibold text-[#3D4532]">Rechazar merma</h3>
+            <p className="mt-2 text-sm text-brand-ink-muted">Puedes registrar un motivo de rechazo (opcional).</p>
+            <label className="mt-5 block text-sm text-brand-ink-muted">
               Motivo
               <textarea
                 value={rejectModal.note}
                 onChange={(e) => setRejectModal((r) => ({ ...r, note: e.target.value }))}
-                className="mt-2 min-h-[110px] w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-slate-600"
+                className="app-textarea mt-2 min-h-[110px] w-full rounded-2xl px-3 py-2"
                 placeholder="Ej: evidencia insuficiente, cantidad inconsistente, etc."
               />
             </label>
@@ -493,7 +489,7 @@ export default function MermasPage() {
               <button
                 type="button"
                 onClick={() => setRejectModal({ open: false, shrinkageId: '', note: '' })}
-                className="rounded-3xl border border-slate-700 px-5 py-2 text-slate-300"
+                className="app-btn-secondary rounded-3xl px-5 py-2"
               >
                 Cancelar
               </button>
@@ -504,7 +500,7 @@ export default function MermasPage() {
                   setRejectModal({ open: false, shrinkageId: '', note: '' });
                   await handleReject(shrinkageId, note.trim());
                 }}
-                className="rounded-3xl bg-rose-600 px-5 py-2 font-semibold text-white hover:bg-rose-500"
+                className="app-btn-danger rounded-3xl px-5 py-2 font-semibold"
               >
                 Confirmar rechazo
               </button>

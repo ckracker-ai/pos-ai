@@ -13,6 +13,8 @@ import Sale from '../models/Sale.model';
 import SaleDetail from '../models/SaleDetail.model';
 import Product from '../../catalog/models/Product.model';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
+import deliveryTrackingDelegate from '../../delivery/delegates/DeliveryTrackingDelegate';
+import { parseDeliveryStatus } from '../../delivery/deliveryTransitions';
 
 const router = Router();
 
@@ -245,6 +247,11 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
       total?: number;
       discount?: number;
       status?: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+      requiresDelivery?: boolean;
+      deliveryCustomerName?: string;
+      deliveryPhone?: string;
+      deliveryAddress?: string;
+      deliveryAmount?: number;
       notes?: string;
       details?: Array<{
         productId: string;
@@ -255,6 +262,25 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
     };
 
     const details = Array.isArray(body.details) ? body.details : [];
+    const requiresDelivery = Boolean(body.requiresDelivery);
+    const deliveryCustomerName = String(body.deliveryCustomerName ?? '').trim();
+    const deliveryPhone = String(body.deliveryPhone ?? '').trim();
+    const deliveryAddress = String(body.deliveryAddress ?? '').trim();
+    const deliveryAmount = Number(body.deliveryAmount ?? 0);
+
+    if (requiresDelivery) {
+      if (!deliveryCustomerName || !deliveryPhone || !deliveryAddress) {
+        return sendFail(
+          res,
+          'DELIVERY_REQUIRED_FIELDS: nombre cliente, teléfono y dirección son obligatorios.',
+          422
+        );
+      }
+      if (!Number.isFinite(deliveryAmount) || deliveryAmount < 0) {
+        return sendFail(res, 'DELIVERY_AMOUNT_INVALID', 422);
+      }
+    }
+
     const saleId = uuidv4();
     const branchId = req.user!.branchId;
     const sellerId = req.user!.userId;
@@ -266,6 +292,11 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
         total: Number(body.total ?? 0),
         discount: Number(body.discount ?? 0),
         status: body.status ?? 'PENDING',
+        requiresDelivery,
+        deliveryCustomerName: requiresDelivery ? deliveryCustomerName : null,
+        deliveryPhone: requiresDelivery ? deliveryPhone : null,
+        deliveryAddress: requiresDelivery ? deliveryAddress : null,
+        deliveryAmount: requiresDelivery ? deliveryAmount : 0,
         notes: body.notes ?? null,
         empresaId,
         branchId,
@@ -309,6 +340,17 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
       );
 
       await deductBranchStock(productId, branchId, quantity, transaction);
+    }
+
+    if (requiresDelivery) {
+      const seeded = await deliveryTrackingDelegate.seedCreatedForSale(
+        saleId,
+        empresaId,
+        branchId,
+        sellerId,
+        transaction
+      );
+      if (!seeded.success) throw new Error(seeded.error);
     }
 
     await transaction.commit();
@@ -386,6 +428,48 @@ router.delete('/sales/:id', requireSeller, async (req: AuthenticatedRequest, res
   } catch {
     return sendFail(res, 'ERROR_DELETING_SALE', 400);
   }
+});
+
+router.get('/deliveries/pending', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const result = await deliveryTrackingDelegate.listPending(
+    getEffectiveEmpresaId(req),
+    req.user!.branchId
+  );
+  if (!result.success) return sendFail(res, result.error, 400);
+  return sendOk(res, { deliveries: result.value });
+});
+
+router.patch('/sales/:id/delivery-status', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const body = (req.body ?? {}) as { status?: string; note?: string };
+  const status = parseDeliveryStatus(body.status);
+  if (!status) return sendFail(res, 'VALIDATION_ERROR: status required', 422);
+
+  const result = await deliveryTrackingDelegate.advanceStatus({
+    saleId: req.params.id,
+    empresaId: getEffectiveEmpresaId(req),
+    branchId: req.user!.branchId,
+    status,
+    note: body.note ?? null,
+    userId: req.user!.userId,
+  });
+  if (!result.success) {
+    const code = result.error.startsWith('SALE_NOT_FOUND') ? 404 : 400;
+    return sendFail(res, result.error, code);
+  }
+  return sendOk(res, {
+    deliveryStatus: result.value.deliveryStatus,
+    event: result.value.event,
+  });
+});
+
+router.get('/sales/:id/delivery-timeline', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const result = await deliveryTrackingDelegate.getTimeline(
+    req.params.id,
+    getEffectiveEmpresaId(req),
+    req.user!.branchId
+  );
+  if (!result.success) return sendFail(res, result.error, 404);
+  return sendOk(res, result.value);
 });
 
 export default router;

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { timingSafeEqual } from 'crypto';
 import express, { Request, Response } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -23,19 +24,45 @@ import assistantRoutes from './modules/assistant/routes/assistant.routes';
 import paymentProofRoutes from './modules/assistant/routes/paymentProof.routes';
 import platformAuthRoutes from './modules/platform/routes/platformAuth.routes';
 import { seedBootstrapPlatformAdmin } from './db/seedBootstrapPlatformAdmin';
+import { seedCutChile } from './db/seedCutChile';
 import { APP_NAME, APP_VERSION } from './version';
+import territoryRoutes from './modules/territory/routes/territory.routes';
+import paymentRoutes from './modules/payments/routes/payment.routes';
+import { legalPublicRoutes, legalProtectedRoutes } from './modules/legal/routes/legal.routes';
 
 
 const internalKeyGuard = (req: Request, res: Response, next: express.NextFunction) => {
-  const key = req.headers['x-internal-key'];
-  if (!process.env.INTERNAL_API_KEY || key !== process.env.INTERNAL_API_KEY) {
+  const expected = process.env.INTERNAL_API_KEY ?? '';
+  const provided = String(req.headers['x-internal-key'] ?? '');
+  if (!expected) {
+    res.status(401).json({ success: false, data: null, error: 'UNAUTHORIZED', code: 401 });
+    return;
+  }
+  const a = Buffer.from(expected, 'utf8');
+  const b = Buffer.from(provided, 'utf8');
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     res.status(401).json({ success: false, data: null, error: 'UNAUTHORIZED', code: 401 });
     return;
   }
   next();
 };
 
+function warnInsecureSecrets(): void {
+  const jwt = process.env.JWT_SECRET ?? 'default_secret';
+  if (jwt === 'default_secret' || jwt.length < 32) {
+    console.warn('⚠️  JWT_SECRET is missing, default, or shorter than 32 chars — use a strong secret in production.');
+  }
+  const ik = process.env.INTERNAL_API_KEY ?? '';
+  if (!ik || ik === 'supersecretkey' || ik.length < 24) {
+    console.warn('⚠️  INTERNAL_API_KEY is missing, default, or weak — rotate before production.');
+  }
+  if (!process.env.FIELD_ENCRYPTION_KEY?.trim() && !process.env.FIELD_ENCRYPTION_KEY_B64?.trim()) {
+    console.warn('⚠️  FIELD_ENCRYPTION_KEY missing — transfer fields cannot be encrypted/decrypted.');
+  }
+}
+
 async function bootstrap(): Promise<void> {
+  warnInsecureSecrets();
   defineAssociations();
 
   try {
@@ -55,6 +82,7 @@ async function bootstrap(): Promise<void> {
     await seedBootstrapAdmin();
     await seedBootstrapDemoUsers();
     await seedBootstrapPlatformAdmin();
+    await seedCutChile();
   } catch (err) {
     console.error('❌  Unable to connect to the database:', err);
     process.exit(1);
@@ -75,18 +103,22 @@ async function bootstrap(): Promise<void> {
   // Public routes (no internal key guard)
   app.use('/auth', authRoutes);
   app.use('/platform', platformAuthRoutes);
+  app.use('/legal', legalPublicRoutes);
 
   // Protected routes (require internal key)
   app.use(internalKeyGuard);
+  app.use('/legal', legalProtectedRoutes);
   app.use('/inventory', inventoryRoutes);
   app.use('/catalog', catalogRoutes);
   app.use('/branch', branchRoutes);
+  app.use('/territory', territoryRoutes);
   
   app.use('/sales', salesRoutes);
   app.use('/shrinkage', shrinkageRoutes);
   app.use('/reports', reportsRoutes);
   app.use('/empresas', empresaRoutes);
   app.use('/assistant', assistantRoutes);
+  app.use('/payments', paymentRoutes);
   app.use('/payment-proofs', paymentProofRoutes);
 
   app.use(globalErrorHandler);

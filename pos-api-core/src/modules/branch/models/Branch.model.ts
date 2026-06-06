@@ -6,6 +6,8 @@ class Branch extends Model {
   public empresaId!: string;
   public name!: string;
   public address?: string;
+  public comunaId?: string | null;
+  public codigoPostal?: string | null;
   public phone?: string;
   public isActive!: boolean;
   public readonly createdAt!: Date;
@@ -32,6 +34,16 @@ Branch.init(
     address: {
       type: DataTypes.TEXT,
       allowNull: true,
+    },
+    comunaId: {
+      type: DataTypes.STRING(8),
+      allowNull: true,
+      field: 'comuna_id',
+    },
+    codigoPostal: {
+      type: DataTypes.STRING(7),
+      allowNull: true,
+      field: 'codigo_postal',
     },
     phone: {
       type: DataTypes.STRING(50),

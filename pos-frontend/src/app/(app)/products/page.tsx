@@ -86,6 +86,7 @@ const [products, setProducts] = useState<Product[]>([]);
   const [quickMinStockDraft, setQuickMinStockDraft] = useState<Record<string, string>>({});
   const [quickNumericWarning, setQuickNumericWarning] = useState<string | null>(null);
   const [formNumericWarning, setFormNumericWarning] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [quickSavingId, setQuickSavingId] = useState<string | null>(null);
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
   const [quickCategoryFilter, setQuickCategoryFilter] = useState('all');
@@ -96,7 +97,7 @@ const [products, setProducts] = useState<Product[]>([]);
     message: string;
     confirmLabel: string;
     variant: 'primary' | 'danger';
-    action: null | (() => Promise<void>);
+    action: null | (() => Promise<boolean>);
   }>({
     open: false,
     title: '',
@@ -181,7 +182,10 @@ const [products, setProducts] = useState<Product[]>([]);
     // Carga de metadatos para el alta de productos (categorías / proveedores).
     const loadCatalogMeta = async () => {
       try {
-        const [categoriesRes, suppliersRes] = await Promise.all([api.getCategories(), api.getSuppliers()]);
+        const [categoriesRes, suppliersRes] = await Promise.all([
+          api.getCategoryLeaves(),
+          api.getSuppliers(),
+        ]);
 
         const categoryRows = extractList<Record<string, unknown>>(
           unwrapApiEnvelope(categoriesRes.data),
@@ -203,8 +207,9 @@ const [products, setProducts] = useState<Product[]>([]);
           categoryId: c.categoryId || loadedCategories[0]?.id || '',
           supplierId: c.supplierId || loadedSuppliers[0]?.id || '',
         }));
-      } catch {
-        // No bloquea el módulo: si falla, el select quedará vacío.
+      } catch (error) {
+        const { displayMessage } = notifyApiError('categories.list', error, { toast: true });
+        setErrorMessage(displayMessage);
       }
     };
 
@@ -258,6 +263,7 @@ const [products, setProducts] = useState<Product[]>([]);
     setEditingProduct(product);
     setSelectedProduct(product);
     setSuccessMessage(null);
+    setModalError(null);
     setFormNumericWarning(null);
     setForm({
       name: product.name ?? '',
@@ -295,12 +301,72 @@ const [products, setProducts] = useState<Product[]>([]);
     });
   };
 
-  const handleUpdateProduct = async () => {
-    if (!editingProduct) return;
-    if (!form.name.trim()) return;
+  const setFormFeedback = (message: string | null) => {
+    setErrorMessage(message);
+    setModalError(message);
+  };
+
+  const validateProductForm = (): string | null => {
+    if (!branchId?.trim()) {
+      return 'Selecciona una sucursal activa en el menú superior antes de guardar.';
+    }
+    if (!form.name.trim()) {
+      return 'Ingresa el nombre del producto.';
+    }
+    if (editingProduct) {
+      const stockDeltaNum = parseNonNegativeInt(form.stock);
+      if (stockDeltaNum === null) {
+        return 'El ingreso de stock debe ser un número mayor o igual a 0.';
+      }
+      const minStockNum = parseNonNegativeInt(form.minStock);
+      if (minStockNum === null) {
+        return 'El stock mínimo debe ser un número mayor o igual a 0.';
+      }
+      return null;
+    }
+
+    if (!form.sku.trim()) return 'Ingresa el SKU del producto.';
+    if (!form.categoryId.trim()) {
+      return 'Selecciona una subcategoría (hoja). Si no hay opciones, créala en Categorías.';
+    }
+    if (!form.supplierId.trim()) {
+      return 'Selecciona un proveedor. Si no hay opciones, créalo en Proveedores.';
+    }
+    if (parsePositiveDecimal(form.price) === null) {
+      return 'El precio debe ser un número mayor a 0 (sin símbolos como $).';
+    }
+    if (parseNonNegativeInt(form.stock) === null) {
+      return 'El stock inicial debe ser un número mayor o igual a 0.';
+    }
+    if (parseNonNegativeInt(form.minStock) === null) {
+      return 'El stock mínimo debe ser un número mayor o igual a 0.';
+    }
+    return null;
+  };
+
+  const requestSaveProduct = () => {
+    const validationError = validateProductForm();
+    if (validationError) {
+      setFormFeedback(validationError);
+      return;
+    }
+    setFormFeedback(null);
+    askConfirmation(
+      editingProduct ? 'Guardar cambios del producto' : 'Crear producto',
+      editingProduct
+        ? '¿Confirmas la modificación del producto y su inventario de sucursal?'
+        : '¿Confirmas la creación de este producto con su stock inicial?',
+      editingProduct ? 'Guardar cambios' : 'Crear producto',
+      'primary',
+      editingProduct ? handleUpdateProduct : handleCreateProduct
+    );
+  };
+
+  const handleUpdateProduct = async (): Promise<boolean> => {
+    if (!editingProduct) return false;
 
     setIsSaving(true);
-    setErrorMessage(null);
+    setFormFeedback(null);
     setSuccessMessage(null);
 
     try {
@@ -312,49 +378,43 @@ const [products, setProducts] = useState<Product[]>([]);
       notifySuccess('Producto actualizado');
       setShowModal(false);
       setEditingProduct(null);
+      setModalError(null);
+      return true;
     } catch (error) {
       if (error instanceof Error && !(error as ApiError).status) {
-        setErrorMessage(error.message);
-        return;
+        setFormFeedback(error.message);
+        return false;
       }
       const { displayMessage } = notifyApiError('products.save', error);
-      setErrorMessage(displayMessage);
+      setFormFeedback(displayMessage);
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteProduct = async (productId: string): Promise<boolean> => {
     try {
       await api.deleteProduct(productId);
       await reloadProducts();
-      setErrorMessage(null);
+      setFormFeedback(null);
       notifySuccess('Producto eliminado');
+      return true;
     } catch (error) {
       const { displayMessage } = notifyApiError('products.delete', error);
-      setErrorMessage(displayMessage);
+      setFormFeedback(displayMessage);
+      return false;
     }
   };
 
-  const handleCreateProduct = async () => {
-    const name = form.name?.trim();
-    const sku = form.sku?.trim();
-    const categoryId = form.categoryId?.trim();
-    const supplierId = form.supplierId?.trim();
-    const priceNum = parsePositiveDecimal(form.price);
-    const stockNum = parseNonNegativeInt(form.stock);
-
-    if (!name || !sku || !categoryId || !supplierId) return;
-    if (priceNum === null) {
-      setErrorMessage('El precio debe ser un número mayor a 0 (sin símbolos como $).');
-      return;
-    }
-    if (stockNum === null) {
-      setErrorMessage('El stock inicial debe ser un número mayor o igual a 0.');
-      return;
-    }
-
-    const minStockNum = parseNonNegativeInt(form.minStock);
+  const handleCreateProduct = async (): Promise<boolean> => {
+    const name = form.name.trim();
+    const sku = form.sku.trim();
+    const categoryId = form.categoryId.trim();
+    const supplierId = form.supplierId.trim();
+    const priceNum = parsePositiveDecimal(form.price)!;
+    const stockNum = parseNonNegativeInt(form.stock)!;
+    const minStockNum = parseNonNegativeInt(form.minStock) ?? 0;
 
     const payload = {
       name,
@@ -363,11 +423,11 @@ const [products, setProducts] = useState<Product[]>([]);
       supplierId,
       price: priceNum,
       initialStock: stockNum,
-      minStock: minStockNum ?? 0,
+      minStock: minStockNum,
     };
 
     setIsSaving(true);
-    setErrorMessage(null);
+    setFormFeedback(null);
 
     try {
       await api.createProduct(payload);
@@ -378,19 +438,21 @@ const [products, setProducts] = useState<Product[]>([]);
       setForm({
         name: '',
         sku: '',
-        categoryId: '',
-        supplierId: '',
+        categoryId: categories[0]?.id ?? '',
+        supplierId: suppliers[0]?.id ?? '',
         price: '',
         cost: '',
-        stock: '',
+        stock: '0',
         minStock: '0',
       });
       setSuccessMessage('Producto creado con stock inicial en la sucursal activa.');
-      setErrorMessage(null);
+      setModalError(null);
       notifySuccess('Producto creado');
+      return true;
     } catch (error) {
       const { displayMessage } = notifyApiError('products.save', error);
-      setErrorMessage(displayMessage);
+      setFormFeedback(displayMessage);
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -405,7 +467,7 @@ const [products, setProducts] = useState<Product[]>([]);
     message: string,
     confirmLabel: string,
     variant: 'primary' | 'danger',
-    action: () => Promise<void>
+    action: () => Promise<boolean>
   ) => {
     setConfirmModal({ open: true, title, message, confirmLabel, variant, action });
   };
@@ -414,10 +476,12 @@ const [products, setProducts] = useState<Product[]>([]);
     if (!confirmModal.action) return;
     try {
       setIsConfirming(true);
-      await confirmModal.action();
+      const ok = await confirmModal.action();
+      if (ok) {
+        setConfirmModal((m) => ({ ...m, open: false, action: null }));
+      }
     } finally {
       setIsConfirming(false);
-      setConfirmModal((m) => ({ ...m, open: false, action: null }));
     }
   };
 
@@ -435,10 +499,10 @@ const [products, setProducts] = useState<Product[]>([]);
     });
   }, [products, onlyAssignedToBranch, quickSearchTerm, quickCategoryFilter]);
 
-  const saveQuickStock = async (product: Product) => {
+  const saveQuickStock = async (product: Product): Promise<boolean> => {
     if (!product.id?.trim()) {
-      setErrorMessage('No se pudo actualizar inventario: productId inválido.');
-      return;
+      setFormFeedback('No se pudo actualizar inventario: productId inválido.');
+      return false;
     }
     const rawQty = quickStockDraft[product.id] ?? '0';
     const rawMin = quickMinStockDraft[product.id] ?? String(product.minStock ?? 0);
@@ -446,17 +510,17 @@ const [products, setProducts] = useState<Product[]>([]);
     const minStock = parseNonNegativeInt(rawMin);
 
     if (quantityDelta === null) {
-      setErrorMessage('El ingreso de stock debe ser un número mayor o igual a 0.');
-      return;
+      setFormFeedback('El ingreso de stock debe ser un número mayor o igual a 0.');
+      return false;
     }
     if (minStock === null) {
-      setErrorMessage('El stock mínimo debe ser un número mayor o igual a 0.');
-      return;
+      setFormFeedback('El stock mínimo debe ser un número mayor o igual a 0.');
+      return false;
     }
 
     try {
       setQuickSavingId(product.id);
-      setErrorMessage(null);
+      setFormFeedback(null);
       setSuccessMessage(null);
       await api.updateStock({
         productId: product.id,
@@ -476,9 +540,11 @@ const [products, setProducts] = useState<Product[]>([]);
       });
       setSuccessMessage('Ingreso aplicado. El stock se sumó correctamente.');
       notifySuccess('Stock actualizado');
+      return true;
     } catch (error) {
       const { displayMessage } = notifyApiError('products.stock', error);
-      setErrorMessage(displayMessage);
+      setFormFeedback(displayMessage);
+      return false;
     } finally {
       setQuickSavingId(null);
     }
@@ -489,30 +555,32 @@ const [products, setProducts] = useState<Product[]>([]);
       <AppPageContent className="overflow-x-hidden">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Productos</p>
-              <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de productos</h1>
-              <p className="mt-2 max-w-2xl text-slate-400">
+              <p className="app-eyebrow">Productos</p>
+              <h1 className="app-heading-page">Mantenedor de productos</h1>
+              <p className="mt-2 max-w-2xl app-text-muted">
                 Catálogo e inventario por sucursal (selector en la barra superior). Stock según sucursal activa.
               </p>
-              <p className="mt-1 text-sm text-slate-500">Sucursal: {activeBranchName}</p>
+              <p className="mt-1 text-sm text-[#6b7280]">Sucursal: {activeBranchName}</p>
               {currentUser && (
-                <p className="mt-3 text-sm text-slate-500">Sesión iniciada como: {currentUser.name}</p>
+                <p className="mt-3 text-sm text-[#6b7280]">Sesión iniciada como: {currentUser.name}</p>
               )}
-              {errorMessage && (
-                <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {errorMessage}
-                </p>
-              )}
-              {successMessage && (
-                <p className="mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  {successMessage}
-                </p>
-              )}
-              {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando productos desde BFF...</p>}
+              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
+              {successMessage && <p className="mt-3 app-alert-success">{successMessage}</p>}
+              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando productos desde BFF...</p>}
             </div>
 
             <button
               onClick={() => {
+                if (!categories.length) {
+                  setFormFeedback(
+                    'No hay subcategorías disponibles. Crea una subcategoría en Categorías antes de agregar productos.'
+                  );
+                  return;
+                }
+                if (!suppliers.length) {
+                  setFormFeedback('No hay proveedores. Crea al menos uno en Proveedores.');
+                  return;
+                }
                 setEditingProduct(null);
                 setForm({
                   name: '',
@@ -521,34 +589,35 @@ const [products, setProducts] = useState<Product[]>([]);
                   supplierId: suppliers[0]?.id ?? '',
                   price: '',
                   cost: '',
-                  stock: '',
+                  stock: '0',
                   minStock: '0',
                 });
                 setSuccessMessage(null);
+                setModalError(null);
                 setFormNumericWarning(null);
                 setShowModal(true);
               }}
               disabled={isActionLocked}
-              className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               + Nuevo producto
             </button>
           </div>
 
           <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
-            <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
+            <section className="app-card rounded-3xl p-6">
               <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Inventario de productos</h2>
-                  <p className="text-sm text-slate-400">Busca, filtra y actualiza los productos.</p>
+                  <h2 className="text-xl font-semibold text-[#3d4532]">Inventario de productos</h2>
+                  <p className="text-sm app-text-muted">Busca, filtra y actualiza los productos.</p>
                 </div>
                 <div className="w-full md:w-[420px]">
-                  <label className="mb-2 flex items-center gap-2 text-xs text-slate-400">
+                  <label className="mb-2 flex items-center gap-2 text-xs app-text-muted">
                     <input
                       type="checkbox"
                       checked={onlyAssignedToBranch}
                       onChange={(e) => setOnlyAssignedToBranch(e.target.checked)}
-                      className="rounded border-slate-600"
+                      className="rounded border-[rgba(209,199,189,0.9)]"
                     />
                     Mostrar solo productos asignados a la sucursal activa
                   </label>
@@ -561,7 +630,7 @@ const [products, setProducts] = useState<Product[]>([]);
                     renderItem={(product) => (
                       <div>
                         <span className="font-medium">{product.name}</span>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs app-text-muted">
                           {product.sku} · {product.category}
                         </div>
                       </div>
@@ -571,18 +640,18 @@ const [products, setProducts] = useState<Product[]>([]);
               </div>
 
               {selectedProduct && (
-                <div className="mb-6 rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                  <p className="text-sm text-slate-400">Producto seleccionado</p>
-                  <h3 className="mt-2 text-lg font-semibold text-white">{selectedProduct.name}</h3>
-                  <p className="text-sm text-slate-400">
+                <div className="app-panel mb-6 p-4">
+                  <p className="text-sm app-text-muted">Producto seleccionado</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#3d4532]">{selectedProduct.name}</h3>
+                  <p className="text-sm app-text-muted">
                     {selectedProduct.sku} · {selectedProduct.category}
                   </p>
                 </div>
               )}
 
-              <div className="rounded-3xl border border-slate-800 overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                  <thead className="bg-slate-950/80 text-slate-400">
+              <div className="app-table-wrap overflow-x-auto">
+                <table className="app-table min-w-full text-left text-sm">
+                  <thead>
                     <tr>
                       <th className="px-6 py-4">Producto</th>
                       <th className="px-6 py-4">SKU</th>
@@ -594,28 +663,28 @@ const [products, setProducts] = useState<Product[]>([]);
                       <th className="px-6 py-4">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 bg-slate-900">
+                  <tbody>
                     {filteredProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
+                        <td colSpan={8} className="px-6 py-8 text-center text-[#6b7280]">
                           No se encontraron productos.
                         </td>
                       </tr>
                     ) : (
                       filteredProducts.map((product) => (
-                        <tr key={product.id} className="hover:bg-slate-950/80 transition">
+                        <tr key={product.id}>
                           <td className="px-6 py-5">
-                            <p className="font-semibold text-white">{product.name}</p>
-                            <p className="text-xs text-slate-500">{product.description}</p>
+                            <p className="font-semibold text-[#3d4532]">{product.name}</p>
+                            <p className="text-xs text-[#6b7280]">{product.description}</p>
                             {!productHasStockInBranch(product) && (
-                              <p className="mt-1 text-xs text-amber-400">Sin fila en esta sucursal</p>
+                              <p className="mt-1 text-xs text-amber-700">Sin fila en esta sucursal</p>
                             )}
                           </td>
-                          <td className="px-6 py-5 text-slate-300">{product.sku}</td>
-                          <td className="px-6 py-5 text-slate-300">{product.category}</td>
-                          <td className="px-6 py-5 text-slate-300">{product.stock ?? 0}</td>
-                          <td className="px-6 py-5 text-slate-300">{product.minStock ?? 0}</td>
-                          <td className="px-6 py-5 text-slate-300">${product.price}</td>
+                          <td className="px-6 py-5">{product.sku}</td>
+                          <td className="px-6 py-5">{product.category}</td>
+                          <td className="px-6 py-5">{product.stock ?? 0}</td>
+                          <td className="px-6 py-5">{product.minStock ?? 0}</td>
+                          <td className="px-6 py-5">${product.price}</td>
                           <td className="px-6 py-5">
                             <StatusBadge active={product.isActive} />
                           </td>
@@ -641,18 +710,18 @@ const [products, setProducts] = useState<Product[]>([]);
                 </table>
               </div>
 
-              <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="app-panel mt-6 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-base font-semibold text-white">Edición rápida de stock</h3>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <h3 className="text-base font-semibold text-[#3d4532]">Edición rápida de stock</h3>
+                    <p className="mt-1 text-sm app-text-muted">
                       Registra ingresos de stock en la sucursal activa (se suman al stock actual).
                     </p>
                     {quickNumericWarning && (
-                      <p className="mt-2 text-xs text-rose-300">{quickNumericWarning}</p>
+                      <p className="mt-2 text-xs text-rose-700">{quickNumericWarning}</p>
                     )}
                   </div>
-                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs text-slate-400">
+                  <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-3 py-1 text-xs text-[#4a533c]">
                     Sucursal: {activeBranchName}
                   </span>
                 </div>
@@ -664,12 +733,12 @@ const [products, setProducts] = useState<Product[]>([]);
                       value={quickSearchTerm}
                       onChange={(e) => setQuickSearchTerm(e.target.value)}
                       placeholder="Buscar por nombre, SKU o categoría"
-                      className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 md:max-w-sm"
+                      className="app-input md:max-w-sm"
                     />
                     <select
                       value={quickCategoryFilter}
                       onChange={(e) => setQuickCategoryFilter(e.target.value)}
-                      className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 md:w-64"
+                      className="app-select md:w-64"
                     >
                       <option value="all">Todas las categorías</option>
                       {Array.from(new Set(products.map((p) => p.category).filter(Boolean))).map((cat) => (
@@ -678,10 +747,10 @@ const [products, setProducts] = useState<Product[]>([]);
                         </option>
                       ))}
                     </select>
-                    <span className="text-xs text-slate-500">{quickStockProducts.length} producto(s)</span>
+                    <span className="text-xs text-[#6b7280]">{quickStockProducts.length} producto(s)</span>
                   </div>
-                  <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                    <thead className="bg-slate-950/80 text-slate-400">
+                  <table className="app-table min-w-full text-left text-sm">
+                    <thead>
                       <tr>
                         <th className="px-4 py-3">Producto</th>
                         <th className="px-4 py-3">SKU</th>
@@ -692,24 +761,24 @@ const [products, setProducts] = useState<Product[]>([]);
                         <th className="px-4 py-3">Acción</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800 bg-slate-900/60">
+                    <tbody>
                       {quickStockProducts.slice(0, 50).map((p) => {
                         const draft = quickStockDraft[p.id];
                         const minDraft = quickMinStockDraft[p.id];
                         return (
-                          <tr key={p.id} className="hover:bg-slate-950/80 transition">
+                          <tr key={p.id}>
                             <td className="px-4 py-3">
-                              <p className="font-semibold text-white truncate max-w-[180px]">{p.name}</p>
+                              <p className="max-w-[180px] truncate font-semibold text-[#3d4532]">{p.name}</p>
                             </td>
-                            <td className="px-4 py-3 text-slate-300">{p.sku}</td>
-                            <td className="px-4 py-3 text-slate-300">{p.stock ?? 0}</td>
-                            <td className="px-4 py-3 text-slate-300">{p.minStock ?? 0}</td>
+                            <td className="px-4 py-3">{p.sku}</td>
+                            <td className="px-4 py-3">{p.stock ?? 0}</td>
+                            <td className="px-4 py-3">{p.minStock ?? 0}</td>
                             <td className="px-4 py-3">
                               <input
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                className="w-28 rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-emerald-500"
+                                className="app-input w-28"
                                 value={draft ?? '0'}
                                 onChange={(e) =>
                                   handleQuickDigitsChange(e.target.value, setQuickStockDraft, p.id)
@@ -721,7 +790,7 @@ const [products, setProducts] = useState<Product[]>([]);
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                className="w-24 rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-emerald-500"
+                                className="app-input w-24"
                                 value={minDraft ?? String(p.minStock ?? 0)}
                                 onChange={(e) =>
                                   handleQuickDigitsChange(e.target.value, setQuickMinStockDraft, p.id)
@@ -741,7 +810,7 @@ const [products, setProducts] = useState<Product[]>([]);
                                     () => saveQuickStock(p)
                                   )
                                 }
-                                className="rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                                className="app-btn-primary px-3 py-2 text-xs disabled:opacity-50"
                               >
                                 {quickSavingId === p.id ? 'Guardando…' : 'Guardar'}
                               </button>
@@ -751,7 +820,7 @@ const [products, setProducts] = useState<Product[]>([]);
                       })}
                       {quickStockProducts.length > 50 && (
                         <tr>
-                          <td colSpan={7} className="px-4 py-4 text-center text-xs text-slate-500">
+                          <td colSpan={7} className="px-4 py-4 text-center text-xs text-[#6b7280]">
                             Mostrando primeros 50 productos por rendimiento. Usa los filtros para acotar más.
                           </td>
                         </tr>
@@ -763,30 +832,30 @@ const [products, setProducts] = useState<Product[]>([]);
             </section>
 
             <aside className="space-y-6">
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
-                <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Información</p>
-                <p className="mt-4 text-slate-400 text-sm leading-6">
+              <div className="app-card rounded-3xl p-6">
+                <p className="app-eyebrow text-[0.7rem] tracking-[0.28em]">Información</p>
+                <p className="mt-4 text-sm leading-6 app-text-muted">
                   En este mantenedor puedes revisar todos los productos, buscar por SKU o categoría y agregar nuevos registros.
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
-                <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Resumen rápido</p>
-                <div className="mt-4 space-y-3 text-slate-300">
-                  <div className="rounded-3xl bg-slate-950/80 p-4">
-                    <p className="text-sm">Productos totales</p>
-                    <p className="mt-1 text-2xl font-semibold text-white">{products.length}</p>
+              <div className="app-card rounded-3xl p-6">
+                <p className="app-eyebrow text-[0.7rem] tracking-[0.28em]">Resumen rápido</p>
+                <div className="mt-4 space-y-3">
+                  <div className="app-panel p-4">
+                    <p className="text-sm app-text-muted">Productos totales</p>
+                    <p className="mt-1 text-2xl font-semibold text-[#3d4532]">{products.length}</p>
                   </div>
-                  <div className="rounded-3xl bg-slate-950/80 p-4">
-                    <p className="text-sm">Producto activo</p>
-                    <p className="mt-1 text-2xl font-semibold text-white">{filteredProducts.length}</p>
+                  <div className="app-panel p-4">
+                    <p className="text-sm app-text-muted">Producto activo</p>
+                    <p className="mt-1 text-2xl font-semibold text-[#3d4532]">{filteredProducts.length}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
-                <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Mermas / Shrinkage</p>
-                <p className="mt-4 text-slate-400 text-sm leading-6">
+              <div className="app-card rounded-3xl p-6">
+                <p className="app-eyebrow text-[0.7rem] tracking-[0.28em]">Mermas</p>
+                <p className="mt-4 text-sm leading-6 app-text-muted">
                   Registra mermas por producto para mantener el inventario consistente.
                 </p>
               </div>
@@ -796,76 +865,86 @@ const [products, setProducts] = useState<Product[]>([]);
 
       {showModal && (
 
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-2xl rounded-[2rem] bg-slate-950 border border-slate-800 p-8 shadow-2xl">
+        <div className="app-modal-overlay">
+          <div className="app-modal-panel max-w-2xl">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+                <p className="app-eyebrow text-xs tracking-[0.28em]">
                   {editingProduct ? 'Editar producto' : 'Nuevo producto'}
                 </p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">
+                <h2 className="mt-3 text-2xl font-semibold text-[#3d4532]">
                   {editingProduct ? 'Actualizar producto' : 'Agregar producto al catálogo'}
                 </h2>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setShowModal(false);
                   setEditingProduct(null);
                 }}
-                className="rounded-full bg-slate-900/80 px-4 py-2 text-slate-300 hover:bg-slate-800 transition"
+                className="app-btn-secondary rounded-full px-4 py-2"
               >
                 ✕
               </button>
             </div>
 
+            {modalError && (
+              <p className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {modalError}
+              </p>
+            )}
+
             <div className="grid gap-6 md:grid-cols-2">
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-[#3d4532]">
                 Nombre
                 <input
                   value={form.name}
                   onChange={(event) => handleInputChange('name', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2"
                   placeholder="Nombre del producto"
                 />
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-[#3d4532]">
                 SKU
                 <input
                   value={form.sku}
                   onChange={(event) => handleInputChange('sku', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2"
                   placeholder={suggestedSku}
                 />
                 {!editingProduct && (
-                  <p className="mt-2 text-xs text-slate-500">Sugerido: {suggestedSku}</p>
+                  <p className="mt-2 text-xs text-[#6b7280]">Sugerido: {suggestedSku}</p>
                 )}
               </label>
-              <label className="block text-sm text-slate-300">
-                Categoría
+              <label className="block text-sm text-[#3d4532]">
+                Subcategoría (hoja)
                 <select
                   value={form.categoryId}
                   onChange={(event) => handleInputChange('categoryId', event.target.value)}
                   disabled={!!editingProduct || categories.length === 0}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2"
                 >
                   {categories.length === 0 ? (
-                    <option value="">Cargando...</option>
+                    <option value="">Sin subcategorías — crea una en Categorías</option>
                   ) : (
                     categories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {c.parentName ? `${c.parentName} → ${c.name}` : c.name}
                       </option>
                     ))
                   )}
                 </select>
+                <span className="mt-1 block text-xs text-[#6b7280]">
+                  Asigna el producto a una subcategoría o categoría sin hijos.
+                </span>
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-[#3d4532]">
                 Proveedor
                 <select
                   value={form.supplierId}
                   onChange={(event) => handleInputChange('supplierId', event.target.value)}
                   disabled={!!editingProduct || suppliers.length === 0}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2"
                 >
                   {suppliers.length === 0 ? (
                     <option value="">Cargando...</option>
@@ -878,23 +957,23 @@ const [products, setProducts] = useState<Product[]>([]);
                   )}
                 </select>
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-[#3d4532]">
                 Precio
                 <input
                   value={form.price}
                   onChange={(event) => handleInputChange('price', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2"
                   placeholder="Precio de venta"
                   type="text"
                   inputMode="decimal"
                 />
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-[#3d4532]">
                 Costo
                 <input
                   value={form.cost}
                   onChange={(event) => handleInputChange('cost', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2"
                   placeholder="Costo"
                   type="text"
                   inputMode="decimal"
@@ -902,10 +981,10 @@ const [products, setProducts] = useState<Product[]>([]);
               </label>
             </div>
 
-            <div className="mt-6 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-5 md:col-span-2">
-              <p className="text-xs uppercase tracking-[0.28em] text-emerald-400/90">Inventario por sucursal</p>
-              <h3 className="mt-2 text-lg font-semibold text-white">{activeBranchName}</h3>
-              <p className="mt-1 text-sm text-slate-400">
+            <div className="mt-6 rounded-2xl border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.06)] p-5 md:col-span-2">
+              <p className="app-eyebrow text-xs tracking-[0.28em]">Inventario por sucursal</p>
+              <h3 className="mt-2 text-lg font-semibold text-[#3d4532]">{activeBranchName}</h3>
+              <p className="mt-1 text-sm app-text-muted">
                 {editingProduct
                   ? productHasStockInBranch(editingProduct)
                     ? 'Registra ingreso de stock en esta sucursal (se suma al stock actual, no modifica el catálogo global).'
@@ -913,28 +992,28 @@ const [products, setProducts] = useState<Product[]>([]);
                   : 'Al crear el producto se registrará el stock inicial en la sucursal activa.'}
               </p>
               {formNumericWarning && (
-                <p className="mt-2 text-xs text-rose-300">{formNumericWarning}</p>
+                <p className="mt-2 text-xs text-rose-700">{formNumericWarning}</p>
               )}
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <label className="block text-sm text-slate-300">
+                <label className="block text-sm text-[#3d4532]">
                   {editingProduct ? 'Ingreso de stock' : 'Stock inicial'}
                   <input
                     value={form.stock}
                     onChange={(event) => handleInputChange('stock', event.target.value)}
-                    className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                    className="app-input mt-2"
                     placeholder="0"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
                   />
                 </label>
-                <label className="block text-sm text-slate-300">
+                <label className="block text-sm text-[#3d4532]">
                   Stock mínimo (alerta)
                   <input
                     value={form.minStock}
                     onChange={(event) => handleInputChange('minStock', event.target.value)}
-                    className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                    className="app-input mt-2"
                     placeholder="0"
                     type="text"
                     inputMode="numeric"
@@ -944,7 +1023,7 @@ const [products, setProducts] = useState<Product[]>([]);
               </div>
 
               {editingProduct && (
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-[#6b7280]">
                   Stock actual en sistema: {editingProduct.stock ?? 0} unidades
                 </p>
               )}
@@ -954,24 +1033,15 @@ const [products, setProducts] = useState<Product[]>([]);
               <button
                 onClick={() => setShowModal(false)}
                 disabled={isSaving || isConfirming}
-                className="rounded-3xl border border-slate-700 px-6 py-3 text-sm text-slate-300 hover:bg-slate-800 transition disabled:opacity-50"
+                className="app-btn-secondary disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
-                onClick={() =>
-                  askConfirmation(
-                    editingProduct ? 'Guardar cambios del producto' : 'Crear producto',
-                    editingProduct
-                      ? '¿Confirmas la modificación del producto y su inventario de sucursal?'
-                      : '¿Confirmas la creación de este producto con su stock inicial?',
-                    editingProduct ? 'Guardar cambios' : 'Crear producto',
-                    'primary',
-                    editingProduct ? handleUpdateProduct : handleCreateProduct
-                  )
-                }
+                type="button"
+                onClick={requestSaveProduct}
                 disabled={isSaving || isConfirming}
-                className="rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white hover:bg-sky-500 transition disabled:opacity-50"
+                className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:opacity-50"
               >
                 {isSaving
                   ? 'Guardando…'

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/core/context/auth';
 import { api } from '@/core/api/api-client';
 import { extractList, extractEntity, normalizeBranch, normalizeUser, unwrapApiEnvelope } from '@/core/api/normalizers';
-import { Branch } from '@/core/interfaces';
+import { Branch, TerritoryComuna, TerritoryRegion } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
@@ -49,10 +49,14 @@ export default function BranchesPage() {
     variant: 'primary',
     action: null,
   });
+  const [regions, setRegions] = useState<TerritoryRegion[]>([]);
+  const [comunas, setComunas] = useState<TerritoryComuna[]>([]);
   const [form, setForm] = useState({
     name: '',
     code: '',
-    city: '',
+    regionId: '',
+    comunaId: '',
+    codigoPostal: '',
     address: '',
     phone: '',
   });
@@ -106,15 +110,93 @@ export default function BranchesPage() {
     loadBranches();
   }, []);
 
+  useEffect(() => {
+    const loadRegions = async () => {
+      try {
+        const res = await api.getTerritoryRegions();
+        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(res.data), ['regions']);
+        setRegions(
+          rows.map((r) => ({
+            codigoCut: String(r.codigoCut ?? r.codigo_cut ?? ''),
+            nombre: String(r.nombre ?? ''),
+            sigla: String(r.sigla ?? ''),
+          }))
+        );
+      } catch {
+        setRegions([]);
+        setErrorMessage('No se pudieron cargar las regiones CUT. Recarga e intenta nuevamente.');
+        setSuccessMessage(null);
+      }
+    };
+    void loadRegions();
+  }, []);
+
+  useEffect(() => {
+    if (!form.regionId) {
+      setComunas([]);
+      return;
+    }
+    const loadComunas = async () => {
+      try {
+        const res = await api.getTerritoryComunas(form.regionId);
+        const rows = extractList<Record<string, unknown>>(unwrapApiEnvelope(res.data), ['comunas']);
+        setComunas(
+          rows.map((c) => ({
+            codigoCut: String(c.codigoCut ?? c.codigo_cut ?? ''),
+            nombre: String(c.nombre ?? ''),
+            regionId: String(c.regionId ?? c.region_id ?? form.regionId),
+            regionNombre: c.regionNombre != null ? String(c.regionNombre) : null,
+          }))
+        );
+      } catch {
+        setComunas([]);
+        setErrorMessage('No se pudieron cargar las comunas para la región seleccionada.');
+        setSuccessMessage(null);
+      }
+    };
+    void loadComunas();
+  }, [form.regionId]);
+
   const handleSaveBranch = async () => {
-    if (!form.name || !form.code || !form.city || !form.address || !form.phone) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const missing: string[] = [];
+    const name = form.name.trim();
+    const address = form.address.trim();
+    const codigoPostal = form.codigoPostal.trim();
+
+    if (!name) missing.push('Nombre de sucursal');
+    if (!form.regionId) missing.push('Región (CUT)');
+    if (!form.comunaId) missing.push('Comuna');
+    if (!codigoPostal) missing.push('Código postal (7 dígitos)');
+    else if (!/^\d{7}$/.test(codigoPostal)) missing.push('Código postal (7 dígitos)');
+    if (!address) missing.push('Dirección');
+
+    if (missing.length) {
+      setErrorMessage(`Completa los datos requeridos: ${missing.join(', ')}.`);
+      return;
+    }
+
+    if (regions.length === 0) {
+      setErrorMessage('Las regiones CUT no están cargadas. Selecciona nuevamente la región y reintenta.');
+      return;
+    }
+
+    const payload = {
+      name,
+      address,
+      phone: form.phone.trim() || undefined,
+      comunaId: form.comunaId,
+      codigoPostal,
+    };
 
     try {
       setSuccessMessage(null);
       if (editingBranch) {
-        await api.updateBranch(editingBranch.id, form);
+        await api.updateBranch(editingBranch.id, payload);
       } else {
-        await api.createBranch(form);
+        await api.createBranch({ ...payload, code: form.code.trim() || undefined });
       }
 
       const response = await api.getBranches();
@@ -124,7 +206,15 @@ export default function BranchesPage() {
       setShowModal(false);
       setEditingBranch(null);
       setErrorMessage(null);
-      setForm({ name: '', code: '', city: '', address: '', phone: '' });
+      setForm({
+        name: '',
+        code: '',
+        regionId: '',
+        comunaId: '',
+        codigoPostal: '',
+        address: '',
+        phone: '',
+      });
       const successText = editingBranch ? 'Sucursal actualizada correctamente' : 'Sucursal creada correctamente';
       setSuccessMessage(successText);
       notifySuccess(successText);
@@ -203,9 +293,9 @@ export default function BranchesPage() {
       <AppPageContent>
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Sucursales</p>
-              <h1 className="mt-3 text-3xl font-semibold text-white">Mantenedor de sucursales</h1>
-              <p className="mt-2 max-w-2xl text-slate-400">
+              <p className="app-eyebrow">Sucursales</p>
+              <h1 className="mt-3 text-3xl font-semibold text-[#3D4532]">Mantenedor de sucursales</h1>
+              <p className="mt-2 max-w-2xl text-brand-ink-muted/80">
                 {canManageBranches
                   ? 'Administra sucursales fijas y puestos temporales (eventos). Usa Desactivar cuando una sucursal cierra: deja de aparecer en ventas nuevas, pero ventas, inventario y reportes históricos se conservan. Restaura desde el filtro Inactivos.'
                   : 'Consulta sucursales para auditoría. Solo el administrador puede crear, editar o desactivar locales.'}
@@ -216,7 +306,7 @@ export default function BranchesPage() {
                 </p>
               )}
               {currentUser && (
-                <p className="mt-3 text-sm text-slate-500">Sesión iniciada como: {currentUser.name}</p>
+                <p className="mt-3 text-sm text-brand-ink-muted">Sesión iniciada como: {currentUser.name}</p>
               )}
               {errorMessage && (
                 <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -228,19 +318,27 @@ export default function BranchesPage() {
                   {successMessage}
                 </p>
               )}
-              {isLoading && <p className="mt-3 text-sm text-slate-500">Cargando sucursales desde BFF...</p>}
+              {isLoading && <p className="mt-3 text-sm text-brand-ink-muted">Cargando sucursales desde BFF...</p>}
             </div>
             {canManageBranches && (
               <button
                 onClick={() => {
                   setEditingBranch(null);
-                  setForm({ name: '', code: '', city: '', address: '', phone: '' });
+                  setForm({
+        name: '',
+        code: '',
+        regionId: '',
+        comunaId: '',
+        codigoPostal: '',
+        address: '',
+        phone: '',
+      });
                   setErrorMessage(null);
                   setSuccessMessage(null);
                   setShowModal(true);
                 }}
                 disabled={isActionLocked}
-                className="inline-flex items-center justify-center rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Nueva sucursal
               </button>
@@ -248,11 +346,11 @@ export default function BranchesPage() {
           </div>
 
           <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
-            <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
+            <section className="app-card rounded-3xl p-6 shadow-lg">
               <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Sucursales</h2>
-                  <p className="text-sm text-slate-400">
+                  <h2 className="text-xl font-semibold text-[#3D4532]">Sucursales</h2>
+                  <p className="text-sm text-brand-ink-muted">
                     Busca por nombre, código o ciudad. Activas: {activeCount} · Inactivas: {inactiveCount}
                   </p>
                 </div>
@@ -268,7 +366,7 @@ export default function BranchesPage() {
                     renderItem={(branch) => (
                       <div>
                         <span className="font-medium">{branch.name}</span>
-                        <div className="text-xs text-slate-400">{branch.city} · {branch.code}</div>
+                        <div className="text-xs text-brand-ink-muted/80">{branch.city} · {branch.code}</div>
                       </div>
                     )}
                   />
@@ -277,42 +375,47 @@ export default function BranchesPage() {
               </div>
 
               {selectedBranch && (
-                <div className="mb-6 rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                  <p className="text-sm text-slate-400">Sucursal seleccionada</p>
-                  <h3 className="mt-2 text-lg font-semibold text-white">{selectedBranch.name}</h3>
-                  <p className="text-sm text-slate-400">{selectedBranch.city} · {selectedBranch.phone}</p>
+                <div className="mb-6 rounded-3xl border border-[rgba(209,199,189,0.75)] bg-[rgba(74,83,60,0.06)] p-4">
+                  <p className="text-sm text-brand-ink-muted">Sucursal seleccionada</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#3D4532]">{selectedBranch.name}</h3>
+                  <p className="text-sm text-brand-ink-muted">{selectedBranch.city} · {selectedBranch.phone}</p>
                 </div>
               )}
 
-              <div className="rounded-3xl border border-slate-800 overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                  <thead className="bg-slate-950/80 text-slate-400">
+              <div className="app-table-wrap overflow-x-auto">
+                <table className="app-table min-w-full text-left text-sm">
+                  <thead>
                     <tr>
                       <th className="px-6 py-4">Sucursal</th>
                       <th className="px-6 py-4">Código</th>
-                      <th className="px-6 py-4">Ciudad</th>
+                      <th className="px-6 py-4">Comuna / CP</th>
                       <th className="px-6 py-4">Teléfono</th>
                       <th className="px-6 py-4">Estado</th>
                       <th className="px-6 py-4">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 bg-slate-900">
+                  <tbody>
                     {filteredBranches.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                        <td colSpan={6} className="px-6 py-8 text-center text-brand-ink-muted">
                           No se encontraron sucursales.
                         </td>
                       </tr>
                     ) : (
                       filteredBranches.map((branch) => (
-                        <tr key={branch.id} className="hover:bg-slate-950/80 transition">
+                        <tr key={branch.id} className="transition">
                           <td className="px-6 py-5">
-                            <p className="font-semibold text-white">{branch.name}</p>
-                            <p className="text-xs text-slate-500">{branch.address}</p>
+                            <p className="font-semibold text-[#3D4532]">{branch.name}</p>
+                            <p className="text-xs text-brand-ink-muted">{branch.address}</p>
                           </td>
-                          <td className="px-6 py-5 text-slate-300">{branch.code}</td>
-                          <td className="px-6 py-5 text-slate-300">{branch.city}</td>
-                          <td className="px-6 py-5 text-slate-300">{branch.phone}</td>
+                          <td className="px-6 py-5 text-brand-ink-muted">{branch.code}</td>
+                          <td className="px-6 py-5 text-brand-ink-muted">
+                            {branch.comunaNombre ?? branch.city}
+                            {branch.codigoPostal ? (
+                              <span className="block text-xs text-brand-ink-muted">CP {branch.codigoPostal}</span>
+                            ) : null}
+                          </td>
+                          <td className="px-6 py-5 text-brand-ink-muted">{branch.phone}</td>
                           <td className="px-6 py-5">
                             <StatusBadge active={branch.isActive} />
                           </td>
@@ -328,7 +431,9 @@ export default function BranchesPage() {
                                 setForm({
                                   name: branch.name,
                                   code: branch.code,
-                                  city: branch.city,
+                                  regionId: branch.regionId ?? '',
+                                  comunaId: branch.comunaId ?? '',
+                                  codigoPostal: branch.codigoPostal ?? '',
                                   address: branch.address,
                                   phone: branch.phone,
                                 });
@@ -370,24 +475,24 @@ export default function BranchesPage() {
             </section>
 
             <aside className="space-y-6">
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
-                <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Notas</p>
-                <p className="mt-4 text-slate-400 text-sm leading-6">
+              <div className="app-card rounded-3xl p-6 shadow-lg">
+                <p className="text-sm uppercase tracking-[0.28em] text-brand-ink-muted">Notas</p>
+                <p className="mt-4 text-brand-ink-muted text-sm leading-6">
                   Desactivar no elimina datos. Sirve para sucursales cerradas o puestos de evento que ya
                   terminaron. Los registros inactivos quedan disponibles en reportes y auditoría.
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-lg">
-                <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Resumen rápido</p>
-                <div className="mt-4 space-y-3 text-slate-300">
-                  <div className="rounded-3xl bg-slate-950/80 p-4">
+              <div className="app-card rounded-3xl p-6 shadow-lg">
+                <p className="text-sm uppercase tracking-[0.28em] text-brand-ink-muted">Resumen rápido</p>
+                <div className="mt-4 space-y-3 text-brand-ink-muted">
+                  <div className="rounded-3xl border border-[rgba(209,199,189,0.75)] bg-[rgba(74,83,60,0.06)] p-4">
                     <p className="text-sm">Sucursales totales</p>
-                    <p className="mt-1 text-2xl font-semibold text-white">{branches.length}</p>
+                    <p className="mt-1 text-2xl font-semibold text-[#3D4532]">{branches.length}</p>
                   </div>
-                  <div className="rounded-3xl bg-slate-950/80 p-4">
+                  <div className="rounded-3xl border border-[rgba(209,199,189,0.75)] bg-[rgba(74,83,60,0.06)] p-4">
                     <p className="text-sm">Sucursales mostradas</p>
-                    <p className="mt-1 text-2xl font-semibold text-white">{filteredBranches.length}</p>
+                    <p className="mt-1 text-2xl font-semibold text-[#3D4532]">{filteredBranches.length}</p>
                   </div>
                 </div>
               </div>
@@ -396,14 +501,14 @@ export default function BranchesPage() {
       </AppPageContent>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-2xl rounded-[2rem] bg-slate-950 border border-slate-800 p-8 shadow-2xl">
+        <div className="app-modal-overlay">
+          <div className="app-modal-panel w-full max-w-2xl rounded-[2rem] p-8 shadow-2xl">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+                <p className="text-xs uppercase tracking-[0.28em] text-brand-ink-muted">
                   {editingBranch ? 'Modificar Sucursal' : 'Nueva Sucursal'}
                 </p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">
+                <h2 className="mt-3 text-2xl font-semibold text-[#3D4532]">
                   {editingBranch ? 'Actualizar sucursal' : 'Agregar nueva sucursal'}
                 </h2>
               </div>
@@ -412,51 +517,91 @@ export default function BranchesPage() {
                   setShowModal(false);
                   setEditingBranch(null);
                 }}
-                className="rounded-full bg-slate-900/80 px-4 py-2 text-slate-300 hover:bg-slate-800 transition"
+                className="rounded-full border border-[rgba(209,199,189,0.75)] bg-[rgba(74,83,60,0.06)] px-4 py-2 text-brand-ink-muted hover:bg-[rgba(74,83,60,0.12)] transition"
               >
                 ✕
               </button>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Nombre de sucursal
                 <input
                   value={form.name}
                   onChange={(event) => handleInputChange('name', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Código
                 <input
                   value={form.code}
                   onChange={(event) => handleInputChange('code', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
-              <label className="block text-sm text-slate-300">
-                Ciudad
+              <label className="block text-sm text-brand-ink-muted">
+                Región (CUT)
+                <select
+                  value={form.regionId}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      regionId: event.target.value,
+                      comunaId: '',
+                    }))
+                  }
+                  className="app-select mt-2 w-full rounded-3xl px-4 py-3"
+                >
+                  <option value="">Selecciona región</option>
+                  {regions.map((r) => (
+                    <option key={r.codigoCut} value={r.codigoCut}>
+                      {r.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm text-brand-ink-muted">
+                Comuna
+                <select
+                  value={form.comunaId}
+                  onChange={(event) => handleInputChange('comunaId', event.target.value)}
+                  disabled={!form.regionId}
+                  className="app-select mt-2 w-full rounded-3xl px-4 py-3 disabled:opacity-50"
+                >
+                  <option value="">Selecciona comuna</option>
+                  {comunas.map((c) => (
+                    <option key={c.codigoCut} value={c.codigoCut}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm text-brand-ink-muted">
+                Código postal (7 dígitos)
                 <input
-                  value={form.city}
-                  onChange={(event) => handleInputChange('city', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  value={form.codigoPostal}
+                  onChange={(event) =>
+                    handleInputChange('codigoPostal', event.target.value.replace(/\D/g, '').slice(0, 7))
+                  }
+                  placeholder="Ej. 9160000"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-brand-ink-muted">
                 Teléfono
                 <input
                   value={form.phone}
                   onChange={(event) => handleInputChange('phone', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
-              <label className="block text-sm text-slate-300 md:col-span-2">
+              <label className="block text-sm text-brand-ink-muted md:col-span-2">
                 Dirección
                 <input
                   value={form.address}
                   onChange={(event) => handleInputChange('address', event.target.value)}
-                  className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-sky-500"
+                  className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
               </label>
             </div>
@@ -468,7 +613,7 @@ export default function BranchesPage() {
                   setEditingBranch(null);
                 }}
                 disabled={isActionLocked}
-                className="rounded-3xl border border-slate-700 px-6 py-3 text-sm text-slate-300 hover:bg-slate-800 transition disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-secondary rounded-3xl px-6 py-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -485,7 +630,7 @@ export default function BranchesPage() {
                   )
                 }
                 disabled={isActionLocked}
-                className="rounded-3xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white hover:bg-sky-500 transition disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {editingBranch ? 'Guardar cambios' : 'Guardar sucursal'}
               </button>

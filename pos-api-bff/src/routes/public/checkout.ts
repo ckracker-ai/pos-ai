@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import config from '../../config/index.js';
 import { ApiCoreServicePlatformEmpresa } from '../../services/apiCoreServicePlatformEmpresa.js';
+import { ApiCoreServicePayment } from '../../services/apiCoreServicePayment.js';
 import { extractCoreError } from '../../utils/extractCoreError.js';
 import { sendFail, sendOk } from '../../utils/response.js';
 
@@ -9,6 +10,19 @@ const confirmSchema = z.object({
   empresaId: z.string().uuid(),
   provider: z.string().min(1).max(40).default('SANDBOX'),
   reference: z.string().min(1).max(120).optional(),
+});
+
+const createSessionSchema = z.object({
+  empresaId: z.string().uuid(),
+  provider: z.string().min(1).max(40).optional(),
+});
+
+const sandboxCompleteSchema = z.object({
+  token: z.string().min(10),
+});
+
+const webpayCommitSchema = z.object({
+  token_ws: z.string().min(10),
 });
 
 const webhookSchema = z.object({
@@ -27,6 +41,7 @@ function webhookSecretOk(request: FastifyRequest, bodySecret?: string): boolean 
 
 const publicCheckoutRoutes = async (app: FastifyInstance) => {
   const core = new ApiCoreServicePlatformEmpresa();
+  const payments = new ApiCoreServicePayment();
 
   app.get('/checkout/:empresaId', async (request, reply) => {
     const { empresaId } = request.params as { empresaId: string };
@@ -43,15 +58,68 @@ const publicCheckoutRoutes = async (app: FastifyInstance) => {
     }
   });
 
+  app.post('/checkout/create-session', async (request, reply) => {
+    const body = createSessionSchema.parse(request.body ?? {});
+    try {
+      const session = await payments.createCheckoutSession({
+        empresaId: body.empresaId,
+        provider: body.provider,
+        returnBaseUrl: config.frontendPublicUrl,
+      });
+      return sendOk(reply, { session });
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to create checkout session'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/checkout/webpay-commit', async (request, reply) => {
+    const body = webpayCommitSchema.parse(request.body ?? {});
+    try {
+      const result = await payments.completeWebpayCommit(body.token_ws);
+      return sendOk(reply, result);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to commit Webpay transaction'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/checkout/sandbox-complete', async (request, reply) => {
+    const body = sandboxCompleteSchema.parse(request.body ?? {});
+    try {
+      const result = await payments.completeSandboxCheckout(body.token);
+      return sendOk(reply, result);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to complete sandbox checkout'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
   app.post('/checkout/confirm', async (request, reply) => {
     const body = confirmSchema.parse(request.body ?? {});
     const reference = body.reference ?? `sandbox-${Date.now()}`;
     try {
-      const data = await core.confirmCheckout(body.empresaId, {
+      const ledger = await payments.processInboundWebhook({
         provider: body.provider,
+        externalId: reference,
         reference,
+        status: 'APPROVED',
+        empresa_id: body.empresaId,
+        metadata: { kind: 'SAAS_SUB', empresaId: body.empresaId },
       });
-      return sendOk(reply, data);
+      return sendOk(reply, { duplicate: ledger.duplicate, ...ledger.data });
     } catch (e: unknown) {
       const err = e as { response?: { status?: number } };
       return sendFail(
@@ -71,11 +139,19 @@ const publicCheckoutRoutes = async (app: FastifyInstance) => {
       return sendFail(reply, 'PAYMENT_NOT_APPROVED', 422);
     }
     try {
-      const data = await core.confirmCheckout(body.empresa_id, {
+      const ledger = await payments.processInboundWebhook({
         provider: body.provider,
+        externalId: body.reference,
         reference: body.reference,
+        status: body.status,
+        empresa_id: body.empresa_id,
+        metadata: { kind: 'SAAS_SUB', empresaId: body.empresa_id },
       });
-      return sendOk(reply, { webhook: 'subscription-payment', ...data });
+      return sendOk(reply, {
+        webhook: 'subscription-payment',
+        duplicate: ledger.duplicate,
+        ...ledger.data,
+      });
     } catch (e: unknown) {
       const err = e as { response?: { status?: number } };
       return sendFail(

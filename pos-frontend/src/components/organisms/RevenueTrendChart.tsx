@@ -44,20 +44,20 @@ export function RevenueTrendChart({ points }: { points: Point[] }) {
             y1={tick.y}
             y2={tick.y}
             stroke="currentColor"
-            className="text-slate-800"
+            className="text-[rgba(74,83,60,0.2)]"
             strokeDasharray="4 4"
           />
-          <text x={padding.left - 8} y={tick.y + 4} textAnchor="end" className="fill-slate-500 text-[10px]">
+          <text x={padding.left - 8} y={tick.y + 4} textAnchor="end" className="fill-[#6b7280] text-[10px]">
             {tick.label}
           </text>
         </g>
       ))}
 
-      <path d={areaPath} className="fill-amber-500/15" />
-      <path d={linePath} fill="none" className="stroke-amber-500" strokeWidth={2.5} strokeLinecap="round" />
+      <path d={areaPath} className="fill-[rgba(74,83,60,0.12)]" />
+      <path d={linePath} fill="none" className="stroke-[#4a533c]" strokeWidth={2.5} strokeLinecap="round" />
 
       {coords.map((c) => (
-        <circle key={c.date} cx={c.x} cy={c.y} r={3} className="fill-amber-400" />
+        <circle key={c.date} cx={c.x} cy={c.y} r={3} className="fill-[#6b7a52]" />
       ))}
 
       {xLabelIndexes.map((idx) => (
@@ -66,7 +66,7 @@ export function RevenueTrendChart({ points }: { points: Point[] }) {
           x={coords[idx].x}
           y={height - 8}
           textAnchor="middle"
-          className="fill-slate-500 text-[10px]"
+          className="fill-[#6b7280] text-[10px]"
         >
           {formatShortDate(points[idx].date)}
         </text>

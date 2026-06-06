@@ -9,6 +9,12 @@ class Sale extends Model {
   public total!: number;
   public discount!: number;
   public status!: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  public requiresDelivery!: boolean;
+  public deliveryCustomerName?: string | null;
+  public deliveryPhone?: string | null;
+  public deliveryAddress?: string | null;
+  public deliveryAmount!: number;
+  public deliveryStatus?: string | null;
   public notes?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -51,6 +57,38 @@ Sale.init(
       type: DataTypes.ENUM('PENDING', 'COMPLETED', 'CANCELLED'),
       allowNull: false,
       defaultValue: 'COMPLETED',
+    },
+    requiresDelivery: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'requires_delivery',
+    },
+    deliveryCustomerName: {
+      type: DataTypes.STRING(160),
+      allowNull: true,
+      field: 'delivery_customer_name',
+    },
+    deliveryPhone: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      field: 'delivery_phone',
+    },
+    deliveryAddress: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'delivery_address',
+    },
+    deliveryAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0,
+      field: 'delivery_amount',
+    },
+    deliveryStatus: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: 'delivery_status',
     },
     notes: {
       type: DataTypes.TEXT,

@@ -4,6 +4,7 @@ import config, { isMetaSendConfigured } from './config/index.js';
 import { whatsappRoutes } from './webhooks/whatsapp.js';
 import { internalNotifyRoutes } from './routes/internalNotify.js';
 import { paymentWebhookRoutes } from './routes/paymentWebhook.js';
+import { posInterpretRoutes } from './routes/posInterpret.js';
 
 const app = Fastify({ logger: true, bodyLimit: 6 * 1024 * 1024 });
 
@@ -21,6 +22,7 @@ app.get('/health', async () => ({
 await whatsappRoutes(app);
 await internalNotifyRoutes(app);
 await paymentWebhookRoutes(app);
+await posInterpretRoutes(app);
 
 app.listen({ port: config.port, host: '0.0.0.0' }, (err, address) => {
   if (err) {

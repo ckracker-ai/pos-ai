@@ -7,6 +7,12 @@ export const branchContextMiddleware = async (request: FastifyRequest, reply: Fa
     return;
   }
 
+  // Endpoints de contexto (sucursales/territorio) deben funcionar sin sucursal activa aún.
+  const apiPath = path.startsWith(config.apiPrefix) ? path.slice(config.apiPrefix.length) : path;
+  if (apiPath.startsWith('/branch') || apiPath.startsWith('/territory')) {
+    return;
+  }
+
   const branchId = String(request.headers[config.branchHeader] ?? '').trim();
 
   if (!branchId) {

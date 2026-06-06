@@ -73,6 +73,23 @@ export const coreClient = {
     ).then((d) => d.sucursales);
   },
 
+  searchTerritoryComunas(empresaId: string, q: string, limit = 8) {
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    return coreFetch<{
+      comunas: Array<{ codigoCut: string; nombre: string; regionNombre?: string | null }>;
+    }>(`/assistant/territory/comunas/search?${params}`, { empresaId }).then((d) => d.comunas);
+  },
+
+  resolveTerritory(
+    empresaId: string,
+    body: { comunaText?: string; comunaId?: string; codigoPostal?: string }
+  ) {
+    return coreFetch<{
+      comunas: Array<{ codigoCut: string; nombre: string }>;
+      branches: Array<{ id: string; name: string; address: string | null }>;
+    }>('/assistant/territory/resolve', { method: 'POST', empresaId, body });
+  },
+
   getStock(empresaId: string, branchId: string, productId: string) {
     return coreFetch<Record<string, unknown>>(
       `/assistant/stock/${branchId}/${productId}`,
@@ -86,6 +103,13 @@ export const coreClient = {
       `/assistant/stock-other/${productId}${q}`,
       { empresaId }
     ).then((d) => d.sucursales);
+  },
+
+  getCategoryCatalogSummary(empresaId: string) {
+    return coreFetch<{ resumen: string; familias: string[] }>(
+      '/assistant/catalog/categories-summary',
+      { empresaId }
+    );
   },
 
   searchProducts(empresaId: string, q: string, branchId?: string) {
@@ -107,6 +131,25 @@ export const coreClient = {
     }
   ) {
     return coreFetch<{ pedido_id: string; total: number; status: string }>('/assistant/orders', {
+      method: 'POST',
+      empresaId,
+      body: payload,
+    });
+  },
+
+  appendPendingOrderItems(
+    empresaId: string,
+    payload: {
+      sucursal_id: string;
+      cliente_telefono: string;
+      items: Array<{ productId: string; quantity: number }>;
+    }
+  ) {
+    return coreFetch<{
+      pedido_id: string;
+      total: number;
+      added: Array<{ nombre: string; quantity: number; subtotal: number }>;
+    }>('/assistant/orders/pending/items', {
       method: 'POST',
       empresaId,
       body: payload,
@@ -185,6 +228,7 @@ export const coreClient = {
       proof_id: string;
       notify_targets: Array<{ phone: string; label: string }>;
       is_update?: boolean;
+      admin_notify_suppressed?: boolean;
     }>('/assistant/payment-proofs', {
       method: 'POST',
       empresaId,
@@ -205,6 +249,20 @@ export const coreClient = {
       method: 'POST',
       empresaId,
       body: payload ?? {},
+    });
+  },
+
+  processPaymentInbound(body: Record<string, unknown>) {
+    return coreFetch<{
+      duplicate: boolean;
+      kind: string;
+      provider: string;
+      externalId: string;
+      status: string;
+      data: Record<string, unknown>;
+    }>('/payments/webhooks/inbound', {
+      method: 'POST',
+      body,
     });
   },
 };

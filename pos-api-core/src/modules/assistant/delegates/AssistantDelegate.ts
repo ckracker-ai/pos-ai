@@ -6,6 +6,13 @@ import Empresa from '../../tenant/models/Empresa.model';
 import SaasPlan from '../../saas/models/SaasPlan.model';
 import Branch from '../../branch/models/Branch.model';
 import Product from '../../catalog/models/Product.model';
+import Category from '../../catalog/models/Category.model';
+import categoryDelegate from '../../catalog/delegates/CategoryDelegate';
+import {
+  matchCategoryIdsByQuery,
+  normalizeCatalogQuery,
+  formatCompactCategoryCatalog,
+} from '../../catalog/utils/categorySearch';
 import User from '../../auth/models/User.model';
 import Role from '../../auth/models/Role.model';
 import Sale from '../../sales/models/Sale.model';
@@ -14,6 +21,12 @@ import AssistantPaymentProof from '../models/AssistantPaymentProof.model';
 import inventoryDelegate from '../../inventory/delegates/InventoryDelegate';
 import { Result, ok, fail } from '../../../types/result';
 import type { SaasPlanFeatures } from '../../saas/constants/planCodes';
+import {
+  buildTransferProfileFromEmpresa,
+  formatTransferPaymentMessage,
+  isTransferProfileComplete,
+  type TransferProfile,
+} from '../../tenant/utils/transferProfile';
 
 function parsePlanFeatures(raw: unknown): SaasPlanFeatures {
   const base: SaasPlanFeatures = {
@@ -37,13 +50,7 @@ export function normalizePhoneE164(raw: string): string {
   return raw.replace(/\D/g, '').replace(/^0+/, '');
 }
 
-export type TransferProfile = {
-  bankName: string | null;
-  accountType: string | null;
-  accountNumber: string | null;
-  holderName: string | null;
-  holderRut: string | null;
-};
+export type { TransferProfile };
 
 export type AssistantContext = {
   bindingId: string;
@@ -58,16 +65,6 @@ export type AssistantContext = {
   transferProfile: TransferProfile | null;
 };
 
-function buildTransferProfile(empresa: Empresa): TransferProfile | null {
-  const bankName = String(empresa.getDataValue('transferBankName') ?? '').trim() || null;
-  const accountType = String(empresa.getDataValue('transferAccountType') ?? '').trim() || null;
-  const accountNumber = String(empresa.getDataValue('transferAccount') ?? '').trim() || null;
-  const holderName = String(empresa.getDataValue('transferHolderName') ?? '').trim() || null;
-  const holderRut = String(empresa.getDataValue('transferRut') ?? '').trim() || null;
-  if (!bankName && !accountNumber && !holderRut && !holderName) return null;
-  return { bankName, accountType, accountNumber, holderName, holderRut };
-}
-
 class AssistantDelegate {
   async resolveByPhone(phone: string, channel: 'WHATSAPP' | 'VOZ' = 'WHATSAPP'): Promise<Result<AssistantContext>> {
     const externalId = normalizePhoneE164(phone);
@@ -80,6 +77,11 @@ class AssistantDelegate {
 
     const empresa = await Empresa.findByPk(String(binding.getDataValue('empresaId') ?? binding.empresaId));
     if (!empresa) return fail('EMPRESA_NOT_FOUND');
+
+    const estadoTributario = String(empresa.getDataValue('estadoTributario') ?? 'FORMAL');
+    if (estadoTributario !== 'FORMAL' && channel === 'WHATSAPP') {
+      return fail('TRIBUTARIO_FORMAL_REQUIRED: formaliza tu negocio antes de WhatsApp IA');
+    }
 
     const plan = await SaasPlan.findByPk(String(empresa.getDataValue('planId') ?? empresa.planId));
     if (!plan) return fail('PLAN_NOT_FOUND');
@@ -103,7 +105,7 @@ class AssistantDelegate {
       defaultBranchId: binding.getDataValue('defaultBranchId') ?? null,
       features,
       planCodigo: String(plan.getDataValue('codigo') ?? ''),
-      transferProfile: buildTransferProfile(empresa),
+      transferProfile: buildTransferProfileFromEmpresa(empresa),
     });
   }
 
@@ -177,30 +179,59 @@ class AssistantDelegate {
     );
   }
 
+  async getCategoryCatalogSummary(empresaId: string): Promise<Result<{ resumen: string; familias: string[] }>> {
+    const treeResult = await categoryDelegate.getTree(empresaId, true);
+    if (!treeResult.success) return treeResult;
+    const resumen = formatCompactCategoryCatalog(treeResult.value);
+    const familias = treeResult.value.filter((n) => n.isActive).map((n) => n.slug);
+    return ok({ resumen, familias });
+  }
+
   async searchProducts(
     empresaId: string,
     query: string,
     branchId?: string
   ): Promise<Result<Record<string, unknown>[]>> {
     const q = query.trim();
-    if (q.length < 2) return fail('VALIDATION_ERROR: query too short');
+    const needle = normalizeCatalogQuery(q);
+
+    const flatResult = await categoryDelegate.listFlat(empresaId);
+    if (!flatResult.success) return flatResult;
+    const categoryIds = needle ? matchCategoryIdsByQuery(flatResult.value, q) : new Set<string>();
+
+    if (needle.length < 2 && categoryIds.size === 0) {
+      return fail('VALIDATION_ERROR: query too short');
+    }
+
+    const byId = new Map(flatResult.value.map((c) => [c.id, c]));
 
     const products = await Product.findAll({
       where: { empresaId, isActive: true },
+      include: [{ model: Category, as: 'category', attributes: ['id', 'name', 'slug', 'parentId'] }],
       order: [['name', 'ASC']],
-      limit: 20,
+      limit: 80,
     });
 
     const filtered = products.filter((p) => {
-      const name = String(p.getDataValue('name') ?? '');
-      const sku = String(p.getDataValue('sku') ?? '');
-      const needle = q.toLowerCase();
-      return name.toLowerCase().includes(needle) || sku.toLowerCase().includes(needle);
+      const name = normalizeCatalogQuery(String(p.getDataValue('name') ?? ''));
+      const sku = normalizeCatalogQuery(String(p.getDataValue('sku') ?? ''));
+      const categoryId = String(p.getDataValue('categoryId') ?? '');
+      const nameMatch = needle.length >= 2 && (name.includes(needle) || sku.includes(needle));
+      const categoryMatch = categoryIds.size > 0 && categoryIds.has(categoryId);
+      return nameMatch || categoryMatch;
     });
 
     const out: Record<string, unknown>[] = [];
     for (const p of filtered.slice(0, 8)) {
       const productId = String(p.getDataValue('id') ?? '');
+      const plain = p.get({ plain: true }) as {
+        category?: { id?: string; name?: string; slug?: string; parentId?: string | null };
+      };
+      const catId = plain.category?.id ? String(plain.category.id) : '';
+      const leaf = catId ? byId.get(catId) : undefined;
+      const parent = leaf?.parentId ? byId.get(leaf.parentId) : undefined;
+      const categoriaLabel = parent ? `${parent.name} › ${leaf?.name ?? ''}` : leaf?.name ?? '';
+
       let cantidad = 0;
       let precio = Number(p.getDataValue('price') ?? 0);
       if (branchId) {
@@ -216,6 +247,8 @@ class AssistantDelegate {
         sku: p.getDataValue('sku'),
         precio,
         cantidad_en_sucursal: branchId ? cantidad : null,
+        categoria: categoriaLabel || undefined,
+        categoria_slug: leaf?.slug ?? undefined,
       });
     }
     return ok(out);
@@ -240,6 +273,11 @@ class AssistantDelegate {
   }): Promise<Result<{ pedido_id: string; total: number; status: string }>> {
     const branch = await Branch.findOne({ where: { id: input.branchId, empresaId: input.empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
+
+    const openCart = await this.findPendingOrderByPhone(input.empresaId, input.clienteTelefono);
+    if (openCart.success && openCart.value.awaiting_customer_confirm) {
+      return fail('PENDING_ORDER_EXISTS_USE_APPEND');
+    }
 
     const sellerId = await this.resolveSellerId(input.empresaId);
     if (!sellerId) return fail('ASSISTANT_SELLER_NOT_FOUND');
@@ -313,6 +351,110 @@ class AssistantDelegate {
 
       await transaction.commit();
       return ok({ pedido_id: saleId, total, status: 'PENDING' });
+    } catch (e) {
+      await transaction.rollback();
+      if (e instanceof Error && e.message === 'INSUFFICIENT_STOCK') {
+        return fail('INSUFFICIENT_STOCK');
+      }
+      throw e;
+    }
+  }
+
+  /** Suma ítems al pedido WSP abierto (antes de *confirmar* del cliente). */
+  async appendItemsToPendingOrder(input: {
+    empresaId: string;
+    branchId: string;
+    clienteTelefono: string;
+    items: Array<{ productId: string; quantity: number }>;
+  }): Promise<
+    Result<{
+      pedido_id: string;
+      total: number;
+      added: Array<{ nombre: string; quantity: number; subtotal: number }>;
+    }>
+  > {
+    const pending = await this.findPendingOrderByPhone(input.empresaId, input.clienteTelefono);
+    if (!pending.success) return pending;
+    if (!pending.value.awaiting_customer_confirm) {
+      return fail('CART_LOCKED_FOR_PAYMENT');
+    }
+    if (pending.value.branch_id !== input.branchId) {
+      return fail('CART_BRANCH_MISMATCH');
+    }
+
+    const saleId = pending.value.pedido_id;
+    const transaction = await sequelize.transaction();
+    const added: Array<{ nombre: string; quantity: number; subtotal: number }> = [];
+
+    try {
+      for (const item of input.items) {
+        const qty = Number(item.quantity);
+        if (!Number.isFinite(qty) || qty <= 0) {
+          await transaction.rollback();
+          return fail('VALIDATION_ERROR: invalid quantity');
+        }
+
+        const stockResult = await inventoryDelegate.getOne(
+          input.empresaId,
+          item.productId,
+          input.branchId
+        );
+        if (!stockResult.success) {
+          await transaction.rollback();
+          return stockResult;
+        }
+        if (stockResult.value.quantity < qty) {
+          await transaction.rollback();
+          return fail('INSUFFICIENT_STOCK');
+        }
+
+        const unitPrice = Number(stockResult.value.product?.price ?? 0);
+        const productName = String(stockResult.value.product?.name ?? 'Producto');
+        const subtotal = unitPrice * qty;
+
+        const existingLine = await SaleDetail.findOne({
+          where: { saleId, productId: item.productId },
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+
+        if (existingLine) {
+          const prevQty = Number(existingLine.getDataValue('quantity') ?? 0);
+          const newQty = prevQty + qty;
+          const newSub = unitPrice * newQty;
+          await existingLine.update(
+            { quantity: newQty, unitPrice, subtotal: newSub },
+            { transaction }
+          );
+          added.push({ nombre: productName, quantity: qty, subtotal });
+        } else {
+          await SaleDetail.create(
+            {
+              id: uuidv4(),
+              saleId,
+              productId: item.productId,
+              quantity: qty,
+              unitPrice,
+              subtotal,
+            },
+            { transaction }
+          );
+          added.push({ nombre: productName, quantity: qty, subtotal });
+        }
+
+        await this.deductStock(item.productId, input.branchId, input.empresaId, qty, transaction);
+      }
+
+      const detailRows = await SaleDetail.findAll({ where: { saleId }, transaction });
+      let total = 0;
+      for (const row of detailRows) {
+        total += Number(row.getDataValue('subtotal') ?? 0);
+      }
+
+      await Sale.update({ total }, { where: { id: saleId, empresaId: input.empresaId }, transaction });
+      await transaction.commit();
+
+      return ok({ pedido_id: saleId, total, added });
     } catch (e) {
       await transaction.rollback();
       if (e instanceof Error && e.message === 'INSUFFICIENT_STOCK') {
@@ -475,24 +617,6 @@ class AssistantDelegate {
     });
   }
 
-  buildPaymentMessage(pedidoId: string, total: number, metodoPago: string): string {
-    if (metodoPago.toUpperCase() === 'TRANSFERENCIA') {
-      return (
-        `Pedido #${pedidoId.slice(0, 8)}\n` +
-        `Total: $${Math.round(total).toLocaleString('es-CL')}\n\n` +
-        `Transferencia (sin comisión):\n` +
-        `Banco demo · Cta vista 12345678\n` +
-        `RUT 76.123.456-7\n` +
-        `Envía comprobante por este chat.`
-      );
-    }
-    return (
-      `Pedido #${pedidoId.slice(0, 8)}\n` +
-      `Total: $${Math.round(total).toLocaleString('es-CL')}\n` +
-      `Link de pago: https://pay.pos-ai.local/demo/${pedidoId.slice(0, 8)}`
-    );
-  }
-
   async buildPaymentMessageForEmpresa(
     empresaId: string,
     pedidoId: string,
@@ -515,28 +639,16 @@ class AssistantDelegate {
       });
     }
 
-    const bank = String(empresa?.getDataValue('transferBankName') ?? 'Banco demo');
-    const accountType = String(empresa?.getDataValue('transferAccountType') ?? 'Cuenta vista');
-    const account = String(empresa?.getDataValue('transferAccount') ?? '12345678');
-    const holderName = String(
-      empresa?.getDataValue('transferHolderName') ??
-        empresa?.getDataValue('nombreFantasia') ??
-        empresa?.getDataValue('razonSocial') ??
-        'Comercio'
-    );
-    const rut = String(empresa?.getDataValue('transferRut') ?? '76.123.456-7');
+    if (!empresa) return fail('EMPRESA_NOT_FOUND');
+
+    const profile = buildTransferProfileFromEmpresa(empresa);
+    if (!isTransferProfileComplete(profile)) {
+      return fail('TRANSFER_PROFILE_INCOMPLETE');
+    }
 
     return ok({
       metodo: 'TRANSFERENCIA',
-      mensaje:
-        `Pedido #${shortId}\n` +
-        `Total: $${totalFmt}\n\n` +
-        `Transferencia (sin comisión):\n` +
-        `${bank} · ${accountType}\n` +
-        `N° ${account}\n` +
-        `Titular: ${holderName}\n` +
-        `RUT ${rut}\n\n` +
-        `Envía *foto del comprobante* donde se vea monto y destinatario.`,
+      mensaje: formatTransferPaymentMessage(pedidoId, total, profile!),
     });
   }
 
@@ -695,6 +807,49 @@ class AssistantDelegate {
     }
   }
 
+  /**
+   * Un solo destinatario WSP para comprobantes: teléfono admin del comercio o primer admin de sucursal.
+   * Evita re-spam a todos los vendedores (S0 A5).
+   */
+  async resolveAdminNotifyTargetForProof(
+    empresaId: string,
+    branchId: string
+  ): Promise<Result<Array<{ phone: string; label: string }>>> {
+    const empresa = await Empresa.findByPk(empresaId);
+    const empresaAdminPhone = normalizePhoneE164(
+      String(empresa?.getDataValue('assistantAdminPhone') ?? '')
+    );
+    if (empresaAdminPhone.length >= 8) {
+      return ok([{ phone: empresaAdminPhone, label: 'Admin comercio' }]);
+    }
+
+    const adminRole = await Role.findOne({ where: { name: 'ADMIN' } });
+    if (!adminRole) return ok([]);
+
+    const adminUser = await User.findOne({
+      where: {
+        empresaId,
+        branchId,
+        isActive: true,
+        roleId: adminRole.getDataValue('id'),
+      },
+      order: [['createdAt', 'ASC']],
+    });
+    const branchAdminPhone = normalizePhoneE164(
+      String(adminUser?.getDataValue('whatsappPhone') ?? '')
+    );
+    if (branchAdminPhone.length >= 8) {
+      return ok([
+        {
+          phone: branchAdminPhone,
+          label: String(adminUser?.getDataValue('fullName') ?? 'Administrador'),
+        },
+      ]);
+    }
+
+    return ok([]);
+  }
+
   async resolveNotifyTargets(
     empresaId: string,
     branchId: string
@@ -761,6 +916,19 @@ class AssistantDelegate {
     empresaId: string,
     branchId: string
   ): Promise<Result<{ removedProofs: number }>> {
+    const cleaned = await this.cleanupPaymentProofsForBranch(empresaId, branchId);
+    if (!cleaned.success) return cleaned;
+    return ok({ removedProofs: cleaned.value.removedProofs });
+  }
+
+  /**
+   * Limpieza demo/operativa: quita duplicados activos por pedido y archiva comprobantes
+   * pendientes cuyo pedido ya no está PENDING (o no existe en la sucursal).
+   */
+  async cleanupPaymentProofsForBranch(
+    empresaId: string,
+    branchId: string
+  ): Promise<Result<{ removedProofs: number; archivedStale: number }>> {
     const sales = await Sale.findAll({
       where: { empresaId, branchId },
       attributes: ['id'],
@@ -782,7 +950,36 @@ class AssistantDelegate {
       if (!keepId) continue;
       removedProofs += await this.retainSingleActivePaymentProof(empresaId, saleId, keepId);
     }
-    return ok({ removedProofs });
+
+    const pendingActive = await AssistantPaymentProof.findAll({
+      where: {
+        empresaId,
+        status: { [Op.in]: ['RECEIVED', 'NOTIFIED_ADMIN'] },
+      },
+    });
+
+    let archivedStale = 0;
+    for (const proof of pendingActive) {
+      const saleId = String(proof.getDataValue('saleId') ?? '');
+      const sale = saleId
+        ? await Sale.findOne({ where: { id: saleId, empresaId, branchId } })
+        : null;
+      const saleStatus = sale ? String(sale.getDataValue('status') ?? '') : '';
+      if (sale && saleStatus === 'PENDING') continue;
+
+      const prevSummary = String(proof.getDataValue('visionSummary') ?? '');
+      const archiveLine = !sale
+        ? '[ARCHIVED] Pedido no encontrado o fuera de sucursal'
+        : '[ARCHIVED] Pedido ya cerrado (limpieza automática)';
+
+      await proof.update({
+        status: 'REJECTED',
+        visionSummary: prevSummary ? `${prevSummary}\n${archiveLine}` : archiveLine,
+      });
+      archivedStale += 1;
+    }
+
+    return ok({ removedProofs, archivedStale });
   }
 
   async registerPaymentProof(input: {
@@ -801,6 +998,7 @@ class AssistantDelegate {
       proof_id: string;
       notify_targets: Array<{ phone: string; label: string }>;
       is_update?: boolean;
+      admin_notify_suppressed?: boolean;
       removed_duplicates?: number;
     }>
   > {
@@ -829,11 +1027,18 @@ class AssistantDelegate {
       order: [['createdAt', 'DESC']],
     });
 
-    const targetsResult = await this.resolveNotifyTargets(input.empresaId, input.branchId);
+    const targetsResult = await this.resolveAdminNotifyTargetForProof(
+      input.empresaId,
+      input.branchId
+    );
     const notifyTargets = targetsResult.success ? targetsResult.value : [];
 
     if (existing) {
       const proofId = String(existing.getDataValue('id') ?? '');
+      const wasAlreadyNotified =
+        String(existing.getDataValue('status') ?? '') === 'NOTIFIED_ADMIN';
+      const shouldNotifyAdmin = !wasAlreadyNotified && notifyTargets.length > 0;
+
       await existing.update({
         clientPhone: normalizePhoneE164(input.clientPhone),
         expectedTotal: input.expectedTotal,
@@ -842,7 +1047,7 @@ class AssistantDelegate {
         visionSummary: input.visionSummary,
         proofImageMime,
         proofImageData,
-        status: notifyTargets.length > 0 ? 'NOTIFIED_ADMIN' : 'RECEIVED',
+        status: wasAlreadyNotified || shouldNotifyAdmin ? 'NOTIFIED_ADMIN' : 'RECEIVED',
       });
       const removedDuplicates = await this.retainSingleActivePaymentProof(
         input.empresaId,
@@ -851,8 +1056,9 @@ class AssistantDelegate {
       );
       return ok({
         proof_id: proofId,
-        notify_targets: [],
+        notify_targets: shouldNotifyAdmin ? notifyTargets : [],
         is_update: true,
+        admin_notify_suppressed: wasAlreadyNotified,
         removed_duplicates: removedDuplicates,
       });
     }

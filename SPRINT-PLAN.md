@@ -1,8 +1,21 @@
 # Plan de sprints — POS-AI
 
-**Actualizado:** 2026-06-02 · Sprint activo WSP/comprobantes.
+**Actualizado:** 2026-06-02 · **S0–S5 + S4 cerrados** · **Siguiente:** WSP P2 o **S6** ERP AI.
 
-**Sprint en curso:** [`docs/sprints/SPRINT-WSP-AFINADO-2026-06.md`](docs/sprints/SPRINT-WSP-AFINADO-2026-06.md) · rama `sprint/wsp-comprobantes-2026-06`
+**Roadmap maestro (2 semanas, 8–12h/día):** [`docs/sprints/SPRINT-MASTER-ROADMAP-2026-H2.md`](docs/sprints/SPRINT-MASTER-ROADMAP-2026-H2.md)
+
+| Sprint | Doc | Rama |
+|--------|-----|------|
+| WSP / comprobantes | [`docs/sprints/SPRINT-WSP-AFINADO-2026-06.md`](docs/sprints/SPRINT-WSP-AFINADO-2026-06.md) | `sprint/wsp-comprobantes-2026-06` |
+| **Catálogo categorías (P0)** | [`docs/sprints/SPRINT-CATALOGO-CATEGORIAS-2026-06.md`](docs/sprints/SPRINT-CATALOGO-CATEGORIAS-2026-06.md) | `sprint/catalogo-categorias-2026-06` |
+| **Territorio CUT + sucursales** | [`docs/sprints/SPRINT-TERRITORIO-CUT-SUCURSALES-2026-06.md`](docs/sprints/SPRINT-TERRITORIO-CUT-SUCURSALES-2026-06.md) | ✅ cerrado |
+| **Master roadmap H2** | [`docs/sprints/SPRINT-MASTER-ROADMAP-2026-H2.md`](docs/sprints/SPRINT-MASTER-ROADMAP-2026-H2.md) | `roadmap` |
+| **S0 cierre base** | [`docs/sprints/SPRINT-S0-CIERRE-BASE-2026-06.md`](docs/sprints/SPRINT-S0-CIERRE-BASE-2026-06.md) | ✅ cerrado |
+| **S1 catálogo jerárquico** | [`docs/sprints/SPRINT-CATALOGO-CATEGORIAS-2026-06.md`](docs/sprints/SPRINT-CATALOGO-CATEGORIAS-2026-06.md) | ✅ cerrado |
+| **S3 POS IA venta v2** | [`docs/sprints/SPRINT-POS-IA-VENTA-v2-2026-06.md`](docs/sprints/SPRINT-POS-IA-VENTA-v2-2026-06.md) | ✅ MVP |
+| **S5 pasarela + conciliación** | [`docs/sprints/SPRINT-S5-PASARELA-CONCILIACION-2026-06.md`](docs/sprints/SPRINT-S5-PASARELA-CONCILIACION-2026-06.md) | ✅ cerrado |
+| **S4 delivery tracking** | [`docs/sprints/SPRINT-S4-DELIVERY-TRACKING-2026-06.md`](docs/sprints/SPRINT-S4-DELIVERY-TRACKING-2026-06.md) | ✅ MVP |
+| **S7 infraestructura legal SaaS** | [`docs/sprints/SPRINT-S7-INFRAESTRUCTURA-LEGAL-2026-06.md`](docs/sprints/SPRINT-S7-INFRAESTRUCTURA-LEGAL-2026-06.md) | 📋 diseño |
 
 ---
 
@@ -72,7 +85,21 @@ Doc: `docs/comercial/PLANES-BD.md` · `.\scripts\migrate-v1.6.1-suscripciones.ps
 
 ---
 
-## 🚀 Mañana — instrucción única al agente
+## 🚀 Sprints prioritarios P0
+
+### Catálogo (DDD)
+
+**Spec:** [`docs/sprints/SPRINT-CATALOGO-CATEGORIAS-2026-06.md`](docs/sprints/SPRINT-CATALOGO-CATEGORIAS-2026-06.md) · [`docs/catalog/CATEGORIAS-JERARQUICAS.md`](docs/catalog/CATEGORIAS-JERARQUICAS.md)
+
+Categorías `parent_id` + `slug`, árbol BFF/agente, productos en subcategoría, manual `/manual`.
+
+### Territorio Chile (CUT) + Sucursales
+
+**Spec:** [`docs/sprints/SPRINT-TERRITORIO-CUT-SUCURSALES-2026-06.md`](docs/sprints/SPRINT-TERRITORIO-CUT-SUCURSALES-2026-06.md) · [`docs/territory/CUT-CHILE.md`](docs/territory/CUT-CHILE.md)
+
+CUT SUBDERE local (sin APIs en llamada), `Region`/`Comuna`, sucursal con `comuna_id` + CP 7 dígitos, búsqueda STT en BFF, UI `/branches`.
+
+## 🚀 Mañana — instrucción única al agente (histórico)
 
 ```
 Retoma POS-AI según docs/HANDOFF-PROXIMO-DIA.md y SPRINT-PLAN.md.
@@ -96,7 +123,7 @@ Detalle completo: **`docs/HANDOFF-PROXIMO-DIA.md`**
 
 1. **Docker arriba:** `docker compose ps` — core, bff, frontend, assistant, mysql.
 2. **Migraciones:** `.\scripts\migrate-v1.7-assistant.ps1` si BD nueva o sin `004-transfer-profile`.
-3. **Smoke:** `.\scripts\qa-smoke.ps1`
+3. **Smoke:** `.\scripts\qa-smoke.ps1` · S0: `.\scripts\qa-smoke.ps1 -IncludeS0`
 4. **Demo E2E Estándar:**
    - Plataforma → Costa Azul → datos transferencia + binding `56900000001`
    - `/platform/whatsapp` → sucursal → buscar → pedido → mensaje transferencia
@@ -154,3 +181,5 @@ Documento: `docs/comercial/VISION-v2.0-SAAS.md`
 | `docs/assistant/README.md` | Assistant técnico |
 | `docs/assistant/COMPROBANTES-VARIANTES.md` | Tipos comprobante |
 | `docs/assistant/META-WHATSAPP.md` | Producción Meta |
+| `docs/catalog/CATEGORIAS-JERARQUICAS.md` | Catálogo P0 |
+| `docs/territory/CUT-CHILE.md` | Territorio CUT + sucursales P0 |

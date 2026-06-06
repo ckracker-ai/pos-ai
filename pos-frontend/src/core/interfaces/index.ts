@@ -6,8 +6,26 @@ export interface Branch {
   code: string;
   address: string;
   city: string;
+  comunaId?: string | null;
+  codigoPostal?: string | null;
+  comunaNombre?: string | null;
+  regionId?: string | null;
+  regionNombre?: string | null;
   phone: string;
   isActive: boolean;
+}
+
+export interface TerritoryRegion {
+  codigoCut: string;
+  nombre: string;
+  sigla: string;
+}
+
+export interface TerritoryComuna {
+  codigoCut: string;
+  nombre: string;
+  regionId: string;
+  regionNombre?: string | null;
 }
 
 export interface Product {
@@ -19,6 +37,7 @@ export interface Product {
   stock: number;
   sku: string;
   category: string;
+  categoryId?: string;
   image?: string;
   isActive: boolean;
   /** Producto con fila en inventory_stock para la sucursal activa. */
@@ -133,7 +152,11 @@ export interface Supplier {
 export interface Category {
   id: string;
   name: string;
+  slug?: string;
   description?: string;
+  parentId?: string | null;
+  parentName?: string | null;
+  depth?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -145,6 +168,18 @@ export interface RoleOption {
 }
 
 export type EmpresaEstado = 'ACTIVO' | 'SUSPENDIDO' | 'PENDIENTE_ONBOARDING';
+
+export type EmpresaEstadoTributario = 'INFORMAL' | 'EN_TRAMITE' | 'FORMAL';
+
+export type FormalizacionProgreso = {
+  diagnostico?: 'ocasional' | 'sustento' | null;
+  pasos?: {
+    sii?: boolean;
+    municipalidad?: boolean;
+    cuentaBancaria?: boolean;
+    capturaRut?: boolean;
+  };
+};
 
 export type SuscripcionEstado = 'ACTIVA' | 'GRACIA' | 'VENCIDA' | 'CANCELADA' | 'PILOTO';
 
@@ -209,6 +244,12 @@ export interface Empresa {
   urlLogo: string | null;
   slug: string;
   estado: EmpresaEstado;
+  estadoTributario: EmpresaEstadoTributario;
+  rubroNegocio: string | null;
+  telefonoNegocio: string | null;
+  formalizacionProgreso: FormalizacionProgreso | null;
+  formalizacionPorcentaje: number;
+  esNegocioEnMarcha: boolean;
   planId: string;
   plan: EmpresaPlanSummary;
   assistantAdminPhone?: string | null;

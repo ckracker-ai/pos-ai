@@ -1,0 +1,137 @@
+{
+  "info": {
+    "name": "POS-AI BFF — Pagos S5",
+    "description": "Checkout SaaS, webhooks idempotentes y core inbound. Variables: bffBaseUrl, coreBaseUrl, keyInternal, gatewaySecret, empresaId.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "bffBaseUrl", "value": "http://localhost:2020/pos/proxy" },
+    { "key": "coreBaseUrl", "value": "http://localhost:1010" },
+    { "key": "keyInternal", "value": "supersecretkey" },
+    { "key": "gatewaySecret", "value": "supersecretkey" },
+    { "key": "empresaId", "value": "" },
+    { "key": "externalId", "value": "TBK-postman-001" },
+    { "key": "saleId", "value": "" },
+    { "key": "checkoutToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Checkout SaaS (BFF public)",
+      "item": [
+        {
+          "name": "GET /public/checkout/:empresaId",
+          "request": {
+            "method": "GET",
+            "url": "{{bffBaseUrl}}/public/checkout/{{empresaId}}"
+          }
+        },
+        {
+          "name": "POST /public/checkout/confirm (ledger)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empresaId\": \"{{empresaId}}\",\n  \"provider\": \"SANDBOX\",\n  \"reference\": \"{{externalId}}\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/checkout/confirm"
+          }
+        },
+        {
+          "name": "POST /public/checkout/create-session (WEBPAY)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empresaId\": \"{{empresaId}}\",\n  \"provider\": \"WEBPAY\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/checkout/create-session"
+          }
+        },
+        {
+          "name": "POST /public/checkout/sandbox-complete",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{checkoutToken}}\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/checkout/sandbox-complete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks BFF",
+      "item": [
+        {
+          "name": "POST /public/webhooks/subscription-payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-subscription-webhook-secret", "value": "{{gatewaySecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empresa_id\": \"{{empresaId}}\",\n  \"provider\": \"WEBPAY\",\n  \"reference\": \"{{externalId}}\",\n  \"status\": \"paid\"\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/webhooks/subscription-payment"
+          }
+        },
+        {
+          "name": "POST /public/webhooks/payment-gateway (SAAS_SUB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-payment-gateway-secret", "value": "{{gatewaySecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"WEBPAY\",\n  \"externalId\": \"{{externalId}}\",\n  \"status\": \"APPROVED\",\n  \"amount\": 0,\n  \"currency\": \"CLP\",\n  \"metadata\": {\n    \"kind\": \"SAAS_SUB\",\n    \"empresaId\": \"{{empresaId}}\"\n  }\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/webhooks/payment-gateway"
+          }
+        },
+        {
+          "name": "POST /public/webhooks/payment-gateway (SALE_WSP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-payment-gateway-secret", "value": "{{gatewaySecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"SANDBOX\",\n  \"externalId\": \"{{externalId}}\",\n  \"status\": \"APPROVED\",\n  \"metadata\": {\n    \"kind\": \"SALE_WSP\",\n    \"empresaId\": \"{{empresaId}}\",\n    \"pedidoId\": \"{{saleId}}\"\n  }\n}"
+            },
+            "url": "{{bffBaseUrl}}/public/webhooks/payment-gateway"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Core payments",
+      "item": [
+        {
+          "name": "POST /payments/webhooks/inbound",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-internal-key", "value": "{{keyInternal}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"SANDBOX\",\n  \"externalId\": \"{{externalId}}\",\n  \"status\": \"APPROVED\",\n  \"metadata\": {\n    \"kind\": \"SAAS_SUB\",\n    \"empresaId\": \"{{empresaId}}\"\n  }\n}"
+            },
+            "url": "{{coreBaseUrl}}/payments/webhooks/inbound"
+          }
+        }
+      ]
+    }
+  ]
+}

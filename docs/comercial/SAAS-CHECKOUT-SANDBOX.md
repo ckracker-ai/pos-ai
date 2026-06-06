@@ -18,8 +18,11 @@ El usuario puede **omitir** el pago y seguir en **PILOTO** (90 días desde regis
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | `/pos/proxy/public/checkout/:empresaId` | Resumen precio y estado |
-| POST | `/pos/proxy/public/checkout/confirm` | Sandbox / confirmación directa |
-| POST | `/pos/proxy/public/webhooks/subscription-payment` | Webhook pasarela |
+| POST | `/pos/proxy/public/checkout/create-session` | Sesión pasarela SANDBOX → `redirectUrl` |
+| POST | `/pos/proxy/public/checkout/sandbox-complete` | Completa token de `/checkout/return` |
+| POST | `/pos/proxy/public/checkout/confirm` | Sandbox / confirmación directa (sin redirect) |
+| POST | `/pos/proxy/public/webhooks/subscription-payment` | Webhook legacy suscripción |
+| POST | `/pos/proxy/public/webhooks/payment-gateway` | Webhook unificado v1.8 (+ HMAC opcional) |
 
 ### Webhook body
 

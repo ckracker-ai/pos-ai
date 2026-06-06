@@ -5,7 +5,7 @@ import { LandingContactForm } from '@/components/molecules/LandingContactForm';
 import {
   LANDING_AI_PILLARS,
   LANDING_AI_STEPS,
-  LANDING_HERO_BG,
+  LANDING_BRAND,
   LANDING_STATS,
 } from '@/core/constants/landing-content';
 import type { LandingPlan } from '@/core/constants/landing-plans';
@@ -55,57 +55,96 @@ function LandingNav() {
   );
 }
 
+function HeroProductPreview() {
+  return (
+    <div className="landing-hero-preview relative p-4 sm:p-5 lg:max-w-md lg:justify-self-end">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-linen/90">Vista POS IA</p>
+        <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-200">
+          En vivo
+        </span>
+      </div>
+      <div className="landing-hero-preview-inner space-y-3 p-4">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+          <span className="text-brand-linen" aria-hidden>
+            🎤
+          </span>
+          <p className="text-sm text-white/90">&quot;agrega 2 empanadas de pino&quot;</p>
+        </div>
+        <ul className="space-y-2 text-sm">
+          <li className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-white/90">
+            <span>Empanada de pino</span>
+            <span className="font-semibold text-brand-linen">×2</span>
+          </li>
+          <li className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-white/90">
+            <span>Café tradicional</span>
+            <span className="font-semibold text-brand-linen">×1</span>
+          </li>
+        </ul>
+        <div className="flex items-center justify-between border-t border-white/10 pt-3">
+          <span className="text-xs text-white/60">Total estimado</span>
+          <span className="font-serif text-lg font-semibold text-brand-linen">$4.850</span>
+        </div>
+      </div>
+      <div className="mt-3 flex items-start gap-2 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 px-3 py-2.5">
+        <span className="mt-0.5 text-xs font-bold text-[#25D366]" aria-hidden>
+          WSP
+        </span>
+        <p className="text-xs leading-relaxed text-white/80">
+          Comprobante validado · monto y cuenta coinciden con tu perfil de transferencia.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function HeroSection() {
   return (
     <section className="landing-hero relative min-h-[100svh] overflow-hidden pt-[4.25rem]">
-      <Image
-        src={LANDING_HERO_BG}
-        alt=""
-        fill
-        priority
-        className="object-cover object-center"
-        sizes="100vw"
-      />
-      <div className="landing-hero-overlay pointer-events-none absolute inset-0" aria-hidden />
-      <div className="landing-hero-grid pointer-events-none absolute inset-0 opacity-40" aria-hidden />
+      <div className="landing-hero-base pointer-events-none absolute inset-0" aria-hidden />
+      <div className="landing-hero-mesh pointer-events-none absolute inset-0" aria-hidden />
+      <div className="landing-hero-orb landing-hero-orb--1" aria-hidden />
+      <div className="landing-hero-orb landing-hero-orb--2" aria-hidden />
+      <div className="landing-hero-grid pointer-events-none absolute inset-0 opacity-60" aria-hidden />
 
-      <div className="relative mx-auto flex min-h-[calc(100svh-4.25rem)] max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 lg:px-8">
-        <div className="max-w-2xl">
-          <p className="landing-badge mb-6 inline-flex items-center gap-2 rounded-full border border-brand-linen/40 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-linen backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-linen" aria-hidden />
-            ERP con IA nativa · Chile
-          </p>
-          <h1 className="font-serif text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Punto de venta inteligente para la próxima generación de PYMEs
-          </h1>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/85">
-            POS-AI unifica caja, inventario, comandas y —cuando lo necesitas— un asistente de WhatsApp que
-            entiende tu negocio, valida transferencias y opera con los mismos datos que tu equipo en tienda.
-          </p>
-          <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <Link
-              href="/registro"
-              className="inline-flex min-w-[200px] items-center justify-center rounded-full bg-brand-linen px-8 py-3.5 text-base font-semibold text-brand-olive shadow-lg transition hover:bg-white"
-            >
-              Crear mi negocio
-            </Link>
-            <a
-              href="#ia"
-              className="inline-flex min-w-[200px] items-center justify-center rounded-full border border-white/40 bg-white/5 px-8 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition hover:bg-white/15"
-            >
-              Ver cómo funciona la IA
-            </a>
+      <div className="relative mx-auto flex min-h-[calc(100svh-4.25rem)] max-w-6xl flex-col justify-center px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
+          <div className="max-w-xl">
+            <p className="landing-badge mb-6 inline-flex items-center gap-2 rounded-full border border-brand-linen/35 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-linen backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-linen" aria-hidden />
+              ERP con IA nativa · Chile
+            </p>
+            <h1 className="font-serif text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.35rem]">
+              Punto de venta inteligente para la próxima generación de PYMEs
+            </h1>
+            <p className="mt-6 text-lg leading-relaxed text-white/82">
+              Habla o escribe como en el mostrador. POS-AI une caja, inventario, comandas y —en plan Estándar—
+              un asistente WhatsApp que conoce tu catálogo y valida transferencias con los datos de tu empresa.
+            </p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:gap-4">
+              <Link
+                href="/registro"
+                className="inline-flex min-w-[200px] items-center justify-center rounded-full bg-brand-linen px-8 py-3.5 text-base font-semibold text-brand-olive shadow-lg transition hover:bg-white"
+              >
+                Crear mi negocio
+              </Link>
+              <a
+                href="#ia"
+                className="inline-flex min-w-[200px] items-center justify-center rounded-full border border-white/35 bg-white/5 px-8 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition hover:bg-white/12"
+              >
+                Ver cómo funciona la IA
+              </a>
+            </div>
           </div>
+
+          <HeroProductPreview />
         </div>
 
-        <ul className="landing-stats mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:mt-20">
+        <ul className="landing-stats mt-14 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:mt-16">
           {LANDING_STATS.map((s) => (
-            <li
-              key={s.label}
-              className="rounded-2xl border border-white/15 bg-white/5 px-4 py-4 backdrop-blur-md"
-            >
-              <p className="font-serif text-2xl font-semibold text-brand-linen sm:text-3xl">{s.value}</p>
-              <p className="mt-1 text-xs text-white/75">{s.label}</p>
+            <li key={s.label} className="landing-stat-card rounded-2xl px-4 py-3.5 sm:py-4">
+              <p className="landing-stat-value font-serif text-2xl font-semibold sm:text-3xl">{s.value}</p>
+              <p className="landing-stat-label mt-1.5 text-xs leading-snug">{s.label}</p>
             </li>
           ))}
         </ul>
@@ -120,7 +159,9 @@ function AiSection() {
       <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-brand-olive/5 blur-3xl" />
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-olive">Vanguardia operativa</p>
+          <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
+            Vanguardia operativa
+          </p>
           <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
             IA que no improvisa: conoce tu stock, tu plan y tus datos de pago
           </h2>
@@ -161,11 +202,24 @@ function AiSection() {
 
 function ServicesSection() {
   return (
-    <section id="servicios" className="border-t border-brand-linen/60 bg-white px-4 py-24 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+    <section id="servicios" className="landing-services relative overflow-hidden border-t border-brand-linen/60 px-4 py-24 sm:px-6 lg:px-8">
+      <Image
+        src={LANDING_BRAND.heroAccent}
+        alt=""
+        fill
+        className="object-cover object-center"
+        sizes="100vw"
+      />
+      <div className="landing-services-overlay pointer-events-none absolute inset-0" aria-hidden />
+      <div className="landing-hero-grid pointer-events-none absolute inset-0 opacity-25" aria-hidden />
+
+      <div className="relative mx-auto max-w-6xl">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <h2 className="font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+            <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
+              Módulos operativos
+            </p>
+            <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
               Todo lo que tu local necesita
             </h2>
             <p className="mt-4 text-brand-ink-muted">
@@ -175,14 +229,14 @@ function ServicesSection() {
           </div>
           <Link
             href="/registro"
-            className="inline-flex shrink-0 items-center justify-center rounded-full border border-brand-olive px-6 py-3 text-sm font-semibold text-brand-olive transition hover:bg-brand-olive hover:text-white"
+            className="inline-flex shrink-0 items-center justify-center rounded-full border border-brand-olive bg-white/90 px-6 py-3 text-sm font-semibold text-brand-olive shadow-sm backdrop-blur-sm transition hover:bg-brand-olive hover:text-white"
           >
             Probar gratis el onboarding
           </Link>
         </div>
         <ul className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {LANDING_MODULES.map((m) => (
-            <li key={m.title} className="landing-module-card p-6">
+            <li key={m.title} className="landing-module-card landing-module-card--on-image p-6">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-olive text-sm font-bold text-white">
                 {m.title.charAt(0)}
               </span>
@@ -230,6 +284,7 @@ function PlansSection({ plans }: { plans: LandingPlan[] }) {
               <p className="mt-1 text-xs text-brand-ink-muted">
                 {plan.sucursales} · {plan.usuarios}
               </p>
+              <p className="mt-1 text-xs text-brand-ink-muted">{plan.roles}</p>
               <ul className="mt-8 flex-1 space-y-3 text-sm text-brand-ink">
                 {plan.features.map((f) => (
                   <li key={f} className="flex gap-2">
@@ -304,12 +359,18 @@ function LandingFooter() {
             © {new Date().getFullYear()} POS-AI · Punto de venta Inteligente
           </span>
         </div>
-        <div className="flex gap-6 text-sm">
+        <div className="flex flex-wrap justify-center gap-4 text-sm sm:gap-6">
           <Link href="/login" className="font-medium text-brand-linen hover:text-white">
             Acceso negocio
           </Link>
           <Link href="/platform/login" className="text-white/75 hover:text-white">
             Plataforma
+          </Link>
+          <Link href="/legal/terminos" className="text-white/75 hover:text-white">
+            Términos
+          </Link>
+          <Link href="/legal/privacidad" className="text-white/75 hover:text-white">
+            Privacidad
           </Link>
         </div>
       </div>

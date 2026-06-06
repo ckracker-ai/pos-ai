@@ -6,22 +6,22 @@ INSERT INTO `saas_planes` (
 ) VALUES
 (
   'a0000000-0000-4000-8000-000000000001', 'BASICO', 'POS-AI Básico',
-  'ERP operativo para PYME: POS, catálogo, comandas, reportes y mantenedores.',
-  24990, 'TRANSFERENCIA', 1, 5,
+  'ERP para un local: POS, catálogo, comandas y reportes. 1 sucursal, 3 usuarios (Admin, Vendedor, Comanda).',
+  24990, 'TRANSFERENCIA', 1, 3,
   JSON_OBJECT('modulosCore', true, 'assistantWhatsapp', false, 'assistantVoz', false, 'pagosOnline', false),
   1, 1, NOW(), NOW()
 ),
 (
   'a0000000-0000-4000-8000-000000000002', 'ESTANDAR', 'POS-AI Estándar',
-  'Básico + asistente IA WhatsApp conectado al inventario y ventas.',
-  44990, 'TRANSFERENCIA', 3, 10,
+  'Básico + hasta 3 sucursales y 6 usuarios + asistente IA WhatsApp.',
+  44990, 'TRANSFERENCIA', 3, 6,
   JSON_OBJECT('modulosCore', true, 'assistantWhatsapp', true, 'assistantVoz', false, 'pagosOnline', false),
   2, 1, NOW(), NOW()
 ),
 (
   'a0000000-0000-4000-8000-000000000003', 'FULL', 'POS-AI Full',
-  'Estándar + asistente voz/teléfono + cobro con medios de pago online.',
-  69990, 'MIXTO', 5, 15,
+  'Estándar + IA telefónica + pasarela de pago online (requiere RUT formalizado).',
+  69990, 'MIXTO', 3, 6,
   JSON_OBJECT('modulosCore', true, 'assistantWhatsapp', true, 'assistantVoz', true, 'pagosOnline', true),
   3, 1, NOW(), NOW()
 );

@@ -57,16 +57,20 @@ CREATE TABLE `empresas` (
   `url_logo` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `slug` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `estado` enum('ACTIVO','SUSPENDIDO','PENDIENTE_ONBOARDING') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDIENTE_ONBOARDING',
+  `estado_tributario` enum('INFORMAL','EN_TRAMITE','FORMAL') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'FORMAL',
+  `rubro_negocio` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `telefono_negocio` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `formalizacion_progreso` json DEFAULT NULL,
   `plan_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `assistant_admin_phone` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL
     COMMENT 'WSP admin validación comprobantes E.164 sin +',
-  `transfer_bank_name` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `transfer_account_type` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `transfer_bank_name` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_account_type` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL
     COMMENT 'Cuenta vista, corriente, RUT, etc.',
-  `transfer_account` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `transfer_holder_name` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `transfer_account` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_holder_name` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL
     COMMENT 'Titular cuenta destino',
-  `transfer_rut` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_rut` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
@@ -235,6 +239,11 @@ CREATE TABLE `sales` (
   `total` decimal(10,2) NOT NULL DEFAULT '0.00',
   `discount` decimal(10,2) NOT NULL DEFAULT '0.00',
   `status` enum('PENDING','COMPLETED','CANCELLED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'COMPLETED',
+  `requires_delivery` tinyint(1) NOT NULL DEFAULT '0',
+  `delivery_customer_name` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delivery_phone` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delivery_address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delivery_amount` decimal(10,2) NOT NULL DEFAULT '0.00',
   `notes` text COLLATE utf8mb4_unicode_ci,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,

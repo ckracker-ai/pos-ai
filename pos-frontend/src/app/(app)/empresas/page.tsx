@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/core/api/api-client';
 import { extractEntity, normalizeEmpresa, unwrapApiEnvelope } from '@/core/api/normalizers';
 import { Empresa, EmpresaEstado, UpdateEmpresaInput } from '@/core/interfaces';
-import { formatPlanValor, METODO_PAGO_LABELS } from '@/core/constants/saas-plan';
+import { formatPlanValor, getPlanDisplayName, METODO_PAGO_LABELS } from '@/core/constants/saas-plan';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { TabList } from '@/components/molecules/TabList';
@@ -13,6 +13,8 @@ import { Navbar } from '@/components/organisms/Navbar';
 import { useAuthStore } from '@/core/context/auth';
 import { getRoleProfile } from '@/core/config/role-access';
 import { notifyApiError, notifySuccess } from '@/store/ui';
+import { EmpresaFormalizarPanel } from '@/components/molecules/EmpresaFormalizarPanel';
+import { WspTransferPreview } from '@/components/molecules/WspTransferPreview';
 
 const ESTADO_LABELS: Record<EmpresaEstado, string> = {
   ACTIVO: 'Activa',
@@ -28,14 +30,7 @@ const ESTADO_STYLES: Record<EmpresaEstado, string> = {
 
 const ACCOUNT_TYPES = ['Cuenta vista', 'Cuenta corriente', 'Cuenta RUT', 'Cuenta ahorro'] as const;
 
-type EmpresaTab = 'general' | 'facturacion' | 'transferencia' | 'plan';
-
-const EMPRESA_TABS: { id: EmpresaTab; label: string }[] = [
-  { id: 'general', label: 'Datos generales' },
-  { id: 'facturacion', label: 'Facturación y marca' },
-  { id: 'transferencia', label: 'Transferencia (IA)' },
-  { id: 'plan', label: 'Plan y suscripción' },
-];
+type EmpresaTab = 'general' | 'formalizar' | 'facturacion' | 'transferencia' | 'plan';
 
 type EmpresaForm = {
   razonSocial: string;
@@ -145,6 +140,7 @@ export default function EmpresasPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSensitiveTransfer, setShowSensitiveTransfer] = useState(false);
 
   const isDirty = useMemo(() => {
     if (!empresa) return false;
@@ -152,6 +148,22 @@ export default function EmpresasPage() {
   }, [empresa, form]);
 
   const hasWhatsappPlan = empresa?.plan?.features?.assistantWhatsapp === true;
+  const showFormalizarTab = empresa?.estadoTributario !== 'FORMAL';
+
+  const empresaTabs = useMemo((): { id: EmpresaTab; label: string }[] => {
+    const tabs: { id: EmpresaTab; label: string }[] = [
+      { id: 'general', label: 'Datos generales' },
+    ];
+    if (showFormalizarTab) {
+      tabs.push({ id: 'formalizar', label: 'Formalizar negocio' });
+    }
+    tabs.push(
+      { id: 'facturacion', label: 'Facturación y marca' },
+      { id: 'transferencia', label: 'Transferencia (IA)' },
+      { id: 'plan', label: 'Plan y suscripción' }
+    );
+    return tabs;
+  }, [showFormalizarTab]);
 
   const transferComplete = useMemo(() => {
     return (
@@ -190,6 +202,7 @@ export default function EmpresasPage() {
 
   const handleReset = () => {
     if (empresa) setForm(empresaToForm(empresa));
+    setShowSensitiveTransfer(false);
   };
 
   const handleSave = async () => {
@@ -215,6 +228,7 @@ export default function EmpresasPage() {
         const normalized = normalizeEmpresa(raw);
         setEmpresa(normalized);
         setForm(empresaToForm(normalized));
+        setShowSensitiveTransfer(false);
       } else {
         await loadEmpresa();
       }
@@ -261,7 +275,7 @@ export default function EmpresasPage() {
                 }}
               >
                 <div className="border-b border-brand-linen/60 p-4 sm:p-6">
-                  <TabList tabs={EMPRESA_TABS} active={activeTab} onChange={setActiveTab} />
+                  <TabList tabs={empresaTabs} active={activeTab} onChange={setActiveTab} />
                 </div>
 
                 <div className="space-y-6 p-4 sm:p-6">
@@ -272,7 +286,11 @@ export default function EmpresasPage() {
                           <FieldLabel>RUT</FieldLabel>
                           <input
                             type="text"
-                            value={empresa.rutEmpresa}
+                            value={
+                              empresa.esNegocioEnMarcha
+                                ? 'Sin RUT — negocio en marcha'
+                                : empresa.rutEmpresa
+                            }
                             readOnly
                             className={inputClass}
                           />
@@ -329,6 +347,20 @@ export default function EmpresasPage() {
                         />
                       </div>
                     </>
+                  )}
+
+                  {activeTab === 'formalizar' && empresa && (
+                    <EmpresaFormalizarPanel
+                      empresa={empresa}
+                      canManage={canManageEmpresa}
+                      onUpdated={(next) => {
+                        setEmpresa(next);
+                        setForm(empresaToForm(next));
+                        if (next.estadoTributario === 'FORMAL') {
+                          setActiveTab('general');
+                        }
+                      }}
+                    />
                   )}
 
                   {activeTab === 'facturacion' && (
@@ -390,7 +422,20 @@ export default function EmpresasPage() {
                             confianza.
                           </p>
                         )}
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowSensitiveTransfer((v) => !v)}
+                            className="rounded-md border border-brand-linen bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-vanilla"
+                          >
+                            {showSensitiveTransfer ? 'Ocultar datos sensibles' : 'Ver datos sensibles'}
+                          </button>
+                        </div>
+                        <p className="mt-2 text-xs text-brand-ink-muted">
+                          Plataforma POS-AI edita los mismos campos en Empresas → canal WhatsApp.
+                        </p>
                       </div>
+                      <WspTransferPreview fields={form} className="mb-2" />
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                           <FieldLabel>Banco</FieldLabel>
@@ -421,7 +466,7 @@ export default function EmpresasPage() {
                         <div>
                           <FieldLabel>Número de cuenta</FieldLabel>
                           <input
-                            type="text"
+                            type={showSensitiveTransfer ? 'text' : 'password'}
                             value={form.transferAccount}
                             onChange={(e) => handleFieldChange('transferAccount', e.target.value)}
                             readOnly={!canManageEmpresa}
@@ -432,7 +477,7 @@ export default function EmpresasPage() {
                         <div>
                           <FieldLabel>RUT titular</FieldLabel>
                           <input
-                            type="text"
+                            type={showSensitiveTransfer ? 'text' : 'password'}
                             value={form.transferRut}
                             onChange={(e) => handleFieldChange('transferRut', e.target.value)}
                             readOnly={!canManageEmpresa}
@@ -443,7 +488,7 @@ export default function EmpresasPage() {
                         <div className="sm:col-span-2">
                           <FieldLabel>Titular de la cuenta</FieldLabel>
                           <input
-                            type="text"
+                            type={showSensitiveTransfer ? 'text' : 'password'}
                             value={form.transferHolderName}
                             onChange={(e) => handleFieldChange('transferHolderName', e.target.value)}
                             readOnly={!canManageEmpresa}
@@ -461,7 +506,7 @@ export default function EmpresasPage() {
                         Plan contratado
                       </p>
                       <p className="mt-2 text-xl font-bold text-brand-ink">
-                        {empresa.plan?.nombre ?? '—'}
+                        {empresa.plan ? getPlanDisplayName(empresa.plan) : '—'}
                       </p>
                       <p className="mt-2 text-sm text-brand-ink-muted">
                         {empresa.plan?.descripcion ?? 'Sin descripción'}

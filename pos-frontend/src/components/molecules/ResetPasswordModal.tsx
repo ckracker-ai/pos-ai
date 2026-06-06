@@ -37,21 +37,21 @@ function PasswordField({
   placeholder?: string;
 }) {
   return (
-    <label className="block text-sm text-slate-300">
+    <label className="block text-sm text-slate-600">
       {label}
       <div className="relative mt-2">
         <input
           type={visible ? 'text' : 'password'}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 pr-24 text-white outline-none focus:border-amber-500"
+          className="app-input w-full rounded-3xl px-4 py-3 pr-24"
           placeholder={placeholder}
           autoComplete="new-password"
         />
         <button
           type="button"
           onClick={onToggleVisible}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-2xl px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-2xl px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[rgba(74,83,60,0.08)]"
         >
           {visible ? 'Ocultar' : 'Ver'}
         </button>
@@ -140,10 +140,10 @@ export function ResetPasswordModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-      <div className="w-full max-w-md rounded-[2rem] border border-slate-800 bg-slate-950 p-8 shadow-2xl">
-        <h2 className="text-xl font-semibold text-white">Restablecer contraseña</h2>
-        <p className="mt-2 text-sm text-slate-400">{userEmail}</p>
+    <div className="app-modal-overlay">
+      <div className="app-modal-panel w-full max-w-md rounded-[2rem] p-8 shadow-2xl">
+        <h2 className="text-xl font-semibold text-[#3D4532]">Restablecer contraseña</h2>
+        <p className="mt-2 text-sm text-slate-600">{userEmail}</p>
         <p className="mt-1 text-xs text-slate-500">
           Define una clave temporal segura y entrégala al usuario por un canal privado.
         </p>
@@ -153,7 +153,7 @@ export function ResetPasswordModal({
             type="button"
             onClick={handleGenerate}
             disabled={isProcessing}
-            className="rounded-2xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+            className="rounded-2xl border border-[rgba(176,138,76,0.45)] bg-[rgba(176,138,76,0.08)] px-3 py-2 text-xs font-semibold text-[#8C6A2B] hover:bg-[rgba(176,138,76,0.14)] disabled:opacity-50"
           >
             Generar temporal
           </button>
@@ -161,7 +161,7 @@ export function ResetPasswordModal({
             type="button"
             onClick={handleCopy}
             disabled={isProcessing || !password}
-            className="rounded-2xl border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+            className="app-btn-secondary rounded-2xl px-3 py-2 text-xs font-semibold disabled:opacity-50"
           >
             Copiar clave
           </button>
@@ -178,9 +178,9 @@ export function ResetPasswordModal({
           />
 
           {password.length > 0 && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
+            <div className="rounded-2xl border border-[rgba(74,83,60,0.2)] bg-[rgba(74,83,60,0.06)] px-4 py-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Fortaleza</span>
+                <span className="text-slate-600">Fortaleza</span>
                 <span
                   className={
                     validation.strength === 'good'
@@ -193,14 +193,14 @@ export function ResetPasswordModal({
                   {validation.label}
                 </span>
               </div>
-              <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800">
+              <div className="mt-2 h-1.5 w-full rounded-full bg-[rgba(74,83,60,0.16)]">
                 <div className={`h-1.5 rounded-full transition-all ${strengthBarClass[validation.strength]}`} />
               </div>
               <ul className="mt-3 space-y-1 text-xs">
                 {validation.checks.map((check) => (
                   <li
                     key={check.label}
-                    className={check.ok ? 'text-emerald-400' : 'text-slate-500'}
+                    className={check.ok ? 'text-[#4A533C]' : 'text-slate-500'}
                   >
                     {check.ok ? '✓' : '○'} {check.label}
                   </li>
@@ -238,7 +238,7 @@ export function ResetPasswordModal({
             type="button"
             onClick={handleClose}
             disabled={isProcessing}
-            className="rounded-3xl border border-slate-700 px-6 py-3 text-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+            className="app-btn-secondary rounded-3xl px-6 py-3 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -246,7 +246,7 @@ export function ResetPasswordModal({
             type="button"
             onClick={handleSubmit}
             disabled={isProcessing || !validation.isValid || !passwordsMatch}
-            className="rounded-3xl bg-amber-600 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isProcessing ? 'Guardando…' : 'Restablecer'}
           </button>

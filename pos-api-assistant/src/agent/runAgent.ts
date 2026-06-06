@@ -2,7 +2,34 @@ import config from '../config/index.js';
 
 import { coreClient, type AssistantContext } from '../core/coreClient.js';
 
+import { parsePedidoLines } from './orderText.js';
+import {
+  branchSelectedSearchPrompt,
+  canAppendToOpenCart,
+  formatAddedLinesReply,
+  searchResultsFooter,
+  type CartLineSummary,
+} from './cartFlow.js';
+import {
+  formatComunaSearchResults,
+  formatTerritoryResolveReply,
+  parseComunaQuery,
+  type ComunaOption,
+} from './territoryFlow.js';
+
 import { SYSTEM_PROMPT } from './systemPrompt.js';
+import {
+  wspHelp,
+  wspNoPendingToConfirm,
+  wspNoPendingOrder,
+  wspNoPendingToCancel,
+  wspPendingPaymentBlock,
+  wspShowPendingHeader,
+  wspShowPendingConfirmStep,
+  wspShowPendingProofStep,
+  wspOrderCancelled,
+  wspTransferProfileIncomplete,
+} from './wspMessages.js';
 
 
 
@@ -19,6 +46,8 @@ export type CatalogItem = {
   precio: number;
 
   cantidad_en_sucursal: number | null;
+
+  categoria?: string;
 
 };
 
@@ -37,6 +66,14 @@ export type Session = {
   /** Tras *sucursales*, el cliente responde con el número. */
 
   lastBranches: Array<{ id: string; name: string }>;
+
+  /** Tras *comuna …*, el cliente elige comuna por número. */
+
+  lastComunas: ComunaOption[];
+
+  /** Árbol compacto de categorías (familias / subcategorías) para el prompt IA. */
+
+  categoryCatalogResumen: string | null;
 
 };
 
@@ -68,28 +105,33 @@ function normalizeProduct(raw: Record<string, unknown>): CatalogItem {
 
       raw.cantidad_en_sucursal != null ? Number(raw.cantidad_en_sucursal) : null,
 
+    categoria: raw.categoria != null ? String(raw.categoria) : undefined,
+
   };
 
 }
 
 
 
-function formatCatalogList(items: CatalogItem[]): string {
-
+function formatCatalogList(items: CatalogItem[], hasOpenCart: boolean): string {
   const lines = items.map((p, i) => {
-
     const qty = p.cantidad_en_sucursal;
-
     const stock =
-
       qty === null ? 'consulta sucursal' : qty > 0 ? `${qty} u.` : 'sin stock';
-
-    return `*${i + 1}.* ${p.nombre} — ${formatPrice(p.precio)} — ${stock}`;
-
+    const cat = p.categoria ? ` (${p.categoria})` : '';
+    return `*${i + 1}.* ${p.nombre}${cat} — ${formatPrice(p.precio)} — ${stock}`;
   });
 
-  return `${lines.join('\n')}\n\nPara pedir: *pedido 1 2* (nº del listado × cantidad) o solo *2 x 3*`;
+  return `${lines.join('\n')}${searchResultsFooter(hasOpenCart)}`;
+}
 
+async function hasOpenCart(context: AssistantContext): Promise<boolean> {
+  try {
+    const pedido = await coreClient.findPendingOrder(context.empresaId, context.phone);
+    return canAppendToOpenCart(pedido.awaiting_customer_confirm);
+  } catch {
+    return false;
+  }
 }
 
 
@@ -118,111 +160,117 @@ function resolveFromCatalogIndex(session: Session, index1Based: number): Catalog
 
 
 
-async function placeOrder(
-
+async function addCartLines(
   session: Session,
-
   branchId: string,
-
-  product: CatalogItem,
-
-  qty: number
-
+  lines: Array<{ product: CatalogItem; qty: number }>
 ): Promise<AgentReply> {
-
   const { context } = session;
 
-  const blocked = await pendingOrderBlock(context);
+  const locked = await pendingOrderBlock(context);
+  if (locked) return locked;
 
-  if (blocked) return blocked;
-
-  const stock = await coreClient.getStock(context.empresaId, branchId, product.producto_id);
-
-  const available = Number(stock.cantidad ?? 0);
-
-  if (available < qty) {
-
-    const otros = await coreClient.stockOther(context.empresaId, product.producto_id, branchId);
-
-    if (otros.length > 0) {
-
-      const alt = otros[0] as Record<string, unknown>;
-
+  for (const { product, qty } of lines) {
+    const stock = await coreClient.getStock(context.empresaId, branchId, product.producto_id);
+    const available = Number(stock.cantidad ?? 0);
+    if (available < qty) {
+      const otros = await coreClient.stockOther(context.empresaId, product.producto_id, branchId);
+      if (otros.length > 0 && lines.length === 1) {
+        const alt = otros[0] as Record<string, unknown>;
+        return {
+          text:
+            `Solo hay ${available} u. de *${product.nombre}* aquí. ` +
+            `En *${String(alt.sucursal_nombre ?? 'otra sucursal')}* hay ${alt.cantidad}. ` +
+            '¿Cambiamos sucursal o apartamos lo disponible?',
+        };
+      }
       return {
-
-        text:
-
-          `Solo hay ${available} u. de *${product.nombre}* aquí. ` +
-
-          `En *${String(alt.sucursal_nombre ?? 'otra sucursal')}* hay ${alt.cantidad}. ` +
-
-          '¿Cambiamos sucursal o apartamos lo disponible?',
-
+        text: `No hay stock suficiente de *${product.nombre}* (hay ${available} u., pediste ${qty}).`,
       };
-
     }
-
-    return { text: `No hay stock suficiente de *${product.nombre}* (${available} u.).` };
-
   }
 
+  const payloadItems = lines.map((l) => ({
+    productId: l.product.producto_id,
+    quantity: l.qty,
+  }));
 
+  let appended = false;
+  let pedidoId: string;
+  let total: number;
+  let added: CartLineSummary[];
 
-  const order = await coreClient.createOrder(context.empresaId, {
+  let openCart = false;
+  try {
+    const pending = await coreClient.findPendingOrder(context.empresaId, context.phone);
+    openCart = canAppendToOpenCart(pending.awaiting_customer_confirm);
+  } catch {
+    openCart = false;
+  }
 
-    sucursal_id: branchId,
+  if (openCart) {
+    const result = await coreClient.appendPendingOrderItems(context.empresaId, {
+      sucursal_id: branchId,
+      cliente_telefono: context.phone,
+      items: payloadItems,
+    });
+    appended = true;
+    pedidoId = result.pedido_id;
+    total = result.total;
+    added = result.added;
+  } else {
+    const order = await coreClient.createOrder(context.empresaId, {
+      sucursal_id: branchId,
+      cliente_telefono: context.phone,
+      items: payloadItems,
+      metodo_pago: context.features?.pagosOnline ? 'WEBPAY' : 'TRANSFERENCIA',
+    });
+    pedidoId = order.pedido_id;
+    total = order.total;
+    added = lines.map((l) => ({
+      nombre: l.product.nombre,
+      quantity: l.qty,
+      subtotal: l.product.precio * l.qty,
+    }));
+  }
 
-    cliente_telefono: context.phone,
-
-    items: [{ productId: product.producto_id, quantity: qty }],
-
-    metodo_pago: context.features?.pagosOnline ? 'WEBPAY' : 'TRANSFERENCIA',
-
-  });
-
-  session.lastSearch = [];
-
-  if (context.features?.pagosOnline) {
-
-    const pay = await coreClient.paymentMessage(context.empresaId, order.pedido_id, order.total);
-
+  if (context.features?.pagosOnline && !appended) {
+    const pay = await coreClient.paymentMessage(context.empresaId, pedidoId, total);
+    const detailLines = added.map(
+      (l) => `• ${l.quantity} × ${l.nombre} — ${formatPrice(l.subtotal)}`
+    );
     return {
-
-      text:
-
-        `Pedido registrado ✅\n` +
-
-        `• ${qty} × ${product.nombre} — ${formatPrice(product.precio * qty)}\n\n` +
-
-        pay.mensaje,
-
+      text: `${appended ? 'Agregado' : 'Pedido registrado'} ✅\n${detailLines.join('\n')}\n\n${pay.mensaje}`,
     };
-
   }
 
   return {
-
-    text:
-
-      `Pedido registrado ✅\n` +
-
-      `• ${qty} × ${product.nombre} — ${formatPrice(product.precio * qty)}\n` +
-
-      `Total: ${formatPrice(order.total)}\n` +
-
-      `Ref. #${order.pedido_id.slice(0, 8)}\n\n` +
-
-      'Revisa el detalle con *mi pedido*.\n' +
-
-      'Si está bien, escribe *confirmar* para recibir datos de transferencia y enviar el comprobante.\n' +
-
-      '¿Te equivocaste? *cancelar pedido*',
-
+    text: formatAddedLinesReply({
+      pedidoId,
+      total,
+      addedLines: added,
+      appended,
+      formatPrice,
+    }),
   };
-
 }
 
+async function placeOrder(
+  session: Session,
+  branchId: string,
+  product: CatalogItem,
+  qty: number
+): Promise<AgentReply> {
+  return addCartLines(session, branchId, [{ product, qty }]);
+}
 
+async function placeMultiOrder(
+  session: Session,
+  branchId: string,
+  lines: Array<{ product: CatalogItem; qty: number }>
+): Promise<AgentReply> {
+  return addCartLines(session, branchId, lines);
+}
 
 async function resolveProductByName(
 
@@ -280,7 +328,9 @@ async function handlePedidoCommand(
 
         'Indica qué quieres pedir:\n' +
 
-        '• *pedido 1 2* — ítem 1 del listado, cantidad 2\n' +
+        '• *pedido 2x2* — ítem 2 del listado, cantidad 2\n' +
+
+        '• *pedido 5x2, 2x1* — varios ítems (coma)\n' +
 
         '• *pedido empanada 2* — por nombre\n' +
 
@@ -290,7 +340,30 @@ async function handlePedidoCommand(
 
   }
 
+  if (session.lastSearch.length === 0) {
+    return {
+      text: 'Primero escribe *buscar …* para ver el listado numerado y luego *pedido 2x2*.',
+    };
+  }
 
+  const parsedLines = parsePedidoLines(body);
+  if (parsedLines) {
+    const resolved: Array<{ product: CatalogItem; qty: number }> = [];
+    for (const line of parsedLines) {
+      const qty = parseOrderQuantity(String(line.qty), 1);
+      if (qty == null) {
+        return { text: `Cantidad inválida en ítem ${line.index}. Ejemplo: *pedido 2x2*` };
+      }
+      const product = resolveFromCatalogIndex(session, line.index);
+      if (!product) {
+        return {
+          text: `No hay ítem *${line.index}* en tu última búsqueda. Escribe *buscar …* de nuevo.`,
+        };
+      }
+      resolved.push({ product, qty });
+    }
+    return placeMultiOrder(session, branchId, resolved);
+  }
 
   const parts = body.split(/\s+/);
 
@@ -376,8 +449,12 @@ async function confirmMyPendingOrder(context: AssistantContext): Promise<AgentRe
     return {
       text: `Pedido confirmado ✅\n\n${pedido.mensaje}`,
     };
-  } catch {
-    return { text: 'No hay pedido pendiente para confirmar. Usa *buscar …* y *pedido 1 2*.' };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '';
+    if (msg.includes('TRANSFER_PROFILE_INCOMPLETE')) {
+      return { text: wspTransferProfileIncomplete() };
+    }
+    return { text: wspNoPendingToConfirm() };
   }
 }
 
@@ -388,19 +465,20 @@ async function showMyPendingOrder(context: AssistantContext): Promise<AgentReply
       (it) => `• ${it.quantity} × ${it.nombre} — ${formatPrice(it.subtotal)}`
     );
     const nextStep = pedido.awaiting_customer_confirm
-      ? 'Si está bien, escribe *confirmar* para recibir datos de pago.\n' +
-        '¿Cantidad incorrecta? *cancelar pedido* y vuelve a pedir.'
-      : 'Ya confirmaste: envía el comprobante (foto) o escribe el monto antes de la foto (*vale 5000*).';
+      ? wspShowPendingConfirmStep()
+      : wspShowPendingProofStep();
     return {
       text:
-        `Pedido pendiente #${pedido.pedido_id.slice(0, 8)}\n` +
-        `Sucursal: ${pedido.branch_name}\n` +
-        `Total: ${formatPrice(pedido.total)}\n\n` +
-        `${lines.join('\n')}\n\n` +
+        wspShowPendingHeader(
+          pedido.pedido_id.slice(0, 8),
+          pedido.branch_name,
+          formatPrice(pedido.total)
+        ) +
+        `\n${lines.join('\n')}\n\n` +
         nextStep,
     };
   } catch {
-    return { text: 'No tienes pedidos pendientes. Busca productos con *buscar …* y luego *pedido 1 2*.' };
+    return { text: wspNoPendingOrder() };
   }
 }
 
@@ -408,63 +486,36 @@ async function cancelMyPendingOrder(context: AssistantContext): Promise<AgentRep
   try {
     const pedido = await coreClient.cancelPendingOrder(context.empresaId, context.phone);
     return {
-      text:
-        `Pedido #${pedido.pedido_id.slice(0, 8)} cancelado ✅\n` +
-        `(Total era ${formatPrice(pedido.total)})\n\n` +
-        'Stock liberado. Puedes pedir de nuevo:\n' +
-        '*buscar empanada* → *pedido 1 2*',
+      text: wspOrderCancelled(pedido.pedido_id.slice(0, 8), formatPrice(pedido.total)),
     };
   } catch {
-    return { text: 'No hay pedido pendiente para cancelar.' };
+    return { text: wspNoPendingToCancel() };
   }
 }
 
 async function pendingOrderBlock(context: AssistantContext): Promise<AgentReply | null> {
   try {
-    const pedido = await coreClient.findPendingOrderDetails(context.empresaId, context.phone);
-    const itemLine = pedido.items[0]
-      ? `${pedido.items[0].quantity} × ${pedido.items[0].nombre}`
-      : 'ver detalle';
+    const pedido = await coreClient.findPendingOrder(context.empresaId, context.phone);
+    if (pedido.awaiting_customer_confirm) {
+      return null;
+    }
     return {
-      text:
-        `Ya tienes un pedido pendiente #${pedido.pedido_id.slice(0, 8)} (${formatPrice(pedido.total)}).\n` +
-        `Contenido: ${itemLine}\n\n` +
-        'Para corregir: *cancelar pedido* y pedir de nuevo.\n' +
-        (pedido.awaiting_customer_confirm
-          ? 'Si el pedido está bien: *confirmar*\n'
-          : 'Envía comprobante o *vale [monto]* antes de la foto.\n') +
-        'Detalle: *mi pedido*',
+      text: wspPendingPaymentBlock(pedido.pedido_id.slice(0, 8), formatPrice(pedido.total)),
     };
   } catch {
     return null;
   }
 }
 
-function helpText(empresaNombre: string): string {
-
-  return (
-
-    `Hola, soy el asistente de *${empresaNombre}*.\n\n` +
-
-    '1️⃣ *sucursales* → elige con el número (ej. *1*)\n' +
-
-    '2️⃣ *buscar empanada* → listado numerado\n' +
-
-    '3️⃣ *pedido 1 2* o *2 x 3* → cantidad del ítem\n' +
-
-    'También: *pedido empanada pino 2* (nombre + cantidad)\n\n' +
-
-    '*mi pedido* · ver pendiente\n' +
-
-    '4️⃣ *confirmar* → datos de transferencia y comprobante\n' +
-
-    '*cancelar pedido* si te equivocaste'
-
-  );
-
+async function ensureCategoryCatalog(session: Session): Promise<void> {
+  if (session.categoryCatalogResumen) return;
+  try {
+    const data = await coreClient.getCategoryCatalogSummary(session.context.empresaId);
+    session.categoryCatalogResumen = data.resumen?.trim() || null;
+  } catch {
+    session.categoryCatalogResumen = null;
+  }
 }
-
-
 
 /** Motor híbrido: reglas locales + OpenAI opcional. */
 
@@ -484,7 +535,7 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
     if (lower === 'ayuda' || lower === 'help' || lower === 'menu') {
 
-      return { text: helpText(context.empresaNombre) };
+      return { text: wspHelp(context.empresaNombre) };
 
     }
 
@@ -534,32 +585,65 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
 
 
+    const comunaQuery = parseComunaQuery(text);
+    if (comunaQuery) {
+      const found = await coreClient.searchTerritoryComunas(context.empresaId, comunaQuery);
+      session.lastComunas = found.map((c) => ({
+        codigoCut: c.codigoCut,
+        nombre: c.nombre,
+        regionNombre: c.regionNombre ?? null,
+      }));
+      session.lastBranches = [];
+      session.lastSearch = [];
+      return { text: formatComunaSearchResults(session.lastComunas) };
+    }
+
     const branchByNumber = text.match(/^(\d+)$/);
 
-    if (branchByNumber && session.lastSearch.length === 0 && session.lastBranches.length > 0) {
-
+    if (branchByNumber && session.lastSearch.length === 0 && session.lastComunas.length > 0) {
       const idx = Number(branchByNumber[1]) - 1;
-
-      const picked = session.lastBranches[idx];
-
-      if (picked) {
-
-        branchId = picked.id;
-
-        await coreClient.setSessionBranch(context.bindingId, branchId);
-
-        session.branchId = branchId;
-
-        session.lastBranches = [];
-
+      const pickedComuna = session.lastComunas[idx];
+      if (pickedComuna) {
+        const resolved = await coreClient.resolveTerritory(context.empresaId, {
+          comunaId: pickedComuna.codigoCut,
+        });
+        session.lastComunas = [];
+        if (resolved.branches.length === 1) {
+          const b = resolved.branches[0]!;
+          branchId = b.id;
+          await coreClient.setSessionBranch(context.bindingId, branchId);
+          session.branchId = branchId;
+          session.lastBranches = [{ id: b.id, name: b.name }];
+          return {
+            text: formatTerritoryResolveReply({
+              comunaNombre: pickedComuna.nombre,
+              branches: [{ name: b.name, address: b.address }],
+              empresaNombre: context.empresaNombre,
+            }),
+          };
+        }
+        session.lastBranches = resolved.branches.map((b) => ({ id: b.id, name: b.name }));
         return {
-
-          text: `Perfecto, atiendo pedidos en *${picked.name}*.\n\n¿Qué buscas? Ej: *buscar empanada*`,
-
+          text: formatTerritoryResolveReply({
+            comunaNombre: pickedComuna.nombre,
+            branches: resolved.branches.map((b) => ({ name: b.name, address: b.address })),
+            empresaNombre: context.empresaNombre,
+          }),
         };
-
       }
+    }
 
+    if (branchByNumber && session.lastSearch.length === 0 && session.lastBranches.length > 0) {
+      const idx = Number(branchByNumber[1]) - 1;
+      const picked = session.lastBranches[idx];
+      if (picked) {
+        branchId = picked.id;
+        await coreClient.setSessionBranch(context.bindingId, branchId);
+        session.branchId = branchId;
+        session.lastBranches = [];
+        session.lastComunas = [];
+        return { text: branchSelectedSearchPrompt(picked.name) };
+      }
     }
 
 
@@ -588,7 +672,7 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
         session.lastBranches = [];
 
-        return { text: `Perfecto, atiendo pedidos en *${list[idx].name}*.\n\n¿Qué buscas? Ej: *buscar empanada*` };
+        return { text: branchSelectedSearchPrompt(list[idx].name) };
 
       }
 
@@ -608,10 +692,21 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
 
 
+    if (lower === 'categorias' || lower === 'categorías' || lower === 'menu categorias') {
+      await ensureCategoryCatalog(session);
+      if (!session.categoryCatalogResumen) {
+        return { text: 'Aún no hay categorías configuradas en el catálogo.' };
+      }
+      return {
+        text:
+          `*Familias del menú:*\n\n${session.categoryCatalogResumen}\n\n` +
+          'Busca con *buscar …* (ej. *buscar empanada* o el nombre de una familia).',
+      };
+    }
+
     if (lower.startsWith('buscar ') || lower.startsWith('stock ')) {
-
       const q = text.replace(/^buscar\s+|^stock\s+/i, '').trim();
-
+      await ensureCategoryCatalog(session);
       const productos = await coreClient.searchProducts(context.empresaId, q, branchId);
 
       if (productos.length === 0) {
@@ -621,8 +716,9 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
       }
 
       session.lastSearch = productos.slice(0, 8).map((p) => normalizeProduct(p));
+      const openCart = await hasOpenCart(context);
 
-      return { text: `En tu sucursal:\n\n${formatCatalogList(session.lastSearch)}` };
+      return { text: `En tu sucursal:\n\n${formatCatalogList(session.lastSearch, openCart)}` };
 
     }
 
@@ -678,7 +774,7 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
 
 
-    return { text: helpText(context.empresaNombre) };
+    return { text: wspHelp(context.empresaNombre) };
 
   } catch (e) {
 
@@ -693,12 +789,12 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 async function runOpenAi(session: Session, userText: string): Promise<AgentReply> {
 
   const catalogHint =
-
-    session.lastSearch.length > 0
-
+    (session.categoryCatalogResumen
+      ? `\nCategorías del menú:\n${session.categoryCatalogResumen}`
+      : '') +
+    (session.lastSearch.length > 0
       ? `\nÚltimo listado numerado:\n${session.lastSearch.map((p, i) => `${i + 1}. ${p.nombre}`).join('\n')}`
-
-      : '';
+      : '');
 
 
 
@@ -767,6 +863,10 @@ export async function buildSession(phone: string): Promise<Session> {
     lastSearch: [],
 
     lastBranches: [],
+
+    lastComunas: [],
+
+    categoryCatalogResumen: null,
 
   };
 

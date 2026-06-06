@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import assistantDelegate, { normalizePhoneE164 } from '../delegates/AssistantDelegate';
+import { territoryDelegate } from '../../territory/delegates/TerritoryDelegate';
 import { loadAssistantPlan, AssistantRequest } from '../middleware/assistantContext';
 const router = Router();
 
 const mapError = (error: string): number => {
-  if (error.startsWith('VALIDATION_ERROR')) return 422;
+  if (error.startsWith('VALIDATION_ERROR') || error === 'TRANSFER_PROFILE_INCOMPLETE') return 422;
   if (
     error === 'ASSISTANT_BINDING_NOT_FOUND' ||
     error === 'BRANCH_NOT_FOUND' ||
@@ -16,6 +17,8 @@ const mapError = (error: string): number => {
   if (error.startsWith('ASSISTANT_PLAN_REQUIRED') || error === 'INSUFFICIENT_STOCK') return 403;
   if (error === 'INSUFFICIENT_STOCK') return 409;
   if (error === 'SALE_NOT_ONLINE_PAYMENT' || error === 'SALE_ALREADY_CLOSED') return 409;
+  if (error === 'CART_LOCKED_FOR_PAYMENT' || error === 'PENDING_ORDER_EXISTS_USE_APPEND') return 409;
+  if (error === 'CART_BRANCH_MISMATCH') return 409;
   return 400;
 };
 
@@ -61,6 +64,40 @@ router.get('/stock-other/:productId', async (req: AssistantRequest, res) => {
   );
   if (result.success) return sendOk(res, { sucursales: result.value });
   return sendFail(res, result.error, mapError(result.error));
+});
+
+router.get('/catalog/categories-summary', async (req: AssistantRequest, res) => {
+  const result = await assistantDelegate.getCategoryCatalogSummary(req.assistantEmpresaId!);
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapError(result.error));
+});
+
+router.get('/territory/comunas/search', async (req: AssistantRequest, res) => {
+  const q = String(req.query.q ?? '');
+  const limit = Number(req.query.limit ?? 8);
+  const result = await territoryDelegate.searchComunas(q, limit);
+  if (!result.success) return sendFail(res, result.error, 400);
+  return sendOk(res, result.data);
+});
+
+router.post('/territory/resolve', async (req: AssistantRequest, res) => {
+  const body = req.body as { comunaText?: string; codigoPostal?: string; comunaId?: string };
+  let comunaText = body.comunaText;
+  if (body.comunaId && !comunaText) {
+    comunaText = body.comunaId;
+  }
+  const result = await territoryDelegate.resolveLocation({
+    comunaText,
+    codigoPostal: body.codigoPostal,
+    empresaId: req.assistantEmpresaId!,
+  });
+  if (!result.success) {
+    if (result.error === 'INVALID_POSTAL_CODE') {
+      return sendFail(res, 'Código postal debe tener 7 dígitos', 422);
+    }
+    return sendFail(res, result.error, 400);
+  }
+  return sendOk(res, result.data);
 });
 
 router.get('/products/search', async (req: AssistantRequest, res) => {
@@ -125,6 +162,25 @@ router.get('/orders/pending/details', async (req: AssistantRequest, res) => {
   const phone = String(req.query.phone ?? '');
   const result = await assistantDelegate.findPendingOrderDetails(req.assistantEmpresaId!, phone);
   if (result.success) return sendOk(res, { pedido: result.value });
+  return sendFail(res, result.error, mapError(result.error));
+});
+
+router.post('/orders/pending/items', async (req: AssistantRequest, res) => {
+  const body = req.body ?? {};
+  const phone = normalizePhoneE164(String(body.cliente_telefono ?? body.clienteTelefono ?? req.query.phone ?? ''));
+  const rawItems = Array.isArray(body.items) ? body.items : [];
+  const items = rawItems.map((it: Record<string, unknown>) => ({
+    productId: String(it.productId ?? it.producto_id ?? ''),
+    quantity: Number(it.quantity ?? it.cantidad ?? 0),
+  }));
+
+  const result = await assistantDelegate.appendItemsToPendingOrder({
+    empresaId: req.assistantEmpresaId!,
+    branchId: String(body.sucursal_id ?? body.branchId ?? ''),
+    clienteTelefono: phone,
+    items,
+  });
+  if (result.success) return sendOk(res, result.value);
   return sendFail(res, result.error, mapError(result.error));
 });
 

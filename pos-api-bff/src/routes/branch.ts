@@ -6,13 +6,20 @@ import { sendFail, sendOk } from '../utils/response.js';
 
 const createBranchSchema = z.object({
   name: z.string().min(1),
-  address: z.string().optional(),
+  address: z.string().min(1),
+  phone: z.string().optional(),
+  comunaId: z.string().min(4).max(8),
+  codigoPostal: z.string().regex(/^\d{7}$/, 'Código postal de 7 dígitos'),
+  code: z.string().optional(),
+  city: z.string().optional(),
 });
 
 const updateBranchSchema = z.object({
   name: z.string().min(1).optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
+  comunaId: z.string().min(4).max(8).optional(),
+  codigoPostal: z.string().regex(/^\d{7}$/).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -48,7 +55,18 @@ const branchRoutes = async (app: FastifyInstance) => {
     const { token, internalKey, branchId } = getCoreRequestContext(request);
     const body = createBranchSchema.parse(request.body);
     try {
-      const data = await branchCore.createBranch(body, token, internalKey, branchId);
+      const data = await branchCore.createBranch(
+        {
+          name: body.name,
+          address: body.address,
+          phone: body.phone,
+          comunaId: body.comunaId,
+          codigoPostal: body.codigoPostal,
+        },
+        token,
+        internalKey,
+        branchId
+      );
       return sendOk(reply, data, 201);
     } catch (e: any) {
       const statusCode = e?.response?.status ?? 400;
@@ -61,7 +79,18 @@ const branchRoutes = async (app: FastifyInstance) => {
     const { token, internalKey, branchId } = getCoreRequestContext(request);
     const body = createBranchSchema.parse(request.body);
     try {
-      const data = await branchCore.createBranch(body, token, internalKey, branchId);
+      const data = await branchCore.createBranch(
+        {
+          name: body.name,
+          address: body.address,
+          phone: body.phone,
+          comunaId: body.comunaId,
+          codigoPostal: body.codigoPostal,
+        },
+        token,
+        internalKey,
+        branchId
+      );
       return sendOk(reply, data, 201);
     } catch (e: any) {
       const statusCode = e?.response?.status ?? 400;

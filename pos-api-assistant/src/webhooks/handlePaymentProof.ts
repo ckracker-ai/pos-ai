@@ -1,4 +1,23 @@
+import { isOrderCommandText } from '../agent/orderText.js';
 import { buildSession } from '../agent/runAgent.js';
+import {
+  wspProofAwaitingConfirmForImage,
+  wspProofAwaitingConfirmForText,
+  wspProofDefaultReply,
+  wspProofFormatUnsupported,
+  wspProofNoAmountReply,
+  wspProofNoPendingForProof,
+  wspProofNotPaymentImage,
+  wspProofOnlinePlan,
+  wspProofOnlinePlanWithTransferNote,
+  wspProofOverpayReply,
+  wspProofPartialReply,
+  wspProofPdfUnsupported,
+  wspProofRecipientUnclearReply,
+  wspProofTextClaimHint,
+  wspProofUnclearReply,
+  wspProofWrongRecipientReply,
+} from '../agent/wspMessages.js';
 import { coreClient } from '../core/coreClient.js';
 import { downloadMetaMedia } from '../meta/downloadMedia.js';
 import { sendWhatsAppText } from '../meta/sendMessage.js';
@@ -25,6 +44,7 @@ const PAYMENT_CLAIM_RE =
 
 export function isPaymentClaimText(text: string): boolean {
   const t = text.trim();
+  if (isOrderCommandText(t)) return false;
   if (PAYMENT_CLAIM_RE.test(t)) return true;
   if (/(vale|pago|transfer|comprobante)/i.test(t) && /\d/.test(t)) return true;
   if (isLikelyPaymentAmountText(t)) return true;
@@ -56,76 +76,38 @@ function clientReplyForVariant(
   pedidoId: string,
   expected: number,
   detected: number | null,
-  notified: boolean
+  notified: boolean,
+  proofUpdated = false
 ): string {
   const shortId = pedidoId.slice(0, 8);
+  const label = variantLabel(variant);
+  const opts = {
+    shortId,
+    variantLabel: label,
+    expectedLabel: formatClp(expected),
+    detectedLabel: detected != null ? formatClp(detected) : null,
+    notified,
+    proofUpdated,
+  };
 
   switch (variant) {
     case 'NOT_PAYMENT':
-      return (
-        'La imagen no parece un comprobante de transferencia bancaria.\n' +
-        'Envía una *captura de pantalla* de tu app bancaria (BancoEstado, BCI, Santander, Mach, etc.) ' +
-        'donde se vea el monto y la transferencia.'
-      );
+      return wspProofNotPaymentImage();
     case 'UNCLEAR':
-      return notified
-        ? `Recibimos tu comprobante 📎 (pedido #${shortId})\n` +
-            'La lectura automática no fue concluyente; el *local revisará la imagen* manualmente.\n\n' +
-            'Tip: antes de la foto escribe *vale 5000* o pon el monto en el caption al enviar la imagen.'
-        : 'No logramos leer bien el comprobante 📷\n' +
-            'Reenvía una captura completa o escribe *vale 5000* justo antes de la foto.';
+      return wspProofUnclearReply(opts);
     case 'NO_AMOUNT':
-      return notified
-        ? `Recibimos tu comprobante 📎 (pedido #${shortId})\n` +
-            'Guardamos la imagen para que el *local valide el pago*.\n\n' +
-            'Para la próxima: escribe *vale 5000* (o el total) *antes* de enviar la foto, ' +
-            'o escríbelo en el campo caption junto a 📷 Imagen.'
-        : `Recibimos tu imagen (pedido #${shortId}) pero no vimos el monto.\n` +
-            'Escribe *vale 5000* y luego envía la foto, o indica el monto en el caption de la imagen.';
+      return wspProofNoAmountReply(opts);
     case 'TRANSFER_PARTIAL':
-      return (
-        `Recibimos tu comprobante 📎 (pedido #${shortId})\n` +
-        `${variantLabel(variant)}\n` +
-        `Total pedido: ${formatClp(expected)}` +
-        (detected != null ? ` · Detectado: ${formatClp(detected)}` : '') +
-        '\n\nSi el monto del pedido está mal, escribe *cancelar pedido* y pide de nuevo con la cantidad correcta.' +
-        (notified ? '\n\nNotificamos al local para revisión.' : '')
-      );
+      return wspProofPartialReply(opts);
     case 'TRANSFER_OVERPAY':
     case 'TRANSFER_AMOUNT_MISMATCH':
-      return (
-        `Recibimos tu comprobante 📎\n` +
-        `Pedido #${shortId}\n` +
-        `${variantLabel(variant)}\n` +
-        (detected != null ? `Detectado: ${formatClp(detected)} · Esperado: ${formatClp(expected)}\n\n` : '') +
-        'Si te equivocaste al pedir, escribe *cancelar pedido* y arma uno nuevo.\n' +
-        'El equipo del local también puede revisar el pago.'
-      );
+      return wspProofOverpayReply(opts);
     case 'WRONG_RECIPIENT':
-      return (
-        `Recibimos tu comprobante 📎 (pedido #${shortId})\n` +
-        `${variantLabel(variant)}\n\n` +
-        'Verifica que transferiste a la *cuenta y RUT* que te enviamos al confirmar el pedido.\n' +
-        'Si fue a otra cuenta, contacta al local antes de reenviar.'
-      );
+      return wspProofWrongRecipientReply(shortId, label);
     case 'AMOUNT_OK_RECIPIENT_UNCLEAR':
-      return (
-        `Recibimos tu comprobante 📎\n` +
-        `Pedido #${shortId}\n` +
-        `${variantLabel(variant)}\n\n` +
-        (notified
-          ? 'Notificamos al local para validar destinatario y monto.'
-          : 'El comercio validará manualmente.')
-      );
+      return wspProofRecipientUnclearReply(opts);
     default:
-      return (
-        `Recibimos tu comprobante 📎\n` +
-        `Pedido #${shortId}\n` +
-        `${variantLabel(variant)}\n\n` +
-        (notified
-          ? 'Notificamos al equipo del local para validación. Te avisamos cuando confirmen el pago.'
-          : 'Aún no hay vendedor/admin con WhatsApp en esta sucursal; el comercio validará manualmente.')
-      );
+      return wspProofDefaultReply(opts);
   }
 }
 
@@ -134,17 +116,11 @@ async function loadImageFromIncoming(
 ): Promise<{ imageBase64: string; mimeType: string; caption?: string } | { error: string }> {
   if (incoming.kind === 'document') {
     if (incoming.mimeType.includes('pdf')) {
-      return {
-        error:
-          'Recibimos un PDF. Por ahora envía una *captura de pantalla* (JPG/PNG) del comprobante desde tu app bancaria.',
-      };
+      return { error: wspProofPdfUnsupported() };
     }
     const { buffer, mimeType } = await downloadMetaMedia(incoming.mediaId);
     if (!mimeType.startsWith('image/')) {
-      return {
-        error:
-          'Formato no soportado. Envía una *foto* o captura del comprobante de transferencia (JPG/PNG).',
-      };
+      return { error: wspProofFormatUnsupported() };
     }
     return {
       imageBase64: buffer.toString('base64'),
@@ -174,7 +150,7 @@ export async function handlePaymentProofTextClaim(from: string, text: string): P
   const { context } = session;
 
   if (context.features.pagosOnline) {
-    return 'Tu plan usa *pago en línea*. Usa el link que te enviamos al confirmar el pedido.';
+    return wspProofOnlinePlan();
   }
 
   rememberPaymentHint(from, text);
@@ -183,23 +159,18 @@ export async function handlePaymentProofTextClaim(from: string, text: string): P
   try {
     const pedido = await coreClient.findPendingOrder(context.empresaId, context.phone);
     if (pedido.awaiting_customer_confirm) {
-      return (
-        'Tu pedido aún no está confirmado.\n' +
-        'Escribe *mi pedido* para revisar y *confirmar* cuando esté bien.\n' +
-        'Después podrás enviar el comprobante.'
-      );
+      return wspProofAwaitingConfirmForText();
     }
     const amountLine = parsedAmount
       ? `\n\n✓ Anoté monto *${formatClp(parsedAmount)}* para tu próxima foto.`
       : '';
-    return (
-      `Pedido pendiente #${pedido.pedido_id.slice(0, 8)} · Total ${formatClp(pedido.total)}` +
-      amountLine +
-      '\n\nAhora envía la *foto del comprobante* (botón 📷 Imagen).\n' +
-      'El monto que escribiste se usará aunque la IA no lea la imagen.'
-    );
+    return wspProofTextClaimHint({
+      pedidoId: pedido.pedido_id,
+      totalLabel: formatClp(pedido.total),
+      amountLine,
+    });
   } catch {
-    return 'No encontré un pedido pendiente. Primero arma un pedido con *buscar* y *pedido*.';
+    return wspProofNoPendingForProof();
   }
 }
 
@@ -208,10 +179,7 @@ export async function handlePaymentProofImage(incoming: ProofIncoming): Promise<
   const { context } = session;
 
   if (context.features.pagosOnline) {
-    return (
-      'Tu plan incluye *pago en línea*. Usa el link que te enviamos al confirmar el pedido.\n' +
-      'Si ya pagaste en línea, no necesitas enviar comprobante por transferencia.'
-    );
+    return wspProofOnlinePlanWithTransferNote();
   }
 
   const loaded = await loadImageFromIncoming(incoming);
@@ -227,14 +195,11 @@ export async function handlePaymentProofImage(incoming: ProofIncoming): Promise<
   try {
     pedido = await coreClient.findPendingOrder(context.empresaId, context.phone);
   } catch {
-    return 'No encontré un pedido pendiente a tu nombre. Primero arma un pedido con *buscar* y *pedido*.';
+    return wspProofNoPendingForProof();
   }
 
   if (pedido.awaiting_customer_confirm) {
-    return (
-      'Tu pedido aún no está confirmado.\n' +
-      'Escribe *confirmar* para recibir datos de transferencia y luego envía la foto del comprobante.'
-    );
+    return wspProofAwaitingConfirmForImage();
   }
 
   const captionHint = resolvePaymentCaption(incoming.from, loaded.caption);
@@ -250,7 +215,11 @@ export async function handlePaymentProofImage(incoming: ProofIncoming): Promise<
   const skipNotify = analysis.variant === 'NOT_PAYMENT';
   const aiMatch = analysis.variant === 'TRANSFER_OK';
 
-  let proof: { notify_targets: Array<{ phone: string; label: string }> } = { notify_targets: [] };
+  let proof: {
+    notify_targets: Array<{ phone: string; label: string }>;
+    is_update?: boolean;
+    admin_notify_suppressed?: boolean;
+  } = { notify_targets: [] };
 
   if (!skipNotify) {
     proof = await coreClient.registerPaymentProof(context.empresaId, {
@@ -269,7 +238,10 @@ export async function handlePaymentProofImage(incoming: ProofIncoming): Promise<
   const matchLabel = variantLabel(analysis.variant);
   const detected = analysis.amount;
 
-  if (!skipNotify) {
+  const sentAdminNotify =
+    !skipNotify && !proof.admin_notify_suppressed && proof.notify_targets.length > 0;
+
+  if (sentAdminNotify) {
     const adminLines = [
       `POS-AI · ${context.empresaNombre}`,
       `Comprobante transferencia`,
@@ -304,11 +276,14 @@ export async function handlePaymentProofImage(incoming: ProofIncoming): Promise<
     }
   }
 
+  const adminWasNotified = sentAdminNotify || Boolean(proof.admin_notify_suppressed);
+
   return clientReplyForVariant(
     analysis.variant,
     pedido.pedido_id,
     pedido.total,
     detected,
-    proof.notify_targets.length > 0
+    adminWasNotified,
+    Boolean(proof.is_update)
   );
 }

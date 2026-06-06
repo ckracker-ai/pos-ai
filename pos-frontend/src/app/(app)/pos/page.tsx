@@ -1,16 +1,36 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
-import { api, getApiErrorMessage } from '@/core/api/api-client';
-import { fetchProductsForBranch } from '@/core/api/normalizers';
+import { api, ApiError, getApiErrorMessage } from '@/core/api/api-client';
+import {
+  extractEntity,
+  fetchProductsForBranch,
+  normalizeCategoryTreeNode,
+  normalizeEmpresa,
+  unwrapApiEnvelope,
+} from '@/core/api/normalizers';
+import {
+  buildCategoryFilterMaps,
+  productMatchesPrincipalCategory,
+  type PrincipalCategoryOption,
+} from '@/core/utils/category-filter';
 import { Product } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
 import { ProductQuickPicker } from '@/components/organisms/ProductQuickPicker';
+import { interpretPosCartClient } from '@/core/pos/posAiRulesClient';
+import {
+  PosAiCommandPanel,
+  type PosAiCommandPanelHandle,
+} from '@/components/molecules/PosAiCommandPanel';
+import { applyPosAiActions } from '@/core/pos/applyPosAiActions';
+import type { PosAiResult } from '@/core/pos/posAiTypes';
+import { unwrapApiData } from '@/core/api/api-client';
+import { validateAddToCart, validateSaleForm } from '@/core/pos/posSaleAssist';
 import { coercePositiveIntInput } from '@/core/utils/numeric-input';
 import {
   CHILE_IVA_LABEL,
@@ -32,11 +52,16 @@ interface PosLineItem {
 interface ReceiptData {
   items: PosLineItem[];
   subtotal: number;
+  deliveryAmount: number;
   tax: number;
   total: number;
   createdAtIso: string;
   saleReference: string;
   paymentType: 'cash' | 'pos';
+  requiresDelivery: boolean;
+  deliveryCustomerName?: string;
+  deliveryPhone?: string;
+  deliveryAddress?: string;
   branchName: string;
   sellerName: string;
 }
@@ -51,6 +76,11 @@ export default function PosPage() {
   const [cart, setCart] = useState<PosLineItem[]>([]);
   const [notes, setNotes] = useState('');
   const [paymentType, setPaymentType] = useState<'cash' | 'pos'>('cash');
+  const [requiresDelivery, setRequiresDelivery] = useState(false);
+  const [deliveryCustomerName, setDeliveryCustomerName] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryAmountInput, setDeliveryAmountInput] = useState('0');
   const [saleNumberInput, setSaleNumberInput] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
@@ -58,6 +88,52 @@ export default function PosPage() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [pickerResetKey, setPickerResetKey] = useState(0);
+  const [principalCategories, setPrincipalCategories] = useState<PrincipalCategoryOption[]>([]);
+  const [leafToPrincipal, setLeafToPrincipal] = useState<Map<string, string>>(new Map());
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [lastAiResult, setLastAiResult] = useState<PosAiResult | null>(null);
+  const [showManualProductForm, setShowManualProductForm] = useState(false);
+  const [empresaDisplayName, setEmpresaDisplayName] = useState('Mi negocio');
+  const [isInformalTicket, setIsInformalTicket] = useState(false);
+  const posAiPanelRef = useRef<PosAiCommandPanelHandle>(null);
+
+  useEffect(() => {
+    const loadEmpresa = async () => {
+      try {
+        const res = await api.getEmpresaMe();
+        const raw = extractEntity<Record<string, unknown>>(unwrapApiEnvelope(res.data), ['empresa']);
+        if (!raw) return;
+        const empresa = normalizeEmpresa(raw);
+        setEmpresaDisplayName(empresa.nombreFantasia?.trim() || empresa.razonSocial);
+        setIsInformalTicket(empresa.estadoTributario !== 'FORMAL');
+      } catch {
+        /* ticket sigue usable sin perfil empresa */
+      }
+    };
+    void loadEmpresa();
+  }, []);
+
+  useEffect(() => {
+    const loadCategoryTree = async () => {
+      try {
+        const res = await api.getCategoryTree();
+        const envelope = unwrapApiEnvelope(res.data) as { tree?: unknown[] };
+        const tree = Array.isArray(envelope?.tree)
+          ? envelope.tree
+              .filter((n): n is Record<string, unknown> => Boolean(n) && typeof n === 'object')
+              .map((n) => normalizeCategoryTreeNode(n))
+          : [];
+        const { principals, leafToPrincipal: map } = buildCategoryFilterMaps(tree);
+        setPrincipalCategories(principals);
+        setLeafToPrincipal(map);
+      } catch {
+        setPrincipalCategories([]);
+        setLeafToPrincipal(new Map());
+      }
+    };
+    loadCategoryTree();
+  }, []);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -81,35 +157,63 @@ export default function PosPage() {
 
 
   const selectedProduct = products.find((product) => product.id === selectedProductId);
-  const availableProducts = useMemo(
-    () => products.filter((p) => Number(p.stock ?? 0) > 0),
-    [products]
-  );
+  const availableProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (Number(p.stock ?? 0) <= 0) return false;
+      return productMatchesPrincipalCategory(p.categoryId, categoryFilter, leafToPrincipal);
+    });
+  }, [products, categoryFilter, leafToPrincipal]);
+
+  useEffect(() => {
+    if (!availableProducts.some((p) => p.id === selectedProductId)) {
+      setSelectedProductId('');
+    }
+  }, [availableProducts, selectedProductId]);
 
 
   const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + item.total, 0),
     [cart]
   );
+  const deliveryAmount = useMemo(() => {
+    if (!requiresDelivery) return 0;
+    const n = Number(deliveryAmountInput || 0);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [requiresDelivery, deliveryAmountInput]);
 
   const tax = calculateIvaFromNet(subtotal);
-  const total = calculateTotalWithIva(subtotal);
+  const totalProducts = calculateTotalWithIva(subtotal);
+  const total = totalProducts + deliveryAmount;
 
-  const handleAddProduct = () => {
-    if (!selectedProduct) return;
-    if (quantity < 1) return;
-    if (Number(selectedProduct.stock ?? 0) <= 0) {
+  const addProductToCart = (product: Product, qty: number) => {
+    const check = validateAddToCart({
+      product: {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        stock: Number(product.stock ?? 0),
+        categoryId: product.categoryId,
+        category: product.category,
+      },
+      quantity: qty,
+      cart: cart.map((item) => ({ id: item.id, quantity: item.quantity })),
+    });
+    if (!check.ok) {
       setMessageType('error');
-      setMessage(`"${selectedProduct.name}" no tiene stock disponible en ${activeBranchName}.`);
+      setMessage(check.message);
       return;
     }
 
     setCart((current) => {
-      const existing = current.find((item) => item.id === selectedProduct.id);
+      const existing = current.find((item) => item.id === product.id);
       if (existing) {
         return current.map((item) =>
-          item.id === selectedProduct.id
-            ? { ...item, quantity: item.quantity + quantity, total: (item.quantity + quantity) * item.unitPrice }
+          item.id === product.id
+            ? {
+                ...item,
+                quantity: item.quantity + qty,
+                total: (item.quantity + qty) * item.unitPrice,
+              }
             : item
         );
       }
@@ -117,11 +221,11 @@ export default function PosPage() {
       return [
         ...current,
         {
-          id: selectedProduct.id,
-          name: selectedProduct.name,
-          quantity,
-          unitPrice: selectedProduct.price,
-          total: selectedProduct.price * quantity,
+          id: product.id,
+          name: product.name,
+          quantity: qty,
+          unitPrice: product.price,
+          total: product.price * qty,
         },
       ];
     });
@@ -132,20 +236,108 @@ export default function PosPage() {
     setMessageType('success');
   };
 
+  const handleAddProduct = () => {
+    if (!selectedProduct) return;
+    addProductToCart(selectedProduct, quantity);
+  };
+
+  const handleQuickAddSuggestion = (productId: string, qty = 1) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    addProductToCart(product, Math.max(1, qty));
+  };
+
+  const posAiProducts = useMemo(
+    () =>
+      products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku ?? '',
+        price: p.price,
+        stock: Number(p.stock ?? 0),
+      })),
+    [products]
+  );
+
+  const handlePosAiCommand = async (userText: string) => {
+    setAiLoading(true);
+    const stocksPayload = posAiProducts.map((p) => ({
+      id: p.id,
+      nombre: p.name,
+      sku: p.sku,
+      precio: p.price,
+      stock_actual: p.stock,
+    }));
+    const cartPayload = cart.map((item) => ({
+      id_producto: item.id,
+      cantidad: item.quantity,
+      precio_unitario: item.unitPrice,
+    }));
+
+    try {
+      let result: PosAiResult;
+      try {
+        const res = await api.interpretPosCommand({
+          userText,
+          stocks: stocksPayload,
+          cart: cartPayload,
+        });
+        result = unwrapApiData<PosAiResult>(res.data);
+      } catch (apiError) {
+        const status = apiError instanceof ApiError ? apiError.status : undefined;
+        if (status === 404 || status === 502 || status === 503) {
+          result = interpretPosCartClient({
+            userText,
+            stocks: stocksPayload,
+            cart: cartPayload,
+          });
+        } else {
+          throw apiError;
+        }
+      }
+      setLastAiResult(result);
+      const outcome = applyPosAiActions({
+        result,
+        cart,
+        products: posAiProducts,
+      });
+      setCart(outcome.cart);
+      setMessageType(outcome.cleared || outcome.cart.length > 0 ? 'success' : 'error');
+      setMessage(outcome.message);
+      if (outcome.shouldSubmitSale) {
+        await handleConfirmSale(outcome.cart);
+      }
+    } catch (error) {
+      setMessageType('error');
+      setMessage(getApiErrorMessage(error));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleRemoveItem = (itemId: string) => {
     setCart((current) => current.filter((item) => item.id !== itemId));
   };
 
-  const handleConfirmSale = async () => {
-    if (cart.length === 0) {
-      setMessageType('error');
-      setMessage('Agrega al menos un producto al carrito.');
-      return;
-    }
+  const handleConfirmSale = async (cartOverride?: PosLineItem[]) => {
+    const saleCart = cartOverride ?? cart;
+    const saleSubtotal = saleCart.reduce((sum, item) => sum + item.total, 0);
+    const saleTax = calculateIvaFromNet(saleSubtotal);
+    const saleTotalProducts = calculateTotalWithIva(saleSubtotal);
+    const saleTotal = saleTotalProducts + deliveryAmount;
 
-    if (!saleNumberInput.trim()) {
+    const formCheck = validateSaleForm({
+      cart: saleCart.map((item) => ({ id: item.id, quantity: item.quantity })),
+      saleNumber: saleNumberInput,
+      requiresDelivery,
+      deliveryCustomerName,
+      deliveryPhone,
+      deliveryAddress,
+      deliveryAmount,
+    });
+    if (!formCheck.ok) {
       setMessageType('error');
-      setMessage('Ingresa el número de venta (efectivo o POS) antes de confirmar.');
+      setMessage(formCheck.messages[0] ?? 'Revisa el formulario de venta.');
       return;
     }
 
@@ -158,11 +350,16 @@ export default function PosPage() {
     const finalNotes = [notes.trim() || null, paymentNote].filter(Boolean).join(' • ');
 
     const salePayload = {
-      total,
+      total: saleTotal,
       discount: 0,
       status: 'PENDING',
+      requiresDelivery,
+      deliveryCustomerName: requiresDelivery ? deliveryCustomerName.trim() : undefined,
+      deliveryPhone: requiresDelivery ? deliveryPhone.trim() : undefined,
+      deliveryAddress: requiresDelivery ? deliveryAddress.trim() : undefined,
+      deliveryAmount: requiresDelivery ? deliveryAmount : 0,
       notes: finalNotes || undefined,
-      details: cart.map((item) => ({
+      details: saleCart.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
@@ -175,18 +372,28 @@ export default function PosPage() {
       const reference = saleNumberInput.trim();
       const nowIso = new Date().toISOString();
       setReceiptData({
-        items: cart.map((item) => ({ ...item })),
-        subtotal,
-        tax,
-        total,
+        items: saleCart.map((item) => ({ ...item })),
+        subtotal: saleSubtotal,
+        deliveryAmount,
+        tax: saleTax,
+        total: saleTotal,
         createdAtIso: nowIso,
         saleReference: reference,
         paymentType,
+        requiresDelivery,
+        deliveryCustomerName: requiresDelivery ? deliveryCustomerName.trim() : undefined,
+        deliveryPhone: requiresDelivery ? deliveryPhone.trim() : undefined,
+        deliveryAddress: requiresDelivery ? deliveryAddress.trim() : undefined,
         branchName: activeBranchName,
         sellerName: user?.name || 'Usuario',
       });
       // En POS mostramos el número ingresado por caja.
       setCart([]);
+      setRequiresDelivery(false);
+      setDeliveryCustomerName('');
+      setDeliveryPhone('');
+      setDeliveryAddress('');
+      setDeliveryAmountInput('0');
       setShowReceipt(true);
       setMessageType('success');
       setMessage('Venta registrada. La comanda aparecerá en Cocina.');
@@ -218,32 +425,72 @@ export default function PosPage() {
           </div>
 
           {message && (
-            <div
-              className={`rounded-3xl border p-4 mb-6 ${
-                messageType === 'error'
-                  ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
-                  : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
-              }`}
-            >
+            <div className={`mb-6 ${messageType === 'error' ? 'app-alert-error' : 'app-alert-success'}`}>
               {message}
             </div>
           )}
 
           <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
             <div className="space-y-6">
-              <section className="rounded-3xl border border-slate-800 bg-slate-950/90 p-6 shadow-lg">
+              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-brand-linen/80 bg-brand-surface/40 px-4 py-3 text-sm text-brand-ink">
+                <input
+                  type="checkbox"
+                  checked={showManualProductForm}
+                  onChange={(e) => setShowManualProductForm(e.target.checked)}
+                  className="h-4 w-4 rounded border-brand-linen accent-brand-olive"
+                />
+                Mostrar formulario clásico para agregar productos
+              </label>
+
+              <PosAiCommandPanel
+                ref={posAiPanelRef}
+                disabled={!branchId || products.length === 0}
+                loading={aiLoading}
+                lastResult={lastAiResult}
+                cart={cart.map((item) => ({ id: item.id, quantity: item.quantity }))}
+                products={posAiProducts.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  price: p.price,
+                  stock: p.stock,
+                  categoryId: products.find((x) => x.id === p.id)?.categoryId,
+                  category: products.find((x) => x.id === p.id)?.category,
+                }))}
+                onSubmit={handlePosAiCommand}
+                onQuickAdd={handleQuickAddSuggestion}
+              />
+
+              {showManualProductForm && (
+              <section className="app-card rounded-3xl p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-white">Agregar Productos</h2>
-                    <p className="mt-2 text-slate-400">
+                    <h2 className="text-xl font-semibold text-[#3d4532]">Agregar productos</h2>
+                    <p className="mt-2 text-sm app-text-muted">
                       Solo se muestran productos con stock en {activeBranchName}.
                     </p>
                   </div>
+                  {principalCategories.length > 0 && (
+                    <label className="text-sm app-text-muted">
+                      Familia
+                      <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="app-select mt-2 min-w-[12rem]"
+                      >
+                        <option value="all">Todas las familias</option>
+                        {principalCategories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
 
                 <div className="mt-6 grid gap-4 md:grid-cols-[1.7fr_0.9fr] items-end">
                   <label className="space-y-2 block">
-                    <span className="text-sm text-slate-400">Producto</span>
+                    <span className="text-sm app-text-muted">Producto</span>
                     <ProductQuickPicker
                       products={availableProducts}
                       selectedProductId={selectedProductId}
@@ -253,59 +500,61 @@ export default function PosPage() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm text-slate-400">Cantidad</span>
+                    <span className="text-sm app-text-muted">Cantidad</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
                       value={quantity}
                       onChange={(event) => setQuantity(coercePositiveIntInput(event.target.value))}
-                      className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-amber-400"
+                      className="app-input"
                     />
                   </label>
                 </div>
                 {availableProducts.length === 0 && (
-                  <p className="mt-3 text-xs text-amber-300">
+                  <p className="mt-3 text-xs text-brand-olive">
                     No hay productos con stock para esta sucursal. Cambia la sucursal activa o carga inventario.
                   </p>
                 )}
 
                 <button
                   onClick={handleAddProduct}
-                  className="mt-6 inline-flex items-center justify-center rounded-3xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 shadow hover:bg-amber-400 transition"
+                  className="app-btn-primary mt-6 inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold shadow transition"
                 >
                   + Agregar
                 </button>
               </section>
+              )}
 
-              <section className="rounded-3xl border border-slate-800 bg-slate-950/90 p-6 shadow-lg">
+              <section className="app-card rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-xl font-semibold text-white">Carrito</h2>
-                    <p className="text-slate-400 text-sm">{cart.length} ítem(s)</p>
+                    <h2 className="text-xl font-semibold text-[#3d4532]">Carrito</h2>
+                    <p className="text-sm app-text-muted">{cart.length} ítem(s)</p>
                   </div>
-                  <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">
+                  <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#4a533c]">
                     Total: ${total}
                   </span>
                 </div>
 
                 <div className="space-y-4">
                   {cart.length === 0 ? (
-                    <div className="rounded-3xl border border-dashed border-slate-700 p-8 text-center text-slate-500">
+                    <div className="app-panel rounded-3xl border border-dashed p-8 text-center text-[#6b7280]">
                       Sin productos aún. Agrega uno arriba.
                     </div>
                   ) : (
                     cart.map((item) => (
-                      <div key={item.id} className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4 flex items-center justify-between gap-4">
+                      <div key={item.id} className="app-panel flex items-center justify-between gap-4 rounded-3xl p-4">
                         <div>
-                          <p className="font-semibold text-white">{item.name}</p>
-                          <p className="text-sm text-slate-400">{item.quantity} × ${item.unitPrice}</p>
+                          <p className="font-semibold text-[#3d4532]">{item.name}</p>
+                          <p className="text-sm app-text-muted">{item.quantity} × ${item.unitPrice}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-white">${item.total}</p>
+                          <p className="font-semibold text-[#3d4532]">${item.total}</p>
                           <button
+                            type="button"
                             onClick={() => handleRemoveItem(item.id)}
-                            className="mt-2 text-xs text-rose-400 hover:text-rose-300"
+                            className="mt-2 text-xs text-rose-700 hover:text-rose-900"
                           >
                             Eliminar
                           </button>
@@ -316,47 +565,108 @@ export default function PosPage() {
                 </div>
 
                 <div className="mt-6 space-y-4">
-                  <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4">
-                    <p className="text-sm text-slate-400">Pago (obligatorio)</p>
+                  <div className="app-panel p-4">
+                    <p className="text-sm app-text-muted">Pago (obligatorio)</p>
                     <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                      <label className="block text-sm text-slate-300">
+                      <label className="block text-sm text-[#3d4532]">
                         Forma de pago
                         <select
                           value={paymentType}
                           onChange={(e) => setPaymentType(e.target.value as 'cash' | 'pos')}
-                          className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400"
+                          className="app-select mt-2"
                         >
                           <option value="cash">Efectivo</option>
                           <option value="pos">POS de pago</option>
                         </select>
                       </label>
 
-                      <label className="block text-sm text-slate-300">
+                      <label className="block text-sm text-[#3d4532]">
                         Número de venta
                         <input
                           value={saleNumberInput}
                           onChange={(e) => setSaleNumberInput(e.target.value)}
-                          className="mt-2 w-full rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400"
+                          className="app-input mt-2"
                           placeholder={paymentType === 'cash' ? 'Ej: EF-000123' : 'Ej: POS-000123'}
                         />
                       </label>
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4">
-                    <p className="text-sm text-slate-400">Notas (opcional)</p>
+                  <div className="app-panel p-4">
+                    <p className="text-sm app-text-muted">Notas (opcional)</p>
                     <textarea
                       value={notes}
                       onChange={(event) => setNotes(event.target.value)}
                       placeholder="Agrega notas relevantes..."
-                      className="mt-3 h-28 w-full rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400"
+                      className="app-textarea mt-3 h-28"
                     />
                   </div>
 
+                  <div
+                    className={`rounded-2xl border p-4 transition ${
+                      requiresDelivery
+                        ? 'border-amber-300 bg-amber-50 shadow-sm'
+                        : 'border-amber-200/80 bg-amber-50/50'
+                    }`}
+                  >
+                    <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-amber-950">
+                      <input
+                        type="checkbox"
+                        checked={requiresDelivery}
+                        onChange={(e) => setRequiresDelivery(e.target.checked)}
+                        className="h-4 w-4 rounded border-amber-400 accent-amber-600"
+                      />
+                      <span>Esta venta requiere delivery</span>
+                    </label>
+                    {requiresDelivery && (
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <label className="block text-sm text-[#3d4532]">
+                          Nombre cliente
+                          <input
+                            value={deliveryCustomerName}
+                            onChange={(e) => setDeliveryCustomerName(e.target.value)}
+                            className="app-input mt-2"
+                            placeholder="Ej: Juan Pérez"
+                          />
+                        </label>
+                        <label className="block text-sm text-[#3d4532]">
+                          Número teléfono
+                          <input
+                            value={deliveryPhone}
+                            onChange={(e) => setDeliveryPhone(e.target.value)}
+                            className="app-input mt-2"
+                            placeholder="Ej: 56912345678"
+                          />
+                        </label>
+                        <label className="block text-sm text-[#3d4532] sm:col-span-2">
+                          Dirección
+                          <input
+                            value={deliveryAddress}
+                            onChange={(e) => setDeliveryAddress(e.target.value)}
+                            className="app-input mt-2"
+                            placeholder="Ej: Av. Providencia 1234, Depto 34"
+                          />
+                        </label>
+                        <label className="block text-sm text-[#3d4532]">
+                          Monto delivery
+                          <input
+                            type="number"
+                            min={0}
+                            step={100}
+                            value={deliveryAmountInput}
+                            onChange={(e) => setDeliveryAmountInput(e.target.value)}
+                            className="app-input mt-2"
+                            placeholder="Ej: 2000"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
                   <button
-                    onClick={handleConfirmSale}
+                    onClick={() => handleConfirmSale()}
                     disabled={isSubmitting}
-                    className="w-full rounded-3xl bg-amber-500 px-6 py-4 text-sm font-semibold text-slate-950 shadow hover:bg-amber-400 transition disabled:cursor-not-allowed disabled:bg-amber-700"
+                    className="app-btn-primary w-full rounded-3xl px-6 py-4 text-sm font-semibold shadow transition disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? 'Procesando venta...' : 'Confirmar Venta'}
                   </button>
@@ -365,9 +675,9 @@ export default function PosPage() {
             </div>
 
             <aside className="space-y-6">
-              <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-6 shadow-lg">
-                <h2 className="text-xl font-semibold text-white mb-4">Resumen</h2>
-                <div className="space-y-3 text-sm text-slate-400">
+              <div className="app-card rounded-3xl p-6">
+                <h2 className="mb-4 text-xl font-semibold text-[#3d4532]">Resumen</h2>
+                <div className="space-y-3 text-sm app-text-muted">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
                     <span>${subtotal}</span>
@@ -376,16 +686,22 @@ export default function PosPage() {
                     <span>{CHILE_IVA_LABEL}</span>
                     <span>${tax}</span>
                   </div>
-                  <div className="flex justify-between text-white font-semibold text-lg">
+                  {requiresDelivery && (
+                    <div className="flex justify-between">
+                      <span>Delivery</span>
+                      <span>${deliveryAmount}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-semibold text-[#3d4532]">
                     <span>Total</span>
                     <span>${total}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-6 shadow-lg">
-                <h2 className="text-xl font-semibold text-white mb-3">Instrucciones</h2>
-                <p className="text-sm text-slate-400 leading-6">
+              <div className="app-card rounded-3xl p-6">
+                <h2 className="mb-3 text-xl font-semibold text-[#3d4532]">Instrucciones</h2>
+                <p className="text-sm leading-6 app-text-muted">
                   Agrega productos al carrito, verifica el total y presiona confirmar venta. El ticket se imprimirá directamente en lugar de descargarse.
                 </p>
               </div>
@@ -393,59 +709,83 @@ export default function PosPage() {
           </div>
 
           {showReceipt && receiptData && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 print:hidden">
-              <div className="w-full max-w-3xl rounded-[2rem] bg-slate-900 border border-slate-700 p-6 shadow-2xl">
+            <div className="app-modal-overlay print:hidden">
+              <div className="app-modal-panel max-w-3xl">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm uppercase text-amber-400 tracking-[0.28em]">Venta registrada exitosamente</p>
-                    <h3 className="mt-3 text-2xl font-bold text-white">ERP Multi Sucursal</h3>
-                    <p className="text-sm text-slate-400">Empanadas Costa Azul</p>
+                    <p className="app-eyebrow text-sm tracking-[0.28em] text-[#4a533c]">
+                      Venta registrada exitosamente
+                    </p>
+                    <h3 className="mt-3 text-2xl font-bold text-[#3d4532]">ERP Multi Sucursal</h3>
+                    <p className="text-sm app-text-muted">{empresaDisplayName}</p>
+                    {isInformalTicket && (
+                      <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        Documento interno — no constituye boleta electrónica ni documento tributario.
+                      </p>
+                    )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => setShowReceipt(false)}
-                    className="rounded-full border border-slate-700 bg-slate-950 p-2 text-slate-300 hover:text-white transition"
+                    className="app-btn-secondary rounded-full px-3 py-2"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="mt-6 rounded-3xl bg-slate-950/80 border border-slate-800 p-6">
-                  <div className="grid gap-4 sm:grid-cols-2 text-sm text-slate-400">
+                <div className="app-panel mt-6 p-6">
+                  <div className="grid gap-4 sm:grid-cols-2 text-sm app-text-muted">
                     <div>
-                      <p className="font-semibold text-slate-200">Sucursal</p>
+                      <p className="font-semibold text-[#3d4532]">Sucursal</p>
                       <p>{receiptData.branchName}</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-200">Vendedor</p>
+                      <p className="font-semibold text-[#3d4532]">Vendedor</p>
                       <p>{receiptData.sellerName}</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-200">Fecha</p>
+                      <p className="font-semibold text-[#3d4532]">Fecha</p>
                       <p>{new Date(receiptData.createdAtIso).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-200">Folio</p>
+                      <p className="font-semibold text-[#3d4532]">Folio</p>
                       <p>#{receiptData.saleReference}</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-200">Pago</p>
+                      <p className="font-semibold text-[#3d4532]">Pago</p>
                       <p>{receiptData.paymentType === 'cash' ? 'Efectivo' : 'POS de pago'}</p>
                     </div>
+                    {receiptData.requiresDelivery && (
+                      <>
+                        <div>
+                          <p className="font-semibold text-[#3d4532]">Cliente delivery</p>
+                          <p>{receiptData.deliveryCustomerName}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-[#3d4532]">Teléfono delivery</p>
+                          <p>{receiptData.deliveryPhone}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="font-semibold text-[#3d4532]">Dirección delivery</p>
+                          <p>{receiptData.deliveryAddress}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="mt-6 space-y-4">
                     {receiptData.items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between rounded-3xl bg-slate-950/90 border border-slate-800 p-4">
+                      <div key={item.id} className="app-stat-inner flex items-center justify-between rounded-2xl p-4">
                         <div>
-                          <p className="font-semibold text-white">{item.name}</p>
-                          <p className="text-sm text-slate-400">{item.quantity} × ${item.unitPrice}</p>
+                          <p className="font-semibold text-[#3d4532]">{item.name}</p>
+                          <p className="text-sm app-text-muted">{item.quantity} × ${item.unitPrice}</p>
                         </div>
-                        <p className="font-semibold text-white">${item.total}</p>
+                        <p className="font-semibold text-[#3d4532]">${item.total}</p>
                       </div>
                     ))}
                   </div>
 
-                  <div className="mt-6 space-y-2 text-sm text-slate-400">
+                  <div className="mt-6 space-y-2 text-sm app-text-muted">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
                       <span>${receiptData.subtotal}</span>
@@ -454,7 +794,13 @@ export default function PosPage() {
                       <span>{CHILE_IVA_LABEL}</span>
                       <span>${receiptData.tax}</span>
                     </div>
-                    <div className="flex justify-between text-white font-semibold text-lg">
+                  {receiptData.requiresDelivery && (
+                    <div className="flex justify-between">
+                      <span>Delivery</span>
+                      <span>${receiptData.deliveryAmount}</span>
+                    </div>
+                  )}
+                    <div className="flex justify-between text-lg font-semibold text-[#3d4532]">
                       <span>Total</span>
                       <span>${receiptData.total}</span>
                     </div>
@@ -463,15 +809,13 @@ export default function PosPage() {
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button
+                    type="button"
                     onClick={handlePrint}
-                    className="rounded-3xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400 transition"
+                    className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold transition"
                   >
                     Imprimir
                   </button>
-                  <button
-                    onClick={() => setShowReceipt(false)}
-                    className="rounded-3xl border border-slate-700 px-6 py-3 text-sm text-slate-200 hover:bg-slate-800 transition"
-                  >
+                  <button type="button" onClick={() => setShowReceipt(false)} className="app-btn-secondary">
                     Cerrar
                   </button>
                 </div>
@@ -482,10 +826,15 @@ export default function PosPage() {
           <div id="ticket-print-area" className="hidden print:block">
             <div className="pos-ticket mx-auto bg-white p-3 text-slate-900">
               <div className="mb-6 text-center">
-                <p className="text-sm font-semibold uppercase text-amber-600">ERP Multi Sucursal</p>
-                <p className="mt-2 text-xs text-slate-500">Empanadas Costa Azul</p>
+                <p className="text-sm font-semibold uppercase text-brand-olive">ERP Multi Sucursal</p>
+                <p className="mt-2 text-xs text-brand-ink-muted">{empresaDisplayName}</p>
+                {isInformalTicket && (
+                  <p className="mt-2 text-[10px] leading-snug text-amber-800">
+                    Documento interno — no constituye boleta electrónica ni documento tributario.
+                  </p>
+                )}
               </div>
-              <div className="mb-6 grid gap-4 sm:grid-cols-2 text-xs text-slate-600">
+              <div className="mb-6 grid gap-4 sm:grid-cols-2 text-xs text-brand-ink-muted">
                 <div>
                   <p className="font-semibold text-slate-900">Sucursal</p>
                   <p>{receiptData?.branchName}</p>
@@ -506,13 +855,29 @@ export default function PosPage() {
                   <p className="font-semibold text-slate-900">Pago</p>
                   <p>{receiptData?.paymentType === 'cash' ? 'Efectivo' : 'POS de pago'}</p>
                 </div>
+                {receiptData?.requiresDelivery && (
+                  <>
+                    <div>
+                      <p className="font-semibold text-slate-900">Cliente delivery</p>
+                      <p>{receiptData.deliveryCustomerName}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">Teléfono delivery</p>
+                      <p>{receiptData.deliveryPhone}</p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="font-semibold text-slate-900">Dirección delivery</p>
+                      <p>{receiptData.deliveryAddress}</p>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="mb-6 border-t border-slate-200 pt-4">
                 {(receiptData?.items ?? []).map((item) => (
                   <div key={item.id} className="mb-4 flex justify-between text-sm">
                     <div>
                       <p className="font-semibold text-slate-900">{item.name}</p>
-                      <p className="text-slate-600">{item.quantity} x ${item.unitPrice}</p>
+                      <p className="text-brand-ink-muted">{item.quantity} x ${item.unitPrice}</p>
                     </div>
                     <p className="font-semibold text-slate-900">${item.total}</p>
                   </div>
@@ -520,19 +885,29 @@ export default function PosPage() {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Subtotal</span>
+                  <span className="text-brand-ink-muted">Subtotal</span>
                   <span className="font-semibold text-slate-900">${receiptData?.subtotal ?? 0}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">{CHILE_IVA_LABEL}</span>
+                  <span className="text-brand-ink-muted">{CHILE_IVA_LABEL}</span>
                   <span className="font-semibold text-slate-900">${receiptData?.tax ?? 0}</span>
                 </div>
+                {(receiptData?.requiresDelivery ?? false) && (
+                  <div className="flex justify-between">
+                    <span className="text-brand-ink-muted">Delivery</span>
+                    <span className="font-semibold text-slate-900">${receiptData?.deliveryAmount ?? 0}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-base font-semibold text-slate-900">
                   <span>Total</span>
                   <span>${receiptData?.total ?? 0}</span>
                 </div>
               </div>
-              <p className="mt-8 text-center text-xs text-slate-500">Gracias por su compra · Conserve este comprobante</p>
+              <p className="mt-8 text-center text-xs text-brand-ink-muted">
+                {isInformalTicket
+                  ? 'Comprobante interno de venta · Conserve este documento'
+                  : 'Gracias por su compra · Conserve este comprobante'}
+              </p>
             </div>
           </div>
       </AppPageContent>

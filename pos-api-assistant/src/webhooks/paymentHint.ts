@@ -1,3 +1,4 @@
+import { isOrderCommandText } from '../agent/orderText.js';
 import { parseAmountFromCaption } from '../vision/transferAnalysis.js';
 
 const TTL_MS = 15 * 60 * 1000;
@@ -43,6 +44,7 @@ export function resolvePaymentCaption(phone: string, imageCaption?: string): str
 export function isLikelyPaymentAmountText(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
+  if (isOrderCommandText(t)) return false;
   if (/^(vale|ya\s+pagu)/i.test(t)) return true;
   if (/^\$?\d{1,3}(\.\d{3})+$/.test(t)) return true;
   if (/^\d{4,}$/.test(t)) return true;

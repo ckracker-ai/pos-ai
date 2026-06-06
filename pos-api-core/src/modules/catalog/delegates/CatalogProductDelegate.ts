@@ -4,6 +4,7 @@ import sequelize from '../../../config/database';
 import Product from '../models/Product.model';
 import Category from '../models/Category.model';
 import Supplier from '../models/Supplier.model';
+import categoryDelegate from './CategoryDelegate';
 import InventoryStock from '../../inventory/models/InventoryStock.model';
 import Branch from '../../branch/models/Branch.model';
 import { Result, ok, fail } from '../../../types/result';
@@ -130,8 +131,11 @@ class CatalogProductDelegate {
     const branch = await Branch.findOne({ where: { id: branchId, empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
 
-    const category = await Category.findOne({ where: { id: input.categoryId, empresaId } });
-    if (!category) return fail('CATEGORY_NOT_FOUND');
+    const categoryCheck = await categoryDelegate.assertValidProductCategory(
+      empresaId,
+      input.categoryId
+    );
+    if (!categoryCheck.success) return categoryCheck;
 
     const supplier = await Supplier.findOne({ where: { id: input.supplierId, empresaId } });
     if (!supplier) return fail('SUPPLIER_NOT_FOUND');

@@ -10,6 +10,7 @@ import {
   SaasMetodoPago,
 } from '../constants/metodoPago';
 import { Result, ok, fail } from '../../../types/result';
+import { getPlanDescription, getPlanDisplayName } from '../utils/planDisplay';
 
 export interface SaasPlanRecord {
   id: string;
@@ -64,11 +65,13 @@ class SaasPlanDelegate {
     const valorRaw =
       plain.valor ?? plain.precioReferenciaClp ?? plain.precio_referencia_clp ?? 0;
 
+    const codigo = String(plain.codigo ?? row.codigo ?? DEFAULT_SAAS_PLAN_CODIGO) as SaasPlanCodigo;
+
     return {
       id: String(plain.id ?? row.id ?? ''),
-      codigo: String(plain.codigo ?? row.codigo ?? DEFAULT_SAAS_PLAN_CODIGO) as SaasPlanCodigo,
-      nombre: String(plain.nombre ?? row.nombre ?? ''),
-      descripcion: (plain.descripcion as string | null | undefined) ?? null,
+      codigo,
+      nombre: getPlanDisplayName(codigo, String(plain.nombre ?? row.nombre ?? '')),
+      descripcion: getPlanDescription(codigo, (plain.descripcion as string | null | undefined) ?? null),
       valor: Number(valorRaw),
       metodoPago: parseMetodoPago(plain.metodoPago ?? plain.metodo_pago),
       activo: plain.isActive !== false && plain.is_active !== 0,

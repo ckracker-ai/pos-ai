@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { LoginShell } from '@/components/organisms/LoginShell';
 import { RegistroForm } from '@/components/organisms/RegistroForm';
 import { fetchPublicPlanes } from '@/core/api/public-planes';
+import { fetchPublicLegalCurrent } from '@/core/api/public-legal';
 import {
   buildLandingPlansFromApi,
   FALLBACK_LANDING_PLANS,
@@ -21,7 +22,7 @@ function RegistroFallback() {
 }
 
 export default async function RegistroPage() {
-  const apiPlanes = await fetchPublicPlanes();
+  const [apiPlanes, legal] = await Promise.all([fetchPublicPlanes(), fetchPublicLegalCurrent()]);
   const plans =
     apiPlanes && apiPlanes.length > 0
       ? buildLandingPlansFromApi(apiPlanes)
@@ -30,7 +31,7 @@ export default async function RegistroPage() {
   return (
     <LoginShell>
       <Suspense fallback={<RegistroFallback />}>
-        <RegistroForm plans={plans} />
+        <RegistroForm plans={plans} legal={legal} />
       </Suspense>
     </LoginShell>
   );

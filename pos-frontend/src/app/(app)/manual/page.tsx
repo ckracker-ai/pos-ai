@@ -96,6 +96,9 @@ const sections: ManualSection[] = [
     allowed: ['admin', 'auditor', 'seller'],
     bullets: [
       'Agrega productos al carrito desde el buscador o atajos del catálogo.',
+      'Panel «POS IA»: escribe o dicta como en el mostrador (ej. agrega 2 café tradicional). Sugerencias con cantidad editable. Atajo F2.',
+      'Opcional: activa «formulario clásico» si prefieres buscar producto manualmente.',
+      'El asistente valida stock acumulado en el carrito antes de agregar más unidades.',
       'Confirma cantidades antes de cerrar; el stock se descuenta al completar la venta.',
       'Si falla por stock, revisa inventario de la sucursal activa o pide ajuste al administrador.',
       'Las ventas de mostrador completadas se reflejan de inmediato en Comandas.',
@@ -178,6 +181,41 @@ const sections: ManualSection[] = [
       'Administrador: sucursales y catálogo (productos, categorías, proveedores).',
       'Auditor: consulta usuarios y catálogo; no desactiva registros ni edita empresa.',
       'Prefiere ventanas controladas para cambios masivos; evita horario punta.',
+      'Para categorías con subniveles (Pizzas → Tradicionales, etc.) lee la sección «Categorías y productos».',
+      'Para comuna y código postal de cada local, lee «Sucursales: comuna y código postal».',
+    ],
+  },
+  {
+    id: 'catalogo-categorias',
+    title: 'Categorías y productos (árbol)',
+    hint: 'Cómo organizar el menú para POS, reportes y WhatsApp.',
+    allowed: ['admin', 'auditor'],
+    bullets: [
+      'El catálogo usa dos niveles: categoría principal (ej. Pizzas, Sushi) y subcategoría (ej. Pizzas Tradicionales, Rolls Tempura).',
+      'Paso 1 — Crear categoría principal: nombre claro del rubro, sin padre. Ejemplos: Pizzas, Sushi, Comida Rápida, Bebidas y Líquidos.',
+      'Paso 2 — Crear subcategoría: mismo mantenedor, eligiendo la categoría principal como padre. Ej.: bajo Pizzas → Pizzas Tradicionales, Pizzas Premium, Acompañamientos.',
+      'Paso 3 — Crear producto: asigna siempre una subcategoría (hoja), no la categoría principal si ya tiene hijos. Ej.: producto «Pepperoni» → subcategoría «Pizzas Tradicionales».',
+      'Árbol de referencia (demo Costa Azul / rubro gastronómico): Pizzas (Tradicionales, Premium, Acompañamientos); Sushi (Rolls palta, Rolls tempura, Sashimi); Comida Rápida (Hamburguesas vacuno, Chicken/Veggie); Bebidas (Analcohólicas 1.5L, aguas).',
+      'Los nombres deben ser únicos por empresa; evita duplicar «Pizzas» en principal y en sub.',
+      'Desactivar una categoría oculta sus productos en POS y en búsquedas del bot; no borres si hay ventas históricas.',
+      'Extras y modificadores (toppings, papas, etc.) deben aplicarse solo a la familia correcta (hamburguesas ≠ pizzas); por eso el producto va en la subcategoría adecuada.',
+      'WhatsApp: el cliente busca por nombre; un árbol ordenado mejora sugerencias («buscar rolls tempura»). Tras cambiar categorías, prueba buscar en el simulador.',
+    ],
+  },
+  {
+    id: 'sucursales-territorio',
+    title: 'Sucursales: comuna y código postal',
+    hint: 'Ubicación oficial (CUT Chile) para delivery, facturación y WhatsApp.',
+    allowed: ['admin', 'auditor'],
+    bullets: [
+      'Cada sucursal física debe tener dirección, comuna (lista oficial Chile / CUT) y código postal de 7 dígitos (CorreosChile).',
+      'Paso 1 — En Sucursales, elige Región y luego Comuna en el selector (no escribas la comuna a mano en un campo libre).',
+      'Paso 2 — Ingresa la dirección (calle y número) y el código postal de 7 dígitos de esa dirección.',
+      'Ejemplo: Región Metropolitana → Comuna Estación Central → dirección «Av. Ecuador 123» → CP «9160000» (valor ilustrativo; usa el CP real de tu local).',
+      'El sistema no consulta internet en cada pedido: las comunas vienen cargadas desde el estándar CUT (SUBDERE) en la base de datos.',
+      'WhatsApp / voz: el cliente puede decir su comuna; el bot busca coincidencias aunque falten tildes («estacion central»). Si hay varias, pedirá que elija por número.',
+      'Delivery y despacho usan comuna + CP para zonificar; datos incorrectos envían pedidos a la sucursal equivocada.',
+      'Al abrir un local nuevo, completa comuna y CP antes de activar pedidos por chat.',
     ],
   },
   {
@@ -240,20 +278,20 @@ export default function ManualPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Centro de ayuda</p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+        <div className="app-card mb-6 rounded-3xl p-6">
+          <p className="app-eyebrow">Centro de ayuda</p>
+          <h1 className="mt-2 text-2xl font-semibold text-[#3D4532]">
             Manual operativo por rol
           </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <p className="mt-2 text-sm text-brand-ink-muted">
             Perfil activo: <span className="font-semibold">{roleLabel(user?.role)}</span>. Solo ves
             secciones aplicables a tu rol. Versión: {APP_VERSION_LABEL}.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          <aside className="app-card rounded-3xl p-4">
+            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand-ink-muted">
               Secciones ({visibleSections.length})
             </p>
             <div className="space-y-1">
@@ -264,8 +302,8 @@ export default function ManualPage() {
                   onClick={() => setSelectedSectionId(section.id)}
                   className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${
                     selected?.id === section.id
-                      ? 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100'
-                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                      ? 'bg-[rgba(74,83,60,0.12)] font-medium text-[#3D4532]'
+                      : 'text-brand-ink-muted hover:bg-brand-surface/80'
                   }`}
                 >
                   {section.title}
@@ -274,18 +312,18 @@ export default function ManualPage() {
             </div>
           </aside>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
+          <section className="app-card rounded-3xl p-6 lg:col-span-2">
             {selected ? (
               <>
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                <h2 className="text-xl font-semibold text-[#3D4532]">
                   {selected.title}
                 </h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{selected.hint}</p>
+                <p className="mt-1 text-sm text-brand-ink-muted">{selected.hint}</p>
                 <ul className="mt-4 space-y-2">
                   {selected.bullets.map((item) => (
                     <li
                       key={item}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+                      className="rounded-xl border border-[rgba(209,199,189,0.75)] bg-brand-surface/50 px-3 py-2 text-sm text-brand-ink"
                     >
                       {item}
                     </li>
@@ -293,7 +331,7 @@ export default function ManualPage() {
                 </ul>
               </>
             ) : (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-brand-ink-muted">
                 No hay secciones disponibles para este perfil.
               </p>
             )}
