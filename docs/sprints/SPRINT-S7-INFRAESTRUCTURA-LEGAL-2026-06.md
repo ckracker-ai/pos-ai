@@ -393,6 +393,7 @@ Tooltip IA:
 - [x] Migración `legal_*` aplicada (`v1.15.0`)  
 - [x] Tests S7-T1 parcial + `legal-versions.test.ts`  
 - [x] Checkbox registro + log `legal_acceptances`  
+- [x] Checkbox checkout + log `legal_acceptances` (canal `CHECKOUT`)  
 - [x] Entrada en `SPRINT-PLAN.md`  
 
 ---

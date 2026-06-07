@@ -9,6 +9,9 @@
 **/dist/
 **/build/
 *.tsbuildinfo
+build-out.txt
+# TypeScript emit accidentally written next to sources (BFF)
+pos-api-bff/src/**/*.js
 
 # Environment & secrets
 .env

@@ -7,6 +7,7 @@ import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { posProxyPath } from '@/core/constants/api-path';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
 import { CHILE_IVA_LABEL } from '@/core/constants/tax';
+import type { PublicLegalCurrent } from '@/core/api/public-legal';
 
 type CheckoutData = {
   empresaId: string;
@@ -24,7 +25,21 @@ function formatClp(n: number): string {
   return `$${n.toLocaleString('es-CL')}`;
 }
 
-export function CheckoutForm() {
+type CheckoutFormProps = {
+  legal: PublicLegalCurrent | null;
+};
+
+function mapCheckoutError(error: string): string {
+  if (error.includes('LEGAL_VERSION_MISMATCH')) {
+    return 'Los términos legales se actualizaron. Recarga la página y acepta de nuevo.';
+  }
+  if (error.includes('TERMS_NOT_ACCEPTED')) {
+    return 'Debes aceptar los Términos de Servicio y la Política de Privacidad.';
+  }
+  return error;
+}
+
+export function CheckoutForm({ legal }: CheckoutFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const empresaId = searchParams.get('empresaId') ?? '';
@@ -35,6 +50,7 @@ export function CheckoutForm() {
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState('');
   const [paid, setPaid] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const loadCheckout = useCallback(async () => {
     if (!empresaId) {
@@ -72,19 +88,37 @@ export function CheckoutForm() {
     loadCheckout();
   }, [loadCheckout]);
 
+  const buildLegalAcceptance = () => {
+    if (!legal || !acceptedLegal) return null;
+    return {
+      termsVersion: legal.terms.version,
+      privacyVersion: legal.privacy.version,
+      accepted: true as const,
+    };
+  };
+
   const handlePasarelaSandbox = async () => {
     if (!checkout?.canPay) return;
+    const legalAcceptance = buildLegalAcceptance();
+    if (!legalAcceptance) {
+      setError('Debes aceptar los Términos de Servicio y la Política de Privacidad.');
+      return;
+    }
     setRedirecting(true);
     setError('');
     try {
       const res = await fetch(posProxyPath('public/checkout/create-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ empresaId: checkout.empresaId, provider: 'WEBPAY' }),
+        body: JSON.stringify({
+          empresaId: checkout.empresaId,
+          provider: 'WEBPAY',
+          legalAcceptance,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(String(json.error ?? 'No se pudo iniciar la pasarela'));
+        setError(mapCheckoutError(String(json.error ?? 'No se pudo iniciar la pasarela')));
         return;
       }
       const session = (json.data as { session?: { redirectUrl?: string } })?.session;
@@ -103,6 +137,11 @@ export function CheckoutForm() {
 
   const handleSimulatePay = async () => {
     if (!checkout?.canPay) return;
+    const legalAcceptance = buildLegalAcceptance();
+    if (!legalAcceptance) {
+      setError('Debes aceptar los Términos de Servicio y la Política de Privacidad.');
+      return;
+    }
     setPaying(true);
     setError('');
     try {
@@ -113,11 +152,12 @@ export function CheckoutForm() {
           empresaId: checkout.empresaId,
           provider: 'SANDBOX',
           reference: `sandbox-${Date.now()}`,
+          legalAcceptance,
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(String(json.error ?? 'Pago no confirmado'));
+        setError(mapCheckoutError(String(json.error ?? 'Pago no confirmado')));
         return;
       }
       setPaid(true);
@@ -195,9 +235,45 @@ export function CheckoutForm() {
 
             {checkout.canPay ? (
               <>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-linen/80 bg-brand-surface/30 px-4 py-3 text-sm text-brand-ink">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 rounded border-brand-linen accent-brand-olive"
+                    checked={acceptedLegal}
+                    onChange={(e) => setAcceptedLegal(e.target.checked)}
+                    disabled={!legal}
+                    required
+                  />
+                  <span>
+                    He leído y acepto los{' '}
+                    <Link
+                      href="/legal/terminos"
+                      target="_blank"
+                      className="font-medium text-brand-olive hover:underline"
+                    >
+                      Términos de Servicio
+                    </Link>{' '}
+                    y la{' '}
+                    <Link
+                      href="/legal/privacidad"
+                      target="_blank"
+                      className="font-medium text-brand-olive hover:underline"
+                    >
+                      Política de Privacidad
+                    </Link>
+                    {legal ? (
+                      <span className="block text-xs text-brand-ink-muted">
+                        Versión {legal.terms.version} / {legal.privacy.version}
+                      </span>
+                    ) : (
+                      <span className="block text-xs text-amber-800">Cargando documentos legales…</span>
+                    )}
+                  </span>
+                </label>
+
                 <button
                   type="button"
-                  disabled={redirecting || paying}
+                  disabled={redirecting || paying || !legal || !acceptedLegal}
                   onClick={handlePasarelaSandbox}
                   className="w-full rounded-lg bg-brand-olive py-3 text-sm font-semibold text-white transition hover:bg-[#3d4532] disabled:opacity-60"
                 >
@@ -205,7 +281,7 @@ export function CheckoutForm() {
                 </button>
                 <button
                   type="button"
-                  disabled={paying || redirecting}
+                  disabled={paying || redirecting || !legal || !acceptedLegal}
                   onClick={handleSimulatePay}
                   className="w-full rounded-lg border border-brand-olive py-3 text-sm font-semibold text-brand-olive transition hover:bg-brand-surface disabled:opacity-60"
                 >

@@ -2,19 +2,28 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import config from '../../config/index.js';
 import { ApiCoreServicePlatformEmpresa } from '../../services/apiCoreServicePlatformEmpresa.js';
+import { ApiCoreServiceLegal } from '../../services/apiCoreServiceLegal.js';
 import { ApiCoreServicePayment } from '../../services/apiCoreServicePayment.js';
 import { extractCoreError } from '../../utils/extractCoreError.js';
 import { sendFail, sendOk } from '../../utils/response.js';
+
+const legalAcceptanceSchema = z.object({
+  termsVersion: z.string().min(1),
+  privacyVersion: z.string().min(1),
+  accepted: z.literal(true),
+});
 
 const confirmSchema = z.object({
   empresaId: z.string().uuid(),
   provider: z.string().min(1).max(40).default('SANDBOX'),
   reference: z.string().min(1).max(120).optional(),
+  legalAcceptance: legalAcceptanceSchema,
 });
 
 const createSessionSchema = z.object({
   empresaId: z.string().uuid(),
   provider: z.string().min(1).max(40).optional(),
+  legalAcceptance: legalAcceptanceSchema,
 });
 
 const sandboxCompleteSchema = z.object({
@@ -39,8 +48,25 @@ function webhookSecretOk(request: FastifyRequest, bodySecret?: string): boolean 
   return Boolean(expected && (header === expected || bodySecret === expected));
 }
 
+async function recordCheckoutLegal(
+  legalCore: ApiCoreServiceLegal,
+  request: FastifyRequest,
+  empresaId: string,
+  acceptance: z.infer<typeof legalAcceptanceSchema>
+) {
+  await legalCore.recordAcceptances({
+    empresaId,
+    termsVersion: acceptance.termsVersion,
+    privacyVersion: acceptance.privacyVersion,
+    ipAddress: request.ip,
+    userAgent: String(request.headers['user-agent'] ?? ''),
+    channel: 'CHECKOUT',
+  });
+}
+
 const publicCheckoutRoutes = async (app: FastifyInstance) => {
   const core = new ApiCoreServicePlatformEmpresa();
+  const legalCore = new ApiCoreServiceLegal();
   const payments = new ApiCoreServicePayment();
 
   app.get('/checkout/:empresaId', async (request, reply) => {
@@ -61,6 +87,16 @@ const publicCheckoutRoutes = async (app: FastifyInstance) => {
   app.post('/checkout/create-session', async (request, reply) => {
     const body = createSessionSchema.parse(request.body ?? {});
     try {
+      try {
+        await recordCheckoutLegal(legalCore, request, body.empresaId, body.legalAcceptance);
+      } catch (legalErr: unknown) {
+        const err = legalErr as { response?: { status?: number } };
+        return sendFail(
+          reply,
+          extractCoreError(legalErr, 'Failed to record legal acceptance'),
+          err.response?.status ?? 409
+        );
+      }
       const session = await payments.createCheckoutSession({
         empresaId: body.empresaId,
         provider: body.provider,
@@ -111,6 +147,16 @@ const publicCheckoutRoutes = async (app: FastifyInstance) => {
     const body = confirmSchema.parse(request.body ?? {});
     const reference = body.reference ?? `sandbox-${Date.now()}`;
     try {
+      try {
+        await recordCheckoutLegal(legalCore, request, body.empresaId, body.legalAcceptance);
+      } catch (legalErr: unknown) {
+        const err = legalErr as { response?: { status?: number } };
+        return sendFail(
+          reply,
+          extractCoreError(legalErr, 'Failed to record legal acceptance'),
+          err.response?.status ?? 409
+        );
+      }
       const ledger = await payments.processInboundWebhook({
         provider: body.provider,
         externalId: reference,

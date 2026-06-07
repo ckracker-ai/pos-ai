@@ -16,6 +16,15 @@ $ref = "s5-e2e-$suffix"
 
 Write-Host "=== S5 E2E checkout ===" -ForegroundColor Cyan
 
+Write-Host "0. GET legal/current..."
+$legal = Invoke-RestMethod -Uri "$BaseUrl/public/legal/current" -Method Get
+if (-not $legal.success) { throw "legal: $($legal.error)" }
+$legalAcceptance = @{
+  termsVersion   = $legal.data.terms.version
+  privacyVersion = $legal.data.privacy.version
+  accepted       = $true
+}
+
 Write-Host "1. Registro..."
 $regBody = @{
   rut            = $rut
@@ -24,7 +33,8 @@ $regBody = @{
   adminPassword  = "Str0ngPass!123"
   adminFullName  = "Admin S5"
   planCodigo     = "BASICO"
-} | ConvertTo-Json
+  legalAcceptance = $legalAcceptance
+} | ConvertTo-Json -Depth 5
 
 $reg = Invoke-RestMethod -Uri "$BaseUrl/public/registro" -Method Post -ContentType "application/json" -Body $regBody
 if (-not $reg.success) { throw "registro: $($reg.error)" }
@@ -41,10 +51,11 @@ Write-Host "   total=$($summary.totalClp) estado=$($summary.suscripcionEstado)" 
 
 Write-Host "3. POST checkout/confirm (ledger)..."
 $confirmBody = @{
-  empresaId = $empresaId
-  provider  = "SANDBOX"
-  reference = $ref
-} | ConvertTo-Json
+  empresaId       = $empresaId
+  provider        = "SANDBOX"
+  reference       = $ref
+  legalAcceptance = $legalAcceptance
+} | ConvertTo-Json -Depth 5
 $paid = Invoke-RestMethod -Uri "$BaseUrl/public/checkout/confirm" -Method Post -ContentType "application/json" -Body $confirmBody
 if (-not $paid.success) { throw "confirm: $($paid.error)" }
 $estado = $paid.data.suscripcion.estado

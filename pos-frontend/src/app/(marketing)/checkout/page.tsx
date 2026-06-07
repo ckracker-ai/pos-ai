@@ -1,13 +1,16 @@
 import { Suspense } from 'react';
 import { LoginShell } from '@/components/organisms/LoginShell';
 import { CheckoutForm } from '@/components/organisms/CheckoutForm';
+import { fetchPublicLegalCurrent } from '@/core/api/public-legal';
 
 export const metadata = {
   title: 'Checkout — POS-AI',
   description: 'Pago de suscripción POS-AI (sandbox)',
 };
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  const legal = await fetchPublicLegalCurrent();
+
   return (
     <LoginShell>
       <Suspense
@@ -17,7 +20,7 @@ export default function CheckoutPage() {
           </div>
         }
       >
-        <CheckoutForm />
+        <CheckoutForm legal={legal} />
       </Suspense>
     </LoginShell>
   );
