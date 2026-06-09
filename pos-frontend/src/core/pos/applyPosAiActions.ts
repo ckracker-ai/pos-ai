@@ -1,4 +1,4 @@
-import { validateAddToCart, type PosAssistCartLine } from './posSaleAssist';
+import { formatProductCartLabel, validateAddToCart, type PosAssistCartLine } from './posSaleAssist';
 import type { PosAiCartLine, PosAiProduct, PosAiResult } from './posAiTypes';
 
 export type ApplyPosAiOutcome = {
@@ -11,7 +11,12 @@ export type ApplyPosAiOutcome = {
 function lineFromProduct(product: PosAiProduct, quantity: number): PosAiCartLine {
   return {
     id: product.id,
-    name: product.name,
+    name: formatProductCartLabel({
+      name: product.name,
+      category: product.category,
+      price: product.price,
+      sku: product.sku,
+    }),
     quantity,
     unitPrice: product.price,
     total: product.price * quantity,

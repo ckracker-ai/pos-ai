@@ -12,11 +12,24 @@ export type PosAiAction = {
   reason?: string;
 };
 
+export type PosAiProductOption = {
+  id: string;
+  nombre: string;
+  categoria?: string;
+  sku?: string;
+  precio: number;
+  stock_actual: number;
+};
+
 export type PosAiResult = {
   intent: PosAiIntent;
   actions: PosAiAction[];
   response_message: string;
   trigger_invoice: boolean;
+  /** Variantes o resultados de búsqueda para elegir con un clic. */
+  product_options?: PosAiProductOption[];
+  /** Cantidad detectada en el último comando (ej. «agrega 2 …»). */
+  pending_quantity?: number;
 };
 
 export type PosAiCartLine = {
@@ -33,4 +46,5 @@ export type PosAiProduct = {
   sku: string;
   price: number;
   stock: number;
+  category?: string;
 };

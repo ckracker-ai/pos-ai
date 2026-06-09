@@ -13,6 +13,10 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 & "$root\scripts\migrate-v1.13-planes-pyme.ps1"
 & "$root\scripts\migrate-v1.14-pyme-informal.ps1"
 & "$root\scripts\migrate-v1.15-legal.ps1"
+& "$root\scripts\migrate-v1.15.1-legal-backfill.ps1"
+& "$root\scripts\migrate-v1.15.2-legal-sla.ps1"
+& "$root\scripts\migrate-v1.16-data-subject.ps1"
+& "$root\scripts\migrate-v1.17-category-parent-name.ps1"
 
-Write-Host "OK — migraciones v1.6 … v1.15 legal aplicadas."
+Write-Host "OK — migraciones v1.6 … v1.17 category-parent-name aplicadas."
 Write-Host "Rebuild sugerido: docker compose up -d --build pos-api-core pos-api-assistant pos-api-bff pos-frontend"

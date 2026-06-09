@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildPosQuickActions,
   buildPosSuggestions,
   cartQuantityForProduct,
+  enrichPosAiResult,
+  formatPosProductOptionLabel,
+  formatProductCartLabel,
+  normalizePosVoiceCommand,
+  posAiInputPlaceholder,
   validateAddToCart,
   validateSaleForm,
 } from '../src/core/pos/posSaleAssist.ts';
@@ -53,4 +59,84 @@ test('validateSaleForm exige carrito y número de venta', () => {
 test('cartQuantityForProduct', () => {
   assert.equal(cartQuantityForProduct([{ id: 'x', quantity: 3 }], 'x'), 3);
   assert.equal(cartQuantityForProduct([], 'x'), 0);
+});
+
+test('formatPosProductOptionLabel muestra variante carne o familiar', () => {
+  assert.match(
+    formatPosProductOptionLabel(
+      { name: 'Hamburguesa Italiana', category: 'Hamburguesa Carne', price: 3500 },
+      [{ nombre: 'Hamburguesa Italiana', precio: 3500 }, { nombre: 'Hamburguesa Italiana', precio: 3500 }]
+    ),
+    /Carne/
+  );
+  assert.match(
+    formatPosProductOptionLabel(
+      { name: 'Pizza Española', price: 13500 },
+      [{ nombre: 'Pizza Española', precio: 7000 }, { nombre: 'Pizza Española', precio: 13500 }]
+    ),
+    /Familiar/
+  );
+  assert.match(
+    formatPosProductOptionLabel(
+      { name: 'Hamburguesa Italiana', category: 'Hamburguesas › Carne', price: 3500 },
+      [{ nombre: 'Hamburguesa Italiana', precio: 3500 }, { nombre: 'Hamburguesa Italiana', precio: 3500 }]
+    ),
+    /Carne/
+  );
+});
+
+test('formatProductCartLabel incluye categoria en carrito', () => {
+  assert.equal(
+    formatProductCartLabel({ name: 'Hamburguesa Italiana', category: 'Hamburguesa Pollo' }),
+    'Hamburguesa Italiana — Hamburguesa Pollo'
+  );
+});
+
+test('buildPosQuickActions usa productos del tenant en sesion', () => {
+  const fusionCatalog = [
+    { id: 'hb', name: 'Hamburguesa Italiana', price: 3500, stock: 10, category: 'Hamburguesa Carne' },
+    { id: 'beb', name: 'Coca Cola 1L', price: 1700, stock: 5, category: 'Bebidas' },
+  ];
+  const actions = buildPosQuickActions(fusionCatalog);
+  assert.equal(actions.length, 5);
+  assert.deepEqual(
+    actions.map((a) => a.label),
+    ['buscar', 'agregar', 'quitar', 'ayuda', 'vaciar carrito']
+  );
+  assert.match(actions[0].command, /buscar Hamburguesa Italiana/);
+  assert.match(actions[1].command, /agrega Hamburguesa Italiana/);
+  assert.match(posAiInputPlaceholder(fusionCatalog), /buscar Hamburguesa Italiana/);
+});
+
+test('enrichPosAiResult completa categoria desde catalogo local', () => {
+  const result = enrichPosAiResult(
+    {
+      intent: 'UNKNOWN',
+      actions: [],
+      response_message: 'Elige',
+      trigger_invoice: false,
+      product_options: [
+        {
+          id: 'hb-p',
+          nombre: 'Hamburguesa Italiana',
+          precio: 3500,
+          stock_actual: 20,
+        },
+      ],
+    },
+    [{ id: 'hb-p', category: 'Hamburguesas › Pollo', sku: 'HB-P' }]
+  );
+  assert.equal(result.product_options?.[0]?.categoria, 'Hamburguesas › Pollo');
+  assert.equal(result.product_options?.[0]?.sku, 'HB-P');
+});
+
+test('normalizePosVoiceCommand corrige STT y agrega verbo', () => {
+  assert.equal(
+    normalizePosVoiceCommand('pizza pepperoni familiar'),
+    'agrega pizza pepperonni familiar'
+  );
+  assert.equal(
+    normalizePosVoiceCommand('agrega pizza pepperoni familiar'),
+    'agrega pizza pepperonni familiar'
+  );
 });

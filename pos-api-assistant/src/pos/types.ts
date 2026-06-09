@@ -4,6 +4,8 @@ export type PosStockItem = {
   sku: string;
   precio: number;
   stock_actual: number;
+  /** Subcategoría o ruta corta (ej. «Hamburguesa Pollo») para desambiguar nombres repetidos. */
+  categoria?: string;
 };
 
 export type PosCartItem = {
@@ -28,11 +30,22 @@ export type PosAiAction = {
   reason: string;
 };
 
+export type PosAiProductOption = {
+  id: string;
+  nombre: string;
+  categoria?: string;
+  sku?: string;
+  precio: number;
+  stock_actual: number;
+};
+
 export type PosAiResult = {
   intent: PosAiIntent;
   actions: PosAiAction[];
   response_message: string;
   trigger_invoice: boolean;
+  product_options?: PosAiProductOption[];
+  pending_quantity?: number;
 };
 
 export type PosInterpretInput = {

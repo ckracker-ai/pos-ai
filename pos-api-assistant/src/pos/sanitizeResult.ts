@@ -115,9 +115,11 @@ export function sanitizePosAiResult(
     response = 'Acciones aplicadas al carrito.';
   }
 
+  const hasUpdate = sanitized.some((a) => a.action === 'UPDATE');
+  const hasRemove = sanitized.some((a) => a.action === 'REMOVE');
   const intent =
     sanitized.length > 0
-      ? raw.intent === 'REMOVE_FROM_CART'
+      ? raw.intent === 'REMOVE_FROM_CART' || (hasRemove && !hasUpdate && sanitized.every((a) => a.action === 'REMOVE'))
         ? 'REMOVE_FROM_CART'
         : 'ADD_TO_CART'
       : 'UNKNOWN';

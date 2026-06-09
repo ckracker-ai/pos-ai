@@ -190,6 +190,64 @@ describe('interpretPosCartRules', () => {
 
   });
 
+  const burgerStocks = [
+    {
+      id: 'hb-carne',
+      nombre: 'Hamburguesa Italiana',
+      sku: 'HB-IT-C',
+      precio: 3500,
+      stock_actual: 10,
+      categoria: 'Hamburguesa Carne',
+    },
+    {
+      id: 'hb-pollo',
+      nombre: 'Hamburguesa Italiana',
+      sku: 'HB-IT-P',
+      precio: 3500,
+      stock_actual: 10,
+      categoria: 'Hamburguesa Pollo',
+    },
+  ];
+
+  it('pide variante si hay dos hamburguesas italianas', () => {
+    const r = interpretPosCartRules({
+      userText: 'amburguesa italiana',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'UNKNOWN');
+    assert.equal(r.product_options?.length, 2);
+  });
+
+  it('agrega hamburguesa italiana de pollo con cantidad', () => {
+    const r = interpretPosCartRules({
+      userText: 'agregar 2 hamburguesa italiana de pollo',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.actions[0]?.product_id, 'hb-pollo');
+    assert.equal(r.actions[0]?.quantity, 2);
+  });
+
+  it('ayuda lista comandos con producto del tenant', () => {
+    const r = interpretPosCartRules({
+      userText: 'ayuda',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.match(r.response_message, /Comandos POS IA/i);
+    assert.match(r.response_message, /Hamburguesa Italiana/i);
+  });
+
+  it('elige hamburguesa italiana de pollo por categoria', () => {
+    const r = interpretPosCartRules({
+      userText: 'agrega hamburguesa italiana de pollo',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.actions[0]?.product_id, 'hb-pollo');
+  });
+
 });
 
 

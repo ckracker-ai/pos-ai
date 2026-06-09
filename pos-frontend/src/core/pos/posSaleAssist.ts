@@ -1,10 +1,14 @@
 /** S3 — Asistente de venta en caja (reglas puras, sin LLM en v1). */
 
+import { categoryDisplayShort } from '@/core/utils/category-filter';
+import type { PosAiResult } from './posAiTypes';
+
 export type PosAssistProduct = {
   id: string;
   name: string;
   price: number;
   stock: number;
+  sku?: string;
   categoryId?: string;
   category?: string;
 };
@@ -134,4 +138,147 @@ export function suggestionReasonLabel(reason: PosSuggestion['reason']): string {
     default:
       return 'Stock disponible';
   }
+}
+
+export type PosQuickAction = { label: string; command: string };
+
+function sampleProductLabel(products: PosAssistProduct[]): string {
+  const name = products.find((p) => p.stock > 0)?.name?.trim();
+  if (!name) return 'producto';
+  return name.split(/\s+/).slice(0, 3).join(' ');
+}
+
+/** Chips de búsqueda rápida — usan el catálogo con stock de la sucursal activa. */
+export function buildPosQuickActions(products: PosAssistProduct[]): PosQuickAction[] {
+  const sample = sampleProductLabel(products);
+  return [
+    { label: 'buscar', command: `buscar ${sample}` },
+    { label: 'agregar', command: `agrega ${sample}` },
+    { label: 'quitar', command: 'quitar' },
+    { label: 'ayuda', command: 'ayuda' },
+    { label: 'vaciar carrito', command: 'vaciar carrito' },
+  ];
+}
+
+type ProductLabelInput = {
+  name: string;
+  category?: string;
+  price?: number;
+  sku?: string;
+};
+
+/** Etiqueta legible en carrito y listados (incluye variante: carne, familiar, etc.). */
+export function formatProductCartLabel(input: ProductLabelInput): string {
+  const name = input.name.trim();
+  const cat = categoryDisplayShort(input.category);
+  if (cat) {
+    const catNorm = cat.toLowerCase();
+    const nameNorm = name.toLowerCase();
+    if (!nameNorm.includes(catNorm) && !catNorm.includes(nameNorm)) {
+      return `${name} — ${cat}`;
+    }
+  }
+  return name;
+}
+
+type OptionLabelPeer = { nombre: string; precio: number; categoria?: string };
+
+/** Título en lista «Elige producto» — siempre distingue variantes (Carne, Pollo, etc.). */
+export function formatPosProductOptionLabel(
+  option: ProductLabelInput,
+  peers: OptionLabelPeer[]
+): string {
+  const name = option.name.trim();
+  const cat = categoryDisplayShort(option.category);
+  const price = option.price ?? 0;
+
+  if (cat) {
+    const catNorm = cat.toLowerCase();
+    const nameNorm = name.toLowerCase();
+    if (!nameNorm.includes(catNorm)) {
+      return `${name} — ${cat}`;
+    }
+  }
+
+  const sameName = peers.filter((p) => p.nombre.trim().toLowerCase() === name.toLowerCase());
+  if (sameName.length > 1) {
+    if (sameName.length === 2) {
+      const sorted = [...sameName].sort((a, b) => a.precio - b.precio);
+      if (sorted[0].precio !== sorted[1].precio) {
+        const isLarge = sorted[sorted.length - 1].precio === price;
+        return `${name} — ${isLarge ? 'Familiar' : 'Personal'}`;
+      }
+    }
+    if (option.sku?.trim()) return `${name} (${option.sku.trim()})`;
+    return `${name} — $${price.toLocaleString('es-CL')}`;
+  }
+
+  if (option.sku?.trim()) return `${name} (${option.sku.trim()})`;
+  return name;
+}
+
+/** Completa categoría/SKU en opciones devueltas por el API (a veces vienen vacías). */
+export function enrichPosAiResult(
+  result: PosAiResult,
+  catalog: Array<{ id: string; category?: string; sku?: string }>
+): PosAiResult {
+  const byId = new Map(catalog.map((p) => [p.id, p]));
+  if (!result.product_options?.length) return result;
+  return {
+    ...result,
+    product_options: result.product_options.map((opt) => {
+      const local = byId.get(opt.id);
+      return {
+        ...opt,
+        categoria: opt.categoria?.trim() || local?.category || opt.categoria,
+        sku: opt.sku?.trim() || local?.sku || opt.sku,
+      };
+    }),
+  };
+}
+
+export function formatPosHelpMessage(sampleProductName?: string): string {
+  const sample = sampleProductName?.trim() || 'producto';
+  return (
+    `Comandos POS IA: ` +
+    `buscar ${sample} (ver opciones) · ` +
+    `agrega ${sample} (sumar al carrito) · ` +
+    `quitar (último ítem) · ` +
+    `deja N ${sample} (cambiar cantidad) · ` +
+    `vaciar carrito · ` +
+    `finalizar venta. ` +
+    `Si hay variantes con el mismo nombre, indica cuál (ej. de pollo o de carne).`
+  );
+}
+
+export function posAiInputPlaceholder(products: PosAssistProduct[]): string {
+  const sample = sampleProductLabel(products);
+  return `Ej: "buscar ${sample}" o "agrega ${sample}"`;
+}
+
+const VOICE_ORDER_VERBS_RE =
+  /^(?:agrega|agregar|anade|anadir|suma|sumar|pon|poner|mete|meter|dame|dar|quiero|necesito|buscar|busca|quita|quitar)\s+/i;
+
+/** Corrige transcripción de voz (STT) y añade verbo si el usuario solo dice el producto. */
+export function normalizePosVoiceCommand(raw: string): string {
+  let t = raw.trim().replace(/\s+/g, ' ');
+  if (!t) return t;
+
+  t = t.replace(/\bpeperoni\b/gi, 'pepperonni');
+  t = t.replace(/\bpepperoni\b/gi, 'pepperonni');
+  t = t.replace(/\bpeperon\b/gi, 'pepperonni');
+  t = t.replace(/\bamburguesa\b/gi, 'hamburguesa');
+  t = t.replace(/\bhambueguesa\b/gi, 'hamburguesa');
+
+  if (!VOICE_ORDER_VERBS_RE.test(t)) {
+    const n = t.toLowerCase();
+    if (
+      /\b(pizza|hamburguesa|empanada|cafe|bebida|jugo|cerveza|combo|sandwich)\b/.test(n) ||
+      /^\d{1,3}\s+\S/.test(n)
+    ) {
+      t = `agrega ${t}`;
+    }
+  }
+
+  return t;
 }

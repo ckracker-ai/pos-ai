@@ -395,6 +395,12 @@ export default function CategoriesPage() {
                   onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
                   className="app-input mt-2 w-full rounded-3xl px-4 py-3"
                 />
+                {form.parentId && !editing && (
+                  <span className="mt-1 block text-xs text-brand-ink-muted">
+                    Puedes repetir nombres como Carne o Pollo en otra familia (ej. Sandwich y
+                    Hamburguesas).
+                  </span>
+                )}
               </label>
               <label className="block text-sm text-[#5c6650]">
                 Descripción

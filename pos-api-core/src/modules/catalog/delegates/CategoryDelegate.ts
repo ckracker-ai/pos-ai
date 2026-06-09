@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, UniqueConstraintError } from 'sequelize';
 import Category from '../models/Category.model';
 import { Result, ok, fail } from '../../../types/result';
 import { slugFromCategoryName } from '../utils/categorySlug';
@@ -54,6 +54,48 @@ class CategoryDelegate {
       createdAt: plain.createdAt as Date,
       updatedAt: plain.updatedAt as Date,
     };
+  }
+
+  private async buildSlugBase(
+    empresaId: string,
+    name: string,
+    parentId?: string | null,
+    customSlug?: string | null
+  ): Promise<string> {
+    let base = slugFromCategoryName(customSlug?.trim() || name);
+    if (parentId) {
+      const parent = await this.getById(empresaId, parentId);
+      if (parent) {
+        const parentSlug = String(
+          parent.getDataValue('slug') ??
+            slugFromCategoryName(String(parent.getDataValue('name') ?? ''))
+        );
+        base = `${parentSlug}-${base}`;
+      }
+    }
+    return base;
+  }
+
+  private async assertNameAvailable(
+    empresaId: string,
+    name: string,
+    parentId: string | null,
+    excludeId?: string
+  ): Promise<Result<null>> {
+    const existing = await Category.findOne({
+      where: {
+        empresaId,
+        name,
+        parentId,
+        ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
+      },
+    });
+    if (existing) {
+      return fail(
+        parentId ? 'CATEGORY_NAME_TAKEN_SIBLING' : 'CATEGORY_NAME_TAKEN_ROOT'
+      );
+    }
+    return ok(null);
   }
 
   private async ensureUniqueSlug(
@@ -191,22 +233,36 @@ class CategoryDelegate {
     const name = input.name?.trim() ?? '';
     if (!name) return fail('VALIDATION_ERROR: Category.name is required');
 
-    const parentCheck = await this.validateParent(empresaId, input.parentId ?? null);
+    const parentId = input.parentId ?? null;
+    const parentCheck = await this.validateParent(empresaId, parentId);
     if (!parentCheck.success) return parentCheck;
 
-    const baseSlug = slugFromCategoryName(input.slug?.trim() || name);
+    const nameCheck = await this.assertNameAvailable(empresaId, name, parentId);
+    if (!nameCheck.success) return nameCheck;
+
+    const baseSlug = await this.buildSlugBase(empresaId, name, parentId, input.slug);
     const slug = await this.ensureUniqueSlug(empresaId, baseSlug);
 
-    const row = await Category.create({
-      empresaId,
-      name,
-      slug,
-      description: input.description?.trim() || null,
-      parentId: input.parentId ?? null,
-      isActive: true,
-    });
-
-    return ok(this.toDto(row));
+    try {
+      const row = await Category.create({
+        empresaId,
+        name,
+        slug,
+        description: input.description?.trim() || null,
+        parentId,
+        isActive: true,
+      });
+      return ok(this.toDto(row));
+    } catch (err) {
+      if (err instanceof UniqueConstraintError) {
+        const fields = err.errors.map((e) => e.path).join(',');
+        if (fields.includes('name')) {
+          return fail(parentId ? 'CATEGORY_NAME_TAKEN_SIBLING' : 'CATEGORY_NAME_TAKEN_ROOT');
+        }
+        if (fields.includes('slug')) return fail('SLUG_ALREADY_TAKEN');
+      }
+      throw err;
+    }
   }
 
   async update(
@@ -239,11 +295,28 @@ class CategoryDelegate {
       patch.isActive = input.isActive;
     }
 
+    const nextParentId =
+      input.parentId !== undefined
+        ? input.parentId
+        : (category.getDataValue('parentId') as string | null);
+    const nextName =
+      input.name !== undefined ? (patch.name as string) : String(category.getDataValue('name') ?? '');
+
+    if (input.name !== undefined || input.parentId !== undefined) {
+      const nameCheck = await this.assertNameAvailable(
+        empresaId,
+        nextName.trim(),
+        nextParentId ?? null,
+        id
+      );
+      if (!nameCheck.success) return nameCheck;
+    }
+
     if (input.slug !== undefined) {
-      const baseSlug = slugFromCategoryName(input.slug?.trim() || 'categoria');
+      const baseSlug = await this.buildSlugBase(empresaId, nextName, nextParentId, input.slug);
       patch.slug = await this.ensureUniqueSlug(empresaId, baseSlug, id);
-    } else if (input.name !== undefined) {
-      const baseSlug = slugFromCategoryName(patch.name as string);
+    } else if (input.name !== undefined || input.parentId !== undefined) {
+      const baseSlug = await this.buildSlugBase(empresaId, nextName, nextParentId, null);
       patch.slug = await this.ensureUniqueSlug(empresaId, baseSlug, id);
     }
 

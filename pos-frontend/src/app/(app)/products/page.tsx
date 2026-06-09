@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { paginateList, TablePagination } from '@/components/molecules/TablePagination';
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
 import { api, ApiError } from '@/core/api/api-client';
@@ -107,7 +108,12 @@ const [products, setProducts] = useState<Product[]>([]);
     action: null,
   });
   const [onlyAssignedToBranch, setOnlyAssignedToBranch] = useState(false);
+  const [productPage, setProductPage] = useState(1);
+  const [stockPage, setStockPage] = useState(1);
   const isActionLocked = isSaving || isConfirming || !!confirmModal.open;
+
+  const PRODUCT_PAGE_SIZE = 10;
+  const STOCK_PAGE_SIZE = 5;
 
   const filteredProducts = useMemo(() => {
     const isAssignedToActiveBranch = (product: Product) =>
@@ -130,6 +136,15 @@ const [products, setProducts] = useState<Product[]>([]);
         .includes(lowerQuery)
     );
   }, [products, searchTerm, onlyAssignedToBranch]);
+
+  const paginatedProducts = useMemo(
+    () => paginateList(filteredProducts, productPage, PRODUCT_PAGE_SIZE),
+    [filteredProducts, productPage]
+  );
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [searchTerm, onlyAssignedToBranch]);
 
   const suggestedSku = useMemo(() => {
     const normalizedBranch = activeBranchName
@@ -259,6 +274,16 @@ const [products, setProducts] = useState<Product[]>([]);
   const productHasStockInBranch = (product: Product) =>
     Boolean(product.stockRecordId) || product.inBranch === true;
 
+  const resolveProductCategoryId = (product: Product) => {
+    if (product.categoryId) return product.categoryId;
+    const match = categories.find(
+      (c) =>
+        c.name === product.category ||
+        (c.parentName ? `${c.parentName} → ${c.name}` : c.name) === product.category
+    );
+    return match?.id ?? '';
+  };
+
   const openEditProduct = (product: Product) => {
     setEditingProduct(product);
     setSelectedProduct(product);
@@ -268,8 +293,8 @@ const [products, setProducts] = useState<Product[]>([]);
     setForm({
       name: product.name ?? '',
       sku: product.sku ?? '',
-      categoryId: '',
-      supplierId: '',
+      categoryId: resolveProductCategoryId(product),
+      supplierId: product.supplierId ?? suppliers[0]?.id ?? '',
       price: String(product.price ?? ''),
       cost: String(product.cost ?? ''),
       stock: '0',
@@ -314,6 +339,16 @@ const [products, setProducts] = useState<Product[]>([]);
       return 'Ingresa el nombre del producto.';
     }
     if (editingProduct) {
+      if (!form.sku.trim()) return 'Ingresa el SKU del producto.';
+      if (!form.categoryId.trim()) {
+        return 'Selecciona una subcategoría (hoja). Si no hay opciones, créala en Categorías.';
+      }
+      if (!form.supplierId.trim()) {
+        return 'Selecciona un proveedor. Si no hay opciones, créalo en Proveedores.';
+      }
+      if (parsePositiveDecimal(form.price) === null) {
+        return 'El precio debe ser un número mayor a 0 (sin símbolos como $).';
+      }
       const stockDeltaNum = parseNonNegativeInt(form.stock);
       if (stockDeltaNum === null) {
         return 'El ingreso de stock debe ser un número mayor o igual a 0.';
@@ -370,11 +405,21 @@ const [products, setProducts] = useState<Product[]>([]);
     setSuccessMessage(null);
 
     try {
-      await api.updateProduct(editingProduct.id, { name: form.name.trim() });
+      const priceNum = parsePositiveDecimal(form.price)!;
+      const costNum = parsePositiveDecimal(form.cost) ?? Number(editingProduct.cost ?? 0);
+
+      await api.updateProduct(editingProduct.id, {
+        name: form.name.trim(),
+        sku: form.sku.trim(),
+        categoryId: form.categoryId.trim(),
+        supplierId: form.supplierId.trim(),
+        price: priceNum,
+        cost: costNum,
+      });
       await saveBranchInventory(editingProduct.id, Number(editingProduct.stock ?? 0));
 
       await reloadProducts();
-      setSuccessMessage('Producto actualizado. El ingreso de stock se sumó al inventario actual.');
+      setSuccessMessage('Producto actualizado. Catálogo e inventario guardados.');
       notifySuccess('Producto actualizado');
       setShowModal(false);
       setEditingProduct(null);
@@ -460,6 +505,7 @@ const [products, setProducts] = useState<Product[]>([]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
+    setProductPage(1);
   };
 
   const askConfirmation = (
@@ -498,6 +544,15 @@ const [products, setProducts] = useState<Product[]>([]);
       return [p.name, p.sku, p.category, p.description].join(' ').toLowerCase().includes(q);
     });
   }, [products, onlyAssignedToBranch, quickSearchTerm, quickCategoryFilter]);
+
+  const paginatedStockProducts = useMemo(
+    () => paginateList(quickStockProducts, stockPage, STOCK_PAGE_SIZE),
+    [quickStockProducts, stockPage]
+  );
+
+  useEffect(() => {
+    setStockPage(1);
+  }, [quickSearchTerm, quickCategoryFilter, onlyAssignedToBranch]);
 
   const saveQuickStock = async (product: Product): Promise<boolean> => {
     if (!product.id?.trim()) {
@@ -671,7 +726,7 @@ const [products, setProducts] = useState<Product[]>([]);
                         </td>
                       </tr>
                     ) : (
-                      filteredProducts.map((product) => (
+                      paginatedProducts.items.map((product) => (
                         <tr key={product.id}>
                           <td className="px-6 py-5">
                             <p className="font-semibold text-[#3d4532]">{product.name}</p>
@@ -708,6 +763,12 @@ const [products, setProducts] = useState<Product[]>([]);
                     )}
                   </tbody>
                 </table>
+                <TablePagination
+                  page={paginatedProducts.page}
+                  pageSize={PRODUCT_PAGE_SIZE}
+                  totalItems={filteredProducts.length}
+                  onPageChange={setProductPage}
+                />
               </div>
 
               <div className="app-panel mt-6 p-4">
@@ -747,7 +808,9 @@ const [products, setProducts] = useState<Product[]>([]);
                         </option>
                       ))}
                     </select>
-                    <span className="text-xs text-[#6b7280]">{quickStockProducts.length} producto(s)</span>
+                    <span className="text-xs text-[#6b7280]">
+                      {quickStockProducts.length} producto(s) · {STOCK_PAGE_SIZE} por página
+                    </span>
                   </div>
                   <table className="app-table min-w-full text-left text-sm">
                     <thead>
@@ -762,7 +825,14 @@ const [products, setProducts] = useState<Product[]>([]);
                       </tr>
                     </thead>
                     <tbody>
-                      {quickStockProducts.slice(0, 50).map((p) => {
+                      {paginatedStockProducts.items.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-6 text-center text-xs text-[#6b7280]">
+                            No hay productos con ese filtro. Ajusta la búsqueda o categoría.
+                          </td>
+                        </tr>
+                      ) : (
+                      paginatedStockProducts.items.map((p) => {
                         const draft = quickStockDraft[p.id];
                         const minDraft = quickMinStockDraft[p.id];
                         return (
@@ -817,16 +887,15 @@ const [products, setProducts] = useState<Product[]>([]);
                             </td>
                           </tr>
                         );
-                      })}
-                      {quickStockProducts.length > 50 && (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-4 text-center text-xs text-[#6b7280]">
-                            Mostrando primeros 50 productos por rendimiento. Usa los filtros para acotar más.
-                          </td>
-                        </tr>
-                      )}
+                      }))}
                     </tbody>
                   </table>
+                  <TablePagination
+                    page={paginatedStockProducts.page}
+                    pageSize={STOCK_PAGE_SIZE}
+                    totalItems={quickStockProducts.length}
+                    onPageChange={setStockPage}
+                  />
                 </div>
               </div>
             </section>
@@ -921,21 +990,28 @@ const [products, setProducts] = useState<Product[]>([]);
                 <select
                   value={form.categoryId}
                   onChange={(event) => handleInputChange('categoryId', event.target.value)}
-                  disabled={!!editingProduct || categories.length === 0}
+                  disabled={categories.length === 0}
                   className="app-input mt-2"
                 >
                   {categories.length === 0 ? (
                     <option value="">Sin subcategorías — crea una en Categorías</option>
                   ) : (
-                    categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.parentName ? `${c.parentName} → ${c.name}` : c.name}
-                      </option>
-                    ))
+                    <>
+                      {!form.categoryId && (
+                        <option value="">Selecciona subcategoría…</option>
+                      )}
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.parentName ? `${c.parentName} → ${c.name}` : c.name}
+                        </option>
+                      ))}
+                    </>
                   )}
                 </select>
                 <span className="mt-1 block text-xs text-[#6b7280]">
-                  Asigna el producto a una subcategoría o categoría sin hijos.
+                  {editingProduct
+                    ? 'Puedes cambiar la subcategoría (ej. Carne o Pollo bajo otra familia).'
+                    : 'Asigna el producto a una subcategoría o categoría sin hijos.'}
                 </span>
               </label>
               <label className="block text-sm text-[#3d4532]">
@@ -943,7 +1019,7 @@ const [products, setProducts] = useState<Product[]>([]);
                 <select
                   value={form.supplierId}
                   onChange={(event) => handleInputChange('supplierId', event.target.value)}
-                  disabled={!!editingProduct || suppliers.length === 0}
+                  disabled={suppliers.length === 0}
                   className="app-input mt-2"
                 >
                   {suppliers.length === 0 ? (

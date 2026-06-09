@@ -55,8 +55,8 @@ Category.init(
     indexes: [
       {
         unique: true,
-        name: 'uq_categories_empresa_name',
-        fields: ['empresa_id', 'name'],
+        name: 'uq_categories_empresa_parent_name',
+        fields: ['empresa_id', 'parent_id', 'name'],
       },
       {
         unique: true,

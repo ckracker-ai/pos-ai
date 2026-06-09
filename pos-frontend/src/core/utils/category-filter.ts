@@ -33,6 +33,30 @@ export function buildCategoryFilterMaps(tree: CategoryTreeNode[]) {
   return { principals, leafToPrincipal };
 }
 
+/** Ruta legible por categoría (ej. «Hamburguesas › Carne») para POS IA y etiquetas. */
+export function buildCategoryLabelMap(tree: CategoryTreeNode[]): Map<string, string> {
+  const map = new Map<string, string>();
+
+  const walk = (nodes: CategoryTreeNode[], ancestors: string[]) => {
+    for (const node of nodes) {
+      if (!node.isActive) continue;
+      const path = [...ancestors, node.name];
+      map.set(node.id, path.length > 1 ? path.join(' › ') : node.name);
+      if (node.children?.length) walk(node.children, path);
+    }
+  };
+
+  walk(tree, []);
+  return map;
+}
+
+export function categoryDisplayShort(label: string | undefined): string {
+  const raw = label?.trim() ?? '';
+  if (!raw) return '';
+  const parts = raw.split('›').map((s) => s.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[parts.length - 1] : raw;
+}
+
 export function productMatchesPrincipalCategory(
   categoryId: string | undefined,
   principalFilter: string,

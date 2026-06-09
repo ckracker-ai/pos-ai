@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useBranchStore } from '@/store/branch';
 import { api, ApiError, getApiErrorMessage } from '@/core/api/api-client';
@@ -13,6 +13,7 @@ import {
 } from '@/core/api/normalizers';
 import {
   buildCategoryFilterMaps,
+  buildCategoryLabelMap,
   productMatchesPrincipalCategory,
   type PrincipalCategoryOption,
 } from '@/core/utils/category-filter';
@@ -21,8 +22,10 @@ import { AppPageContent } from '@/components/molecules/AppPageContent';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
+import { PosActionAlert } from '@/components/molecules/PosActionAlert';
 import { ProductQuickPicker } from '@/components/organisms/ProductQuickPicker';
 import { interpretPosCartClient } from '@/core/pos/posAiRulesClient';
+import { normalizePosVoiceCommand } from '@/core/pos/posSaleAssist';
 import {
   PosAiCommandPanel,
   type PosAiCommandPanelHandle,
@@ -30,7 +33,12 @@ import {
 import { applyPosAiActions } from '@/core/pos/applyPosAiActions';
 import type { PosAiResult } from '@/core/pos/posAiTypes';
 import { unwrapApiData } from '@/core/api/api-client';
-import { validateAddToCart, validateSaleForm } from '@/core/pos/posSaleAssist';
+import {
+  enrichPosAiResult,
+  formatProductCartLabel,
+  validateAddToCart,
+  validateSaleForm,
+} from '@/core/pos/posSaleAssist';
 import { coercePositiveIntInput } from '@/core/utils/numeric-input';
 import {
   CHILE_IVA_LABEL,
@@ -83,6 +91,7 @@ export default function PosPage() {
   const [deliveryAmountInput, setDeliveryAmountInput] = useState('0');
   const [saleNumberInput, setSaleNumberInput] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [messageKey, setMessageKey] = useState(0);
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -90,6 +99,7 @@ export default function PosPage() {
   const [pickerResetKey, setPickerResetKey] = useState(0);
   const [principalCategories, setPrincipalCategories] = useState<PrincipalCategoryOption[]>([]);
   const [leafToPrincipal, setLeafToPrincipal] = useState<Map<string, string>>(new Map());
+  const [categoryLabelById, setCategoryLabelById] = useState<Map<string, string>>(new Map());
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [aiLoading, setAiLoading] = useState(false);
   const [lastAiResult, setLastAiResult] = useState<PosAiResult | null>(null);
@@ -97,6 +107,16 @@ export default function PosPage() {
   const [empresaDisplayName, setEmpresaDisplayName] = useState('Mi negocio');
   const [isInformalTicket, setIsInformalTicket] = useState(false);
   const posAiPanelRef = useRef<PosAiCommandPanelHandle>(null);
+
+  const dismissPosMessage = useCallback(() => {
+    setMessage(null);
+  }, []);
+
+  const showPosFeedback = useCallback((type: 'success' | 'error', text: string) => {
+    setMessageType(type);
+    setMessage(text);
+    setMessageKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     const loadEmpresa = async () => {
@@ -127,9 +147,11 @@ export default function PosPage() {
         const { principals, leafToPrincipal: map } = buildCategoryFilterMaps(tree);
         setPrincipalCategories(principals);
         setLeafToPrincipal(map);
+        setCategoryLabelById(buildCategoryLabelMap(tree));
       } catch {
         setPrincipalCategories([]);
         setLeafToPrincipal(new Map());
+        setCategoryLabelById(new Map());
       }
     };
     loadCategoryTree();
@@ -146,13 +168,12 @@ export default function PosPage() {
         setProducts(catalog);
         setSelectedProductId('');
       } catch (error) {
-        setMessageType('error');
-        setMessage(getApiErrorMessage(error));
+        showPosFeedback('error', getApiErrorMessage(error));
       }
     };
 
     loadProducts();
-  }, [branchId]);
+  }, [branchId, showPosFeedback]);
 
 
 
@@ -199,8 +220,7 @@ export default function PosPage() {
       cart: cart.map((item) => ({ id: item.id, quantity: item.quantity })),
     });
     if (!check.ok) {
-      setMessageType('error');
-      setMessage(check.message);
+      showPosFeedback('error', check.message);
       return;
     }
 
@@ -218,11 +238,18 @@ export default function PosPage() {
         );
       }
 
+      const lineName = formatProductCartLabel({
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        sku: product.sku,
+      });
+
       return [
         ...current,
         {
           id: product.id,
-          name: product.name,
+          name: lineName,
           quantity: qty,
           unitPrice: product.price,
           total: product.price * qty,
@@ -232,8 +259,15 @@ export default function PosPage() {
     setSelectedProductId('');
     setQuantity(1);
     setPickerResetKey((k) => k + 1);
-    setMessage(null);
-    setMessageType('success');
+    showPosFeedback(
+      'success',
+      `Agregado ${qty} × ${formatProductCartLabel({
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        sku: product.sku,
+      })}.`
+    );
   };
 
   const handleAddProduct = () => {
@@ -247,6 +281,16 @@ export default function PosPage() {
     addProductToCart(product, Math.max(1, qty));
   };
 
+  const resolveProductCategoryLabel = useCallback(
+    (product: Product) => {
+      if (product.categoryId && categoryLabelById.has(product.categoryId)) {
+        return categoryLabelById.get(product.categoryId)!;
+      }
+      return product.category?.trim() ?? '';
+    },
+    [categoryLabelById]
+  );
+
   const posAiProducts = useMemo(
     () =>
       products.map((p) => ({
@@ -255,11 +299,13 @@ export default function PosPage() {
         sku: p.sku ?? '',
         price: p.price,
         stock: Number(p.stock ?? 0),
+        category: resolveProductCategoryLabel(p),
       })),
-    [products]
+    [products, resolveProductCategoryLabel]
   );
 
   const handlePosAiCommand = async (userText: string) => {
+    const normalizedText = normalizePosVoiceCommand(userText);
     setAiLoading(true);
     const stocksPayload = posAiProducts.map((p) => ({
       id: p.id,
@@ -267,6 +313,7 @@ export default function PosPage() {
       sku: p.sku,
       precio: p.price,
       stock_actual: p.stock,
+      categoria: posAiProducts.find((x) => x.id === p.id)?.category ?? p.category,
     }));
     const cartPayload = cart.map((item) => ({
       id_producto: item.id,
@@ -275,41 +322,74 @@ export default function PosPage() {
     }));
 
     try {
-      let result: PosAiResult;
-      try {
-        const res = await api.interpretPosCommand({
-          userText,
+      const clientResult = enrichPosAiResult(
+        interpretPosCartClient({
+          userText: normalizedText,
           stocks: stocksPayload,
           cart: cartPayload,
-        });
-        result = unwrapApiData<PosAiResult>(res.data);
-      } catch (apiError) {
-        const status = apiError instanceof ApiError ? apiError.status : undefined;
-        if (status === 404 || status === 502 || status === 503) {
-          result = interpretPosCartClient({
-            userText,
+        }),
+        posAiProducts
+      );
+
+      let result = clientResult;
+
+      const clientAdds =
+        clientResult.intent === 'ADD_TO_CART' && clientResult.actions.length > 0;
+
+      if (!clientAdds) {
+        try {
+          const res = await api.interpretPosCommand({
+            userText: normalizedText,
             stocks: stocksPayload,
             cart: cartPayload,
           });
-        } else {
-          throw apiError;
+          const apiResult = enrichPosAiResult(
+            unwrapApiData<PosAiResult>(res.data),
+            posAiProducts
+          );
+          const apiAdds =
+            apiResult.intent === 'ADD_TO_CART' && apiResult.actions.length > 0;
+          if (apiAdds) {
+            result = apiResult;
+          } else if (
+            (clientResult.product_options?.length ?? 0) === 0 &&
+            (apiResult.product_options?.length ?? 0) > 0
+          ) {
+            result = apiResult;
+          }
+        } catch (apiError) {
+          const status = apiError instanceof ApiError ? apiError.status : undefined;
+          if (status !== 404 && status !== 502 && status !== 503) {
+            throw apiError;
+          }
         }
       }
+
       setLastAiResult(result);
       const outcome = applyPosAiActions({
         result,
         cart,
         products: posAiProducts,
       });
+      const cartChanged =
+        outcome.cleared ||
+        outcome.cart.length !== cart.length ||
+        outcome.cart.some(
+          (line, i) =>
+            line.quantity !== cart[i]?.quantity || line.id !== cart[i]?.id
+        );
       setCart(outcome.cart);
-      setMessageType(outcome.cleared || outcome.cart.length > 0 ? 'success' : 'error');
-      setMessage(outcome.message);
+      const hasProductPicker = (result.product_options?.length ?? 0) > 0;
+      const feedbackMessage =
+        hasProductPicker && !cartChanged
+          ? 'Elige la variante en la lista (ej. Carne o Pollo) y pulsa + Agregar.'
+          : outcome.message;
+      showPosFeedback(cartChanged || hasProductPicker ? 'success' : 'error', feedbackMessage);
       if (outcome.shouldSubmitSale) {
         await handleConfirmSale(outcome.cart);
       }
     } catch (error) {
-      setMessageType('error');
-      setMessage(getApiErrorMessage(error));
+      showPosFeedback('error', getApiErrorMessage(error));
     } finally {
       setAiLoading(false);
     }
@@ -336,14 +416,12 @@ export default function PosPage() {
       deliveryAmount,
     });
     if (!formCheck.ok) {
-      setMessageType('error');
-      setMessage(formCheck.messages[0] ?? 'Revisa el formulario de venta.');
+      showPosFeedback('error', formCheck.messages[0] ?? 'Revisa el formulario de venta.');
       return;
     }
 
     setIsSubmitting(true);
-    setMessage(null);
-    setMessageType('success');
+    dismissPosMessage();
 
     const paymentLabel = paymentType === 'cash' ? 'Efectivo' : 'POS de pago';
     const paymentNote = `Venta #${saleNumberInput.trim()} (${paymentLabel})`;
@@ -395,11 +473,9 @@ export default function PosPage() {
       setDeliveryAddress('');
       setDeliveryAmountInput('0');
       setShowReceipt(true);
-      setMessageType('success');
-      setMessage('Venta registrada. La comanda aparecerá en Cocina.');
+      showPosFeedback('success', 'Venta registrada. La comanda aparecerá en Cocina.');
     } catch (error: unknown) {
-      setMessageType('error');
-      setMessage(getApiErrorMessage(error));
+      showPosFeedback('error', getApiErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -424,12 +500,6 @@ export default function PosPage() {
             </div>
           </div>
 
-          {message && (
-            <div className={`mb-6 ${messageType === 'error' ? 'app-alert-error' : 'app-alert-success'}`}>
-              {message}
-            </div>
-          )}
-
           <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
             <div className="space-y-6">
               <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-brand-linen/80 bg-brand-surface/40 px-4 py-3 text-sm text-brand-ink">
@@ -447,14 +517,14 @@ export default function PosPage() {
                 disabled={!branchId || products.length === 0}
                 loading={aiLoading}
                 lastResult={lastAiResult}
-                cart={cart.map((item) => ({ id: item.id, quantity: item.quantity }))}
                 products={posAiProducts.map((p) => ({
                   id: p.id,
                   name: p.name,
                   price: p.price,
                   stock: p.stock,
+                  sku: p.sku,
                   categoryId: products.find((x) => x.id === p.id)?.categoryId,
-                  category: products.find((x) => x.id === p.id)?.category,
+                  category: p.category,
                 }))}
                 onSubmit={handlePosAiCommand}
                 onQuickAdd={handleQuickAddSuggestion}
@@ -940,6 +1010,14 @@ export default function PosPage() {
           }
         }
       `}</style>
+
+      <PosActionAlert
+        message={message}
+        messageKey={messageKey}
+        type={messageType}
+        onDismiss={dismissPosMessage}
+        durationMs={messageType === 'error' ? 6500 : message?.includes('Venta registrada') ? 7000 : 4500}
+      />
     </DashboardLayout>
   );
 }

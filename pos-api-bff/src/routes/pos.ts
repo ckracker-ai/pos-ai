@@ -14,6 +14,7 @@ const interpretSchema = z.object({
       sku: z.string(),
       precio: z.number(),
       stock_actual: z.number(),
+      categoria: z.string().optional(),
     })
   ),
   cart: z.array(

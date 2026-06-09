@@ -11,24 +11,15 @@ import {
   forwardRef,
 } from 'react';
 import { usePosSpeechInput } from '@/core/pos/usePosSpeechInput';
-import { formatPosAiSummary } from '@/core/pos/posAiLabels';
 import {
-  buildPosSuggestions,
-  suggestionReasonLabel,
-  type PosAssistCartLine,
+  buildPosQuickActions,
+  formatPosProductOptionLabel,
+  normalizePosVoiceCommand,
+  posAiInputPlaceholder,
   type PosAssistProduct,
-  type PosSuggestion,
 } from '@/core/pos/posSaleAssist';
-import { coercePositiveIntInput } from '@/core/utils/numeric-input';
+import { parsePositiveInt, sanitizeDigitsOnly } from '@/core/utils/numeric-input';
 import type { PosAiResult } from '@/core/pos/posAiTypes';
-
-const EXAMPLES = [
-  'pino, cafe tradicional, 2 queso',
-  'deja 3 cafe tradicional',
-  'quitar',
-  'quita empanda de pino',
-  'vaciar carrito',
-];
 
 export type PosAiCommandPanelHandle = {
   focusInput: () => void;
@@ -38,7 +29,6 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   lastResult?: PosAiResult | null;
-  cart: PosAssistCartLine[];
   products: PosAssistProduct[];
   onSubmit: (text: string) => void | Promise<void>;
   onQuickAdd: (productId: string, quantity: number) => void;
@@ -46,28 +36,37 @@ type Props = {
 
 export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
   function PosAiCommandPanel(
-    { disabled, loading, lastResult, cart, products, onSubmit, onQuickAdd },
+    { disabled, loading, lastResult, products, onSubmit, onQuickAdd },
     ref
   ) {
     const [text, setText] = useState('');
-    const [suggestionQty, setSuggestionQty] = useState<Record<string, number>>({});
+    const [optionQty, setOptionQty] = useState<Record<string, string>>({});
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const suggestions: PosSuggestion[] = useMemo(
-      () => buildPosSuggestions({ cart, products, max: 6 }),
-      [cart, products]
-    );
+    const productOptions = lastResult?.product_options ?? [];
+    const pendingQuantity = lastResult?.pending_quantity ?? 1;
+    const showProductPicker = productOptions.length > 0;
+
+    const quickActions = useMemo(() => buildPosQuickActions(products), [products]);
+    const inputPlaceholder = useMemo(() => posAiInputPlaceholder(products), [products]);
 
     useImperativeHandle(ref, () => ({
       focusInput: () => inputRef.current?.focus(),
     }));
 
-    const appendTranscript = useCallback((transcript: string) => {
-      setText((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
-      inputRef.current?.focus();
-    }, []);
+    const appendTranscript = useCallback(
+      async (transcript: string) => {
+        const command = normalizePosVoiceCommand(transcript);
+        if (!command || loading || disabled) return;
+        await onSubmit(command);
+        setText('');
+        inputRef.current?.focus();
+      },
+      [disabled, loading, onSubmit]
+    );
 
-    const { listening, supported, toggleListen } = usePosSpeechInput(appendTranscript);
+    const { listening, supported, lastHeard, speechError, toggleListen } =
+      usePosSpeechInput(appendTranscript);
 
     useEffect(() => {
       const onKeyDown = (e: KeyboardEvent) => {
@@ -80,7 +79,42 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
       return () => window.removeEventListener('keydown', onKeyDown);
     }, []);
 
-    const getSuggestionQty = (productId: string) => suggestionQty[productId] ?? 1;
+    const productById = useMemo(
+      () => new Map(products.map((p) => [p.id, p])),
+      [products]
+    );
+
+    const resolveOptionCategory = useCallback(
+      (option: (typeof productOptions)[number]) =>
+        option.categoria?.trim() || productById.get(option.id)?.category?.trim() || '',
+      [productById]
+    );
+
+    const optionPeers = useMemo(
+      () =>
+        productOptions.map((o) => ({
+          nombre: o.nombre,
+          precio: o.precio,
+          categoria: resolveOptionCategory(o),
+        })),
+      [productOptions, resolveOptionCategory]
+    );
+
+    const getOptionQtyText = (productId: string) =>
+      optionQty[productId] ?? String(pendingQuantity);
+
+    const resolveQty = (raw: string) => parsePositiveInt(raw) ?? 1;
+
+    useEffect(() => {
+      if (!showProductPicker) return;
+      setOptionQty((prev) => {
+        const next = { ...prev };
+        for (const option of productOptions) {
+          if (next[option.id] == null) next[option.id] = String(pendingQuantity);
+        }
+        return next;
+      });
+    }, [productOptions, pendingQuantity, showProductPicker]);
 
     const handleSubmit = async (e: FormEvent) => {
       e.preventDefault();
@@ -96,7 +130,8 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-brand-olive">POS IA</p>
             <p className="mt-1 text-sm app-text-muted">
-              Habla o escribe como en el mostrador: agregar, cambiar cantidad, quitar o cerrar venta.
+              Busca en tu catálogo, agrega, quita o cierra la venta. Los ejemplos usan productos de esta
+              sucursal.
             </p>
             <p className="mt-1 text-xs text-brand-ink-muted">
               Atajo{' '}
@@ -106,7 +141,7 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
               · La IA usa el catálogo y stock de tu empresa en esta sucursal
             </p>
           </div>
-          {supported && (
+          {supported ? (
             <button
               type="button"
               onClick={toggleListen}
@@ -119,8 +154,24 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
             >
               {listening ? '● Escuchando…' : '🎤 Voz'}
             </button>
+          ) : (
+            <p className="max-w-[11rem] text-right text-[10px] leading-snug text-brand-ink-muted">
+              Voz no disponible en este navegador (p. ej. iPhone). Escribe el comando.
+            </p>
           )}
         </div>
+
+        {lastHeard && !listening && (
+          <p className="mt-2 text-xs text-brand-ink-muted">
+            <span className="font-semibold text-brand-olive">Escuché:</span> «{lastHeard}» → «
+            {normalizePosVoiceCommand(lastHeard)}»
+          </p>
+        )}
+        {speechError && (
+          <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            {speechError}
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <label className="block">
@@ -131,21 +182,22 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
               value={text}
               onChange={(e) => setText(e.target.value)}
               disabled={disabled || loading}
-              placeholder='Ej: "agrega 2 cafe tradicional"'
+              placeholder={inputPlaceholder}
               className="app-input w-full"
               autoComplete="off"
             />
           </label>
           <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((ex) => (
+            {quickActions.map((action) => (
               <button
-                key={ex}
+                key={action.label}
                 type="button"
                 disabled={disabled || loading}
-                onClick={() => setText(ex)}
+                onClick={() => setText(action.command)}
+                title={action.command}
                 className="rounded-full border border-[rgba(74,83,60,0.2)] bg-brand-surface/80 px-3 py-1 text-xs text-brand-ink-muted transition hover:border-brand-olive hover:text-brand-ink disabled:opacity-50"
               >
-                {ex}
+                {action.label}
               </button>
             ))}
           </div>
@@ -158,24 +210,34 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
           </button>
         </form>
 
-        {suggestions.length > 0 && (
+        {showProductPicker && (
           <div className="mt-5 border-t border-brand-linen/80 pt-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-olive">
-              Sugerencias para tu venta
+              Elige producto
             </p>
             <p className="mt-1 text-xs app-text-muted">
-              Elige cantidad y agrega con un clic — aprende de lo que llevas en el carrito.
+              Elige variante, ajusta cantidad y agrega. Puedes sumar varios de la lista.
             </p>
             <ul className="mt-3 space-y-2">
-              {suggestions.map((s) => (
+              {productOptions.map((option) => (
                 <li
-                  key={s.productId}
-                  className="flex flex-wrap items-center gap-2 rounded-2xl border border-[rgba(74,83,60,0.15)] bg-brand-surface/40 px-3 py-2"
+                  key={option.id}
+                  className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand-olive/30 bg-brand-vanilla/40 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-brand-ink">{s.name}</p>
+                    <p className="truncate text-sm font-semibold text-brand-ink">
+                      {formatPosProductOptionLabel(
+                        {
+                          name: option.nombre,
+                          category: resolveOptionCategory(option),
+                          price: option.precio,
+                          sku: option.sku || productById.get(option.id)?.sku,
+                        },
+                        optionPeers
+                      )}
+                    </p>
                     <p className="text-xs app-text-muted">
-                      ${s.price.toLocaleString('es-CL')} · {suggestionReasonLabel(s.reason)} · {s.stock} u.
+                      ${option.precio.toLocaleString('es-CL')} · {option.stock_actual} u. disponibles
                     </p>
                   </div>
                   <label className="flex items-center gap-1 text-xs app-text-muted">
@@ -183,11 +245,11 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={getSuggestionQty(s.productId)}
+                      value={getOptionQtyText(option.id)}
                       onChange={(e) =>
-                        setSuggestionQty((prev) => ({
+                        setOptionQty((prev) => ({
                           ...prev,
-                          [s.productId]: coercePositiveIntInput(e.target.value),
+                          [option.id]: sanitizeDigitsOnly(e.target.value),
                         }))
                       }
                       className="app-input w-14 py-1 text-center text-sm"
@@ -196,8 +258,8 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => onQuickAdd(s.productId, getSuggestionQty(s.productId))}
-                    className="rounded-xl bg-[rgba(74,83,60,0.12)] px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-[rgba(74,83,60,0.2)] disabled:opacity-50"
+                    onClick={() => onQuickAdd(option.id, resolveQty(getOptionQtyText(option.id)))}
+                    className="rounded-xl border-2 border-brand-olive bg-white px-4 py-2 text-xs font-bold text-brand-olive shadow-md transition hover:bg-brand-vanilla disabled:opacity-50"
                   >
                     + Agregar
                   </button>
@@ -207,15 +269,6 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
           </div>
         )}
 
-        {lastResult && (
-          <p className="mt-4 rounded-xl border border-brand-linen/80 bg-brand-surface/50 px-3 py-2 text-xs text-brand-ink-muted">
-            <span className="font-semibold text-brand-olive">Último comando:</span>{' '}
-            {formatPosAiSummary(lastResult)}
-            {lastResult.response_message ? (
-              <span className="mt-1 block text-brand-ink">{lastResult.response_message}</span>
-            ) : null}
-          </p>
-        )}
       </section>
     );
   }

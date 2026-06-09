@@ -250,6 +250,243 @@ describe('posAiRulesClient', () => {
 
   });
 
+  const burgerStocks = [
+    {
+      id: 'hb-carne',
+      nombre: 'Hamburguesa Italiana',
+      sku: 'HB-IT-C',
+      precio: 3500,
+      stock_actual: 10,
+      categoria: 'Hamburguesa Carne',
+    },
+    {
+      id: 'hb-pollo',
+      nombre: 'Hamburguesa Italiana',
+      sku: 'HB-IT-P',
+      precio: 3500,
+      stock_actual: 10,
+      categoria: 'Hamburguesa Pollo',
+    },
+  ];
+
+  it('pide variante si hay dos hamburguesas italianas', () => {
+    const r = interpretPosCartClient({
+      userText: 'amburguesa italiana',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'UNKNOWN');
+    assert.equal(r.actions.length, 0);
+    assert.equal(r.product_options?.length, 2);
+  });
+
+  it('agrega hamburguesa italiana de carne aunque el precio sea igual', () => {
+    const r = interpretPosCartClient({
+      userText: 'agregar hamburguesa italiana de carne',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'hb-carne');
+  });
+
+  it('agrega pizza española familiar', () => {
+    const stocks = [
+      { id: 'es-p', nombre: 'Pizza Española', sku: 'PE-S', precio: 7000, stock_actual: 20, categoria: 'Pizza Personal' },
+      { id: 'es-f', nombre: 'Pizza Española', sku: 'PE-F', precio: 13500, stock_actual: 20, categoria: 'Pizza Familiar' },
+    ];
+    const r = interpretPosCartClient({
+      userText: 'agrega pizza española familiar',
+      stocks,
+      cart: [],
+    });
+    assert.equal(r.actions[0]?.product_id, 'es-f');
+  });
+
+  it('agrega hamburguesa italiana de carne con subcategoria en arbol', () => {
+    const fusionBurgers = [
+      {
+        id: 'hb-c-p',
+        nombre: 'Hamburguesa Italiana',
+        sku: 'HB-C-P',
+        precio: 3500,
+        stock_actual: 20,
+        categoria: 'Hamburguesas › Carne',
+      },
+      {
+        id: 'hb-c-f',
+        nombre: 'Hamburguesa Italiana',
+        sku: 'HB-C-F',
+        precio: 7000,
+        stock_actual: 15,
+        categoria: 'Hamburguesas › Carne',
+      },
+      {
+        id: 'hb-p-p',
+        nombre: 'Hamburguesa Italiana',
+        sku: 'HB-P-P',
+        precio: 3500,
+        stock_actual: 20,
+        categoria: 'Hamburguesas › Pollo',
+      },
+      {
+        id: 'hb-p-f',
+        nombre: 'Hamburguesa Italiana',
+        sku: 'HB-P-F',
+        precio: 7000,
+        stock_actual: 15,
+        categoria: 'Hamburguesas › Pollo',
+      },
+    ];
+    const r = interpretPosCartClient({
+      userText: 'agregar hamburguesa italiana de carne',
+      stocks: fusionBurgers,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'hb-c-p');
+  });
+
+  it('no agrega pollo al pedir hamburguesa italiana de carne', () => {
+    const fusionBurgers = [
+      {
+        id: 'hb-c-p',
+        nombre: 'Hamburguesa Italiana',
+        sku: 'HB-C-P',
+        precio: 3500,
+        stock_actual: 20,
+        categoria: 'Hamburguesas › Carne',
+      },
+      {
+        id: 'hb-p-p',
+        nombre: 'Hamburguesa Italiana',
+        sku: 'HB-P-P',
+        precio: 3500,
+        stock_actual: 20,
+        categoria: 'Hamburguesas › Pollo',
+      },
+    ];
+    const r = interpretPosCartClient({
+      userText: 'agregar hamburguesa italiana de carne',
+      stocks: fusionBurgers,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'hb-c-p');
+  });
+
+  it('agrega hamburguesa italiana de pollo con cantidad', () => {
+    const r = interpretPosCartClient({
+      userText: 'agregar 2 hamburguesa italiana de pollo',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'hb-pollo');
+    assert.equal(r.actions[0]?.quantity, 2);
+  });
+
+  it('elige hamburguesa italiana de pollo por categoria', () => {
+    const r = interpretPosCartClient({
+      userText: 'agrega hamburguesa italiana de pollo',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'hb-pollo');
+  });
+
+  it('buscar no agrega al carrito y lista opciones', () => {
+    const r = interpretPosCartClient({
+      userText: 'buscar amburguesa',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'UNKNOWN');
+    assert.equal(r.actions.length, 0);
+    assert.ok((r.product_options?.length ?? 0) >= 2);
+  });
+
+  it('ayuda lista comandos con producto del tenant', () => {
+    const r = interpretPosCartClient({
+      userText: 'ayuda',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.match(r.response_message, /Comandos POS IA/i);
+    assert.match(r.response_message, /Hamburguesa Italiana/i);
+  });
+
+  const pizzaStocks = [
+    {
+      id: 'pz-peq',
+      nombre: 'Pizza Pepperonni',
+      sku: 'PZ-P-S',
+      precio: 3500,
+      stock_actual: 20,
+      categoria: 'Pizza Personal',
+    },
+    {
+      id: 'pz-fam',
+      nombre: 'Pizza Pepperonni',
+      sku: 'PZ-P-F',
+      precio: 7000,
+      stock_actual: 20,
+      categoria: 'Pizza Familiar',
+    },
+  ];
+
+  it('agrega pizza pepperonni familiar por tamano', () => {
+    const r = interpretPosCartClient({
+      userText: 'agrega pizza pepperonni familiar',
+      stocks: pizzaStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'pz-fam');
+  });
+
+  it('agrega pizza pepperonni familiar aunque haya muchas pizzas en catalogo', () => {
+    const manyPizzas = [
+      { id: 'ch', nombre: 'Pizza Champiñón', sku: 'PZ-CH', precio: 8000, stock_actual: 10 },
+      { id: 'es-p', nombre: 'Pizza Española', sku: 'PZ-ES-P', precio: 7000, stock_actual: 10 },
+      { id: 'es-f', nombre: 'Pizza Española', sku: 'PZ-ES-F', precio: 13500, stock_actual: 10 },
+      { id: 'it-p', nombre: 'Pizza Italiana', sku: 'PZ-IT-P', precio: 7500, stock_actual: 10 },
+      { id: 'pe-p', nombre: 'Pizza Pepperonni', sku: 'PZ-PE-P', precio: 3500, stock_actual: 20 },
+      { id: 'pe-f', nombre: 'Pizza Pepperonni', sku: 'PZ-PE-F', precio: 13500, stock_actual: 20 },
+    ];
+    const r = interpretPosCartClient({
+      userText: 'pizza pepperonni familiar',
+      stocks: manyPizzas,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'pe-f');
+  });
+
+  it('agrega pizza pepperonni familiar solo por precio si no hay categoria', () => {
+    const stocks = [
+      { id: 'a', nombre: 'Pizza Pepperonni', sku: 'A', precio: 3500, stock_actual: 20 },
+      { id: 'b', nombre: 'Pizza Pepperonni', sku: 'B', precio: 7000, stock_actual: 20 },
+    ];
+    const r = interpretPosCartClient({
+      userText: 'pizza pepperonni familiar',
+      stocks,
+      cart: [],
+    });
+    assert.equal(r.actions[0]?.product_id, 'b');
+  });
+
+  it('ignora sin tomate al buscar producto', () => {
+    const r = interpretPosCartClient({
+      userText: 'hamburguesa italiana de carne sin tomate',
+      stocks: burgerStocks,
+      cart: [],
+    });
+    assert.equal(r.intent, 'ADD_TO_CART');
+    assert.equal(r.actions[0]?.product_id, 'hb-carne');
+  });
+
 });
 
 
