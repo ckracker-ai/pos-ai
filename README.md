@@ -1,94 +1,78 @@
 # POS-AI — ERP SaaS multi-tenant
 
-Producto **v1.7**: multi-empresa + **asistente WhatsApp** (plan Estándar) + validación comprobantes en POS.
+Stack: `pos-frontend` · `pos-api-bff` · `pos-api-core` · `pos-api-assistant` · MySQL (`db-init`).
 
-**Guía completa (PDF):** [`docs/COMENZAR-POS-AI.md`](docs/COMENZAR-POS-AI.md) · [`docs/comercial/COMENZAR-POS-AI.html`](docs/comercial/COMENZAR-POS-AI.html)  
-**Sprints / handoff:** [`SPRINT-PLAN.md`](SPRINT-PLAN.md)
+## Ramas Git
 
-**v1.6 (en curso):** planes SaaS en BD (`saas_planes`) enlazados a cada empresa.
+| Rama | Uso |
+|------|-----|
+| **`master`** | Versión estable / releases |
+| **`dev`** | Desarrollo diario (Docker local) |
 
-```powershell
-.\scripts\migrate-v1.7-assistant.ps1
-docker compose up -d --build pos-api-core pos-api-assistant pos-api-bff pos-frontend
-```
+Flujo: trabajar en **`dev`** → cuando cierra una versión, **merge a `master`** y tag de release.
 
-## Roadmap
+No versionar en Git: `scripts/`, `docs/`, `deploy/`, `.env*` (solo en tu PC o en el VPS).
 
-| Versión | Alcance |
-|---------|---------|
-| **v1.4** ✅ | Multi-tenant, BD `pos-ai-db`, core **1010** |
-| **v1.7** ✅ | Assistant WSP, comprobantes, `/comprobantes` tenant |
-| **v1.8** | Pasarela cobro ventas (Full) |
-| **v2.0** | SaaS self-service checkout |
-
-## Repositorios GitHub
-
-| Producto | Repositorio | Rama principal |
-|----------|-------------|----------------|
-| **POS-AI** | https://github.com/ckracker-ai/pos-ai | `main` (desarrollo: `POS-AI`) |
-| **SVM** | https://github.com/ckracker-ai/svm-erp | `prod` / `dev` |
-
-## Relación con SVM (local)
-
-| | **SVM** | **POS-AI** |
-|---|---|---|
-| Carpeta | `d:\Proyectos\svm\node` | `d:\Proyectos\POS-AI` |
-| Versión | v1.2.x | v1.4.0+ |
-| BD | `erp_core_db` | `pos-ai-db` |
-
-## Estructura
+## Estructura (producto)
 
 ```
 POS-AI/
 ├── pos-frontend/
-├── pos-api-bff/        # puerto 2020, prefijo /pos/proxy
-├── pos-api-core/       # puerto 1010
-├── db-init/init.sql    # → pos-ai-db
-└── docker-compose.yml  # proyecto Docker: pos-ai
+├── pos-api-bff/
+├── pos-api-core/
+├── pos-api-assistant/
+├── db-init/
+├── nginx/
+├── docker-compose.yml
+└── docker-compose.prod.yml
 ```
 
-## Arranque
+## Arranque local (Docker)
 
 ```powershell
-cd d:\Proyectos\POS-AI
 docker compose up -d --build
 ```
 
-| Servicio | Puerto host | Ruta API |
-|----------|-------------|----------|
-| pos-frontend | **8010** | — |
-| pos-api-bff | **2020** | `/pos/proxy/*` |
-| pos-api-core | 1010 | (interno) |
-| pos-api-assistant | **3030** | WhatsApp / assistant |
-| pos-ai-db-mysql | **3308** (host) | — |
+- UI: http://localhost:8010/
+- BFF: http://localhost:2020/
+- Core: http://localhost:1010/
+- Assistant: http://localhost:3030/
 
-> MySQL host: **3308** (SVM usa 3306). Override: `MYSQL_HOST_PORT=3309`.
+Variables de entorno: archivo `.env` en la raíz (**no subir a Git**). En VPS usar `.env.prod` solo en el servidor.
 
-- UI: http://localhost:8010 → redirige a `/platform/login`
-- Login tenant: http://localhost:8010/login
-- BFF health: http://localhost:2020/pos/proxy/health
-- Core health: http://localhost:1010/health
+## Producción (VPS)
 
-Sandbox (puertos alternativos): ver `.env.sandbox.example` + `docker-compose.sandbox.yml`.
-
-## QA smoke
-
-```powershell
-.\scripts\qa-smoke.ps1
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-Checklist manual: `deploy/QA-SMOKE-CHECKLIST.md` · Empresas Postman: `pos-api-core/QA-EMPRESAS-v1.4.md`
+Generar secretos nuevos en el servidor; no reutilizar valores de desarrollo.
 
-## Credenciales dev
+## Limpiar el índice Git (una vez)
 
-| Rol | Email | Contraseña |
-|-----|-------|------------|
-| Admin tenant | `admin@empanadascostaazul.cl` | `@dmin123_` |
-| **Vendedor** | `vendedor@empanadascostaazul.cl` | `Vendedor@12345` |
-| Comanda | `comanda@empanadascostaazul.cl` | `Comanda@12345` |
-| Plataforma | `platform@pos-ai.local` | `PlatformAdmin2026!` |
+Si `deploy/`, `docs/` o `scripts/` ya estaban en GitHub, quítalos del tracking **sin borrar tus archivos locales**:
 
-Los usuarios demo se crean al arrancar `pos-api-core` (`seedBootstrapDemoUsers`). Si ya existía la BD sin vendedor: reinicia core (`docker compose restart pos-api-core`) o `BOOTSTRAP_DEMO_USERS_RESET_PASSWORD=true` una vez.
+```powershell
+cd d:\Proyectos\POS-AI
+git rm -r --cached deploy docs scripts
+git rm --cached SPRINT-PLAN.md CHANGELOG.md .env.docker.example .env.prod.example .env.sandbox.example 2>$null
+git rm -r --cached .cursor 2>$null
+git add .gitignore README.md
+git commit -m "chore: repo solo producto; excluir scripts, docs, deploy y env"
+```
 
-- **Plataforma:** http://localhost:8010/platform/login
-- MySQL user: `usr_pos_ai` / `Usr@12345`
+## Ramas (dejar solo master + dev)
+
+```powershell
+# Desde tu rama de trabajo actual (ej. sprint/wsp-comprobantes-2026-06)
+git checkout -B dev
+git push -u origin dev
+
+# master estable (solo merges de release)
+git checkout master
+git merge dev   # cuando cierre versión
+
+# Borrar ramas locales obsoletas
+git branch -d POS-AI sprint/wsp-comprobantes-2026-06
+git push origin --delete POS-AI sprint/wsp-comprobantes-2026-06
+```

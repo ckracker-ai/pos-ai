@@ -13,12 +13,27 @@ build-out.txt
 # TypeScript emit accidentally written next to sources (BFF)
 pos-api-bff/src/**/*.js
 
-# Environment & secrets
+# Environment & secrets — NUNCA en Git (solo en VPS / máquina local)
 .env
 .env.*
-!.env*.example
-!.env.docker.example
-!.env.prod.example
+**/.env
+**/.env.*
+
+# Operación local (no forma parte del producto versionado)
+/deploy/
+/docs/
+/scripts/
+SPRINT-PLAN.md
+CHANGELOG.md
+
+# IDE / agente local
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
 
 # Logs & debug
 *.log
@@ -33,14 +48,6 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.project
 
 # SSL / certs (Let's Encrypt local)
 nginx/certs/live/
