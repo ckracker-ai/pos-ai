@@ -361,6 +361,13 @@ export const api = {
   ) => getApiClient().patch(`/pos/proxy/empresas/${id}/formalizacion-progreso`, data, config),
   formalizarEmpresa: (id: string, data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().post(`/pos/proxy/empresas/${id}/formalizar`, data, config),
+  getEmpresaDataExport: (id: string, config?: AxiosRequestConfig) =>
+    getApiClient().get(`/pos/proxy/empresas/${id}/data-export`, config),
+  createEmpresaDataDeletionRequest: (
+    id: string,
+    data?: { notes?: string },
+    config?: AxiosRequestConfig
+  ) => getApiClient().post(`/pos/proxy/empresas/${id}/data-deletion-request`, data ?? {}, config),
 
   // Comprobantes WSP (plan Estándar)
   getPaymentProofs: (status: 'pending' | 'all' = 'pending', config?: AxiosRequestConfig) =>

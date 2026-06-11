@@ -16,7 +16,7 @@ export function BranchSelector() {
     const current = branches.find((b) => b.id === selectedBranchId);
     return (
       <div className="hidden sm:block text-right">
-        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-500">Sucursal</p>
+        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-500">Sucursal activa</p>
         <p
           className="text-sm font-medium text-gray-800 dark:text-slate-200 max-w-[220px] break-words"
           title={current?.name ?? activeBranchName}

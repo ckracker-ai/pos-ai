@@ -117,6 +117,50 @@ const empresaRoutes = async (app: FastifyInstance) => {
     }
   });
 
+  app.get('/:id/data-export', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    try {
+      const data = await empresaCore.getDataExport(id, ctx.token, ctx.internalKey, ctx.branchId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to export tenant data'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:id/data-deletion-request', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    const body = (request.body ?? {}) as { notes?: string };
+
+    try {
+      const data = await empresaCore.createDataDeletionRequest(
+        id,
+        { notes: body.notes },
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId
+      );
+      return sendOk(reply, data, 201);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to create data deletion request'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
   app.patch('/:id', { preHandler: [requireSeller] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const ctx = requireCoreRequestContext(reply, request);

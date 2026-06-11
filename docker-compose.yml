@@ -142,6 +142,13 @@ services:
       - BOOTSTRAP_PLATFORM_ADMIN_ENABLED=${BOOTSTRAP_PLATFORM_ADMIN_ENABLED:-true}
       - PLATFORM_ADMIN_EMAIL=${PLATFORM_ADMIN_EMAIL:-platform@pos-ai.local}
       - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
+      - FRONTEND_PUBLIC_URL=${FRONTEND_PUBLIC_URL:-http://localhost:8010}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-POS-AI <noreply@pos-ai.local>}
       - APP_VERSION=${APP_VERSION:-1.4.0}
       - PAYMENT_LINK_BASE_URL=${PAYMENT_LINK_BASE_URL:-https://pay.pos-ai.local/p}
       - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-WEBPAY}
@@ -152,7 +159,6 @@ services:
       - WEBPAY_API_BASE_URL=${WEBPAY_API_BASE_URL:-https://webpay3gint.transbank.cl}
       - PAYMENT_CHECKOUT_TOKEN_SECRET=${PAYMENT_CHECKOUT_TOKEN_SECRET:-supersecretkey}
       - PAYMENT_WEBHOOK_HMAC_SECRET=${PAYMENT_WEBHOOK_HMAC_SECRET:-supersecretkey}
-      - PAYMENT_SANDBOX_RETURN_BASE_URL=${PAYMENT_SANDBOX_RETURN_BASE_URL:-http://localhost:8010}
       - DB_HOST=pos-ai-db-mysql
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-pos-ai-db}

@@ -1,12 +1,18 @@
 import { ApiCoreBaseService } from './apiCoreBaseService.js';
 
 export class ApiCoreServiceAuth extends ApiCoreBaseService {
-  async login(email: string, password: string) {
-    const response = await this.client.post(
-      '/auth/login',
-      { email, password },
-      { headers: this.publicHeaders() }
-    );
+  async login(input: {
+    email: string;
+    password: string;
+    legalAcceptance?: {
+      termsVersion: string;
+      privacyVersion: string;
+      accepted: true;
+    };
+  }) {
+    const response = await this.client.post('/auth/login', input, {
+      headers: this.publicHeaders(),
+    });
     return response.data;
   }
 

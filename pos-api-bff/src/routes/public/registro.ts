@@ -34,6 +34,12 @@ const registroFormalSchema = z.object({
 
   nombreFantasia: z.string().max(120).optional(),
 
+  giroSii: z.string().min(2).max(200).optional(),
+
+  rubroNegocio: z.string().min(2).max(120).optional(),
+
+  telefonoNegocio: z.string().min(8).max(32).optional(),
+
   adminEmail: z.string().email(),
 
   adminPassword: z.string().min(8).max(128),
@@ -110,9 +116,11 @@ const publicRegistroRoutes = async (app: FastifyInstance) => {
 
         nombreFantasia: body.nombreFantasia,
 
-        rubroNegocio: isInformal ? body.rubroNegocio : undefined,
+        giroSii: isInformal ? undefined : body.giroSii,
 
-        telefonoNegocio: isInformal ? body.telefonoNegocio : undefined,
+        rubroNegocio: body.rubroNegocio,
+
+        telefonoNegocio: body.telefonoNegocio,
 
         adminEmail: body.adminEmail,
 

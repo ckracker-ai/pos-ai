@@ -8,6 +8,8 @@ import {
 } from '../../../middleware/auth.middleware';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import empresaDelegate from '../delegates/EmpresaDelegate';
+import platformTenantOpsDelegate from '../../platform/delegates/PlatformTenantOpsDelegate';
+import dataSubjectDelegate from '../../legal/delegates/DataSubjectDelegate';
 import planRoutes from '../../saas/routes/plan.routes';
 import assistantDelegate from '../../assistant/delegates/AssistantDelegate';
 import suscripcionDelegate from '../../saas/delegates/SuscripcionDelegate';
@@ -23,12 +25,16 @@ const mapErrorStatus = (error: string): number => {
     return 409;
   }
   if (error.startsWith('EMAIL_TAKEN') || error.startsWith('ROLE_NOT_FOUND')) return 409;
+  if (error === 'USER_NOT_FOUND' || error === 'BRANCH_NOT_FOUND') return 404;
+  if (error.startsWith('BRANCH_NOT_FOUND')) return 404;
   if (error === 'PLAN_NOT_FOUND') return 404;
   if (error === 'SUBSCRIPTION_ALREADY_ACTIVE') return 409;
   if (error === 'ASSISTANT_PHONE_IN_USE') return 409;
   if (error.startsWith('ASSISTANT_PLAN_REQUIRED')) return 403;
+  if (error.startsWith('ASSISTANT_VOICE_PLAN_REQUIRED')) return 403;
   if (error.startsWith('TRIBUTARIO_FORMAL_REQUIRED')) return 403;
   if (error.startsWith('PLAN_LIMIT_')) return 403;
+  if (error === 'DATA_DELETION_REQUEST_ALREADY_OPEN') return 409;
   return 400;
 };
 
@@ -73,8 +79,35 @@ router.get('/platform/assistant-bindings', async (_req, res) => {
 });
 
 router.get('/platform/:empresaId/branches', async (req, res) => {
-  const result = await assistantDelegate.listBranches(req.params.empresaId);
+  const result = await platformTenantOpsDelegate.listBranches(req.params.empresaId);
   if (result.success) return sendOk(res, { sucursales: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/branches', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await platformTenantOpsDelegate.createBranch(req.params.empresaId, {
+    name: String(body.name ?? ''),
+    address: body.address != null ? String(body.address) : undefined,
+    phone: body.phone != null ? String(body.phone) : undefined,
+  });
+  if (result.success) return sendOk(res, { sucursal: result.value }, 201);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.patch('/platform/:empresaId/branches/:branchId', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await platformTenantOpsDelegate.patchBranch(
+    req.params.empresaId,
+    req.params.branchId,
+    {
+      name: body.name != null ? String(body.name) : undefined,
+      address: body.address != null ? String(body.address) : undefined,
+      phone: body.phone != null ? String(body.phone) : undefined,
+      isActive: body.isActive != null ? Boolean(body.isActive) : undefined,
+    }
+  );
+  if (result.success) return sendOk(res, { sucursal: result.value });
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
@@ -100,6 +133,66 @@ router.post('/platform/:empresaId/assistant-bindings', async (req, res) => {
     adminNotifyPhone: body.adminNotifyPhone ?? body.admin_notify_phone ?? undefined,
   });
   if (result.success) return sendOk(res, result.value, 201);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/voice-bindings', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await assistantDelegate.upsertVoiceBinding({
+    empresaId: req.params.empresaId,
+    externalId: String(body.externalId ?? body.telefono ?? ''),
+    defaultBranchId: body.defaultBranchId ?? body.default_branch_id ?? null,
+  });
+  if (result.success) return sendOk(res, result.value, 201);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/:empresaId/users', async (req, res) => {
+  const result = await platformTenantOpsDelegate.listUsers(req.params.empresaId);
+  if (result.success) return sendOk(res, { users: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/users', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await platformTenantOpsDelegate.createUser(req.params.empresaId, {
+    fullName: String(body.fullName ?? ''),
+    email: String(body.email ?? ''),
+    password: String(body.password ?? ''),
+    roleCodigo: body.roleCodigo,
+    roleId: body.roleId,
+    branchId: body.branchId,
+  });
+  if (result.success) return sendOk(res, { user: result.value }, 201);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.patch('/platform/:empresaId/users/:userId/password', async (req, res) => {
+  const password = String(req.body?.password ?? '');
+  const result = await platformTenantOpsDelegate.resetPassword(
+    req.params.empresaId,
+    req.params.userId,
+    password
+  );
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/users/:userId/legal-reset', async (req, res) => {
+  const result = await platformTenantOpsDelegate.resetUserLegal(
+    req.params.empresaId,
+    req.params.userId
+  );
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/users/:userId/legal-grant', async (req, res) => {
+  const result = await platformTenantOpsDelegate.grantUserLegal(
+    req.params.empresaId,
+    req.params.userId
+  );
+  if (result.success) return sendOk(res, result.value);
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
@@ -203,6 +296,27 @@ router.patch('/:id/formalizacion-progreso', requireAdmin, async (req: Authentica
     req.body ?? {}
   );
   if (result.success) return sendOk(res, { empresa: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/:id/data-export', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const result = await dataSubjectDelegate.exportTenantData(
+    req.params.id,
+    getEffectiveEmpresaId(req)
+  );
+  if (result.success) return sendOk(res, { export: result.value });
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/:id/data-deletion-request', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const body = req.body ?? {};
+  const result = await dataSubjectDelegate.createDeletionRequest({
+    empresaId: req.params.id,
+    tenantEmpresaId: getEffectiveEmpresaId(req),
+    requestedBy: req.user!.userId,
+    notes: body.notes != null ? String(body.notes) : null,
+  });
+  if (result.success) return sendOk(res, result.value, 201);
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 

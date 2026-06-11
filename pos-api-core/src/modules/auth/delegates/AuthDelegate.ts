@@ -8,7 +8,8 @@ import UserService from '../services/UserService';
 import { branchBelongsToEmpresa } from '../../../utils/tenantScope';
 import { readModelString } from '../../../utils/modelAttributes';
 import { assertEmpresaAllowsLogin } from '../../../utils/empresaAccess';
-import { Result, ok, fail } from '../../../types/result';
+import { Result, ok, fail, failWith, type Fail, type FailWithValue, type Ok } from '../../../types/result';
+import legalDelegate from '../../legal/delegates/LegalDelegate';
 import { assertCanAddActiveUser } from '../../saas/utils/planLimits';
 import { normalizePhoneE164 } from '../../assistant/delegates/AssistantDelegate';
 
@@ -22,10 +23,29 @@ export interface RegisterInput {
   whatsappPhone?: string | null;
 }
 
+export interface LegalAcceptanceLoginInput {
+  termsVersion: string;
+  privacyVersion: string;
+  accepted: true;
+}
+
 export interface LoginInput {
   email: string;
   password: string;
+  legalAcceptance?: LegalAcceptanceLoginInput;
+  ipAddress?: string | null;
+  userAgent?: string | null;
 }
+
+export type LoginReauthPayload = {
+  terms: { version: string; title: string };
+  privacy: { version: string; title: string };
+};
+
+export type LoginResult =
+  | Ok<{ token: string; user: UserPayload }>
+  | Fail<string>
+  | FailWithValue<'LEGAL_REAUTH_REQUIRED', LoginReauthPayload>;
 
 export interface UserPayload {
   id: string;
@@ -137,7 +157,7 @@ class AuthDelegate {
     return ok(this.toPayload(user, role.name));
   }
 
-  async login(input: LoginInput): Promise<Result<{ token: string; user: UserPayload }>> {
+  async login(input: LoginInput): Promise<LoginResult> {
     const normalizedEmail = input.email.trim().toLowerCase();
     const user = await UserService.findByEmailWithPassword(normalizedEmail);
 
@@ -178,6 +198,33 @@ class AuthDelegate {
     const tenantLogin = await assertEmpresaAllowsLogin(empresaId);
     if (!tenantLogin.success) {
       return fail(tenantLogin.error);
+    }
+
+    const legalOk = await legalDelegate.userHasCurrentAcceptances(String(userPlain.id));
+    if (!legalOk.success) {
+      return legalOk;
+    }
+
+    if (!legalOk.value) {
+      if (!input.legalAcceptance?.accepted) {
+        const bundle = await legalDelegate.getLoginReauthBundle();
+        if (!bundle.success) return bundle;
+        return failWith<'LEGAL_REAUTH_REQUIRED', LoginReauthPayload>(
+          'LEGAL_REAUTH_REQUIRED',
+          bundle.value
+        );
+      }
+
+      const recorded = await legalDelegate.recordAcceptances({
+        userId: String(userPlain.id),
+        empresaId,
+        termsVersion: input.legalAcceptance.termsVersion,
+        privacyVersion: input.legalAcceptance.privacyVersion,
+        ipAddress: input.ipAddress ?? null,
+        userAgent: input.userAgent ?? null,
+        channel: 'LOGIN_REAUTH',
+      });
+      if (!recorded.success) return recorded;
     }
 
     const userPayload = this.toPayload(user, roleName);

@@ -1,10 +1,25 @@
--- v1.11.0 — S4 Delivery tracking: estado + timeline auditado
+-- v1.11.0 — S4 Delivery tracking: estado + timeline auditado (idempotente)
 
 USE `pos-ai-db`;
 
-ALTER TABLE `sales`
-  ADD COLUMN `delivery_status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL
-    COMMENT 'CREATED|ASSIGNED|ON_ROUTE|DELIVERED|FAILED' AFTER `delivery_amount`;
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = 'pos-ai-db'
+    AND TABLE_NAME = 'sales'
+    AND COLUMN_NAME = 'delivery_status'
+);
+
+SET @add_col := IF(
+  @col_exists = 0,
+  'ALTER TABLE `sales`
+     ADD COLUMN `delivery_status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+       COMMENT ''CREATED|ASSIGNED|ON_ROUTE|DELIVERED|FAILED'' AFTER `delivery_amount`',
+  'SELECT ''delivery_status already exists'' AS info'
+);
+PREPARE stmt FROM @add_col;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `sale_delivery_events` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -26,4 +41,4 @@ WHERE `requires_delivery` = 1 AND (`delivery_status` IS NULL OR `delivery_status
 
 INSERT INTO `schema_migrations` (`version`, `applied_at`)
 VALUES ('v1.11.0-001-sale-delivery-tracking', NOW())
-ON DUPLICATE KEY UPDATE `applied_at` = NOW();
+ON DUPLICATE KEY UPDATE `applied_at` = `applied_at`;

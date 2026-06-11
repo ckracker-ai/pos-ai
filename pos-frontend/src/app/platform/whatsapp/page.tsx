@@ -36,6 +36,8 @@ type AssistantBindingRow = {
 
   empresaId: string;
 
+  empresaNombre?: string;
+
   channel: string;
 
   externalId: string;
@@ -52,16 +54,17 @@ type BranchRow = { id: string; name: string };
 
 
 
+/** Atajos agnósticos al rubro (pastelería, comida, retail, etc.) */
 const QUICK_COMMANDS = [
   'sucursales',
-  '1',
-  'buscar empanada',
-  'pedido 1 2',
+  'buscar',
+  'agregar',
+  'quitar',
+  'listar',
   'confirmar',
-  'mi pedido',
-  'cancelar pedido',
   'ayuda',
 ] as const;
+
 
 
 
@@ -515,7 +518,7 @@ export default function PlatformWhatsappSimPage() {
         description="Plan Estándar · desarrollo sin Meta Graph API. Prueba el flujo del asistente con bindings registrados en Empresas."
       />
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col">
+      <div className="wsp-sim-panel mx-auto flex w-full max-w-2xl flex-col">
 
         <div className="app-card relative z-10 mb-3 space-y-3 rounded-xl px-3 py-3">
 
@@ -603,7 +606,7 @@ export default function PlatformWhatsappSimPage() {
 
                   <option key={b.id} value={b.id}>
 
-                    {b.externalId} (empresa {b.empresaId.slice(0, 8)}…)
+                    {b.empresaNombre ?? 'Empresa'} — {b.externalId}
 
                   </option>
 
@@ -693,7 +696,8 @@ export default function PlatformWhatsappSimPage() {
 
             <p className="text-center text-sm text-slate-600">
 
-              Escribe un mensaje o usa un atajo. Prueba: <strong>sucursales</strong>
+              Escribe un mensaje o usa un atajo. Prueba: <strong>sucursales</strong>,{' '}
+              <strong>buscar</strong> o <strong>ayuda</strong>
 
             </p>
 
@@ -715,7 +719,7 @@ export default function PlatformWhatsappSimPage() {
 
                   m.role === 'user'
 
-                    ? 'bg-[#4A533C] text-white rounded-br-md'
+                    ? 'wsp-on-olive bg-[#4A533C] rounded-br-md'
 
                     : 'bg-white text-slate-800 rounded-bl-md border border-[#D1C7BD]'
 
@@ -857,7 +861,7 @@ export default function PlatformWhatsappSimPage() {
 
             disabled={sending || !input.trim()}
 
-            className="rounded-full bg-brand-olive px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#3d4532] disabled:opacity-50"
+            className="wsp-on-olive rounded-full bg-brand-olive px-5 py-2.5 text-sm font-semibold shadow-sm hover:bg-[#3d4532] disabled:opacity-50"
 
           >
 

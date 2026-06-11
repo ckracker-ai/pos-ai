@@ -6,6 +6,8 @@ type Props = {
   title: string;
   version: string;
   contentMd: string;
+  /** Sin tarjeta exterior — para modales. */
+  embedded?: boolean;
 };
 
 function renderMarkdownLite(md: string): ReactNode[] {
@@ -41,7 +43,11 @@ function renderMarkdownLite(md: string): ReactNode[] {
   });
 }
 
-export function LegalDocumentView({ title, version, contentMd }: Props) {
+export function LegalDocumentView({ title, version, contentMd, embedded = false }: Props) {
+  if (embedded) {
+    return <div className="px-4">{renderMarkdownLite(contentMd)}</div>;
+  }
+
   return (
     <article className="app-card mx-auto max-w-3xl rounded-2xl p-8">
       <p className="text-xs font-semibold uppercase tracking-wider text-brand-olive">Documento legal</p>

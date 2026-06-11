@@ -35,6 +35,10 @@ CHANGELOG.md
 *~
 .project
 
+# Temp / QA local
+tmp-*.json
+tmp-*
+
 # Logs & debug
 *.log
 npm-debug.log*

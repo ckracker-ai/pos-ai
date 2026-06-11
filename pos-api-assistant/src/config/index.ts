@@ -13,6 +13,9 @@ export default {
   metaAppSecret: env.META_APP_SECRET ?? '',
   paymentWebhookSecret:
     env.PAYMENT_WEBHOOK_SECRET?.trim() || env.INTERNAL_API_KEY?.trim() || 'supersecretkey',
+  twilioAuthToken: env.TWILIO_AUTH_TOKEN ?? '',
+  twilioAccountSid: env.TWILIO_ACCOUNT_SID ?? '',
+  publicBaseUrl: env.ASSISTANT_PUBLIC_BASE_URL ?? '',
 };
 
 export function isMetaSendConfigured(): boolean {

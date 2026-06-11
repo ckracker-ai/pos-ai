@@ -23,7 +23,7 @@ export class AuthService {
 
   async login(email: string, password: string) {
     try {
-      const response = await this.coreApi.login(email, password);
+      const response = await this.coreApi.login({ email, password });
       return ok({ data: response });
     } catch (error: any) {
       const statusCode = error.response?.status || 502;

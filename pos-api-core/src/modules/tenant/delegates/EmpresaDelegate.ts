@@ -30,6 +30,7 @@ import { Result, ok, fail } from '../../../types/result';
 import type { SaasPlanCodigo } from '../../saas/constants/planCodes';
 import { getPlanDescription, getPlanDisplayName } from '../../saas/utils/planDisplay';
 import * as argon2 from 'argon2';
+import activationNotificationDelegate from '../../notifications/delegates/ActivationNotificationDelegate';
 
 export interface EmpresaPlanSummary {
   id: string;
@@ -789,6 +790,17 @@ class EmpresaDelegate {
 
     const empresa = await this.findById(empresaId);
     if (!empresa.success) return empresa;
+
+    void activationNotificationDelegate
+      .notifySubscriptionActivated({
+        empresa: empresa.value,
+        suscripcion: paid.value,
+        paymentRef: input.reference,
+        provider: input.provider,
+      })
+      .catch((err: unknown) => {
+        console.warn('[EMAIL] notifySubscriptionActivated error:', err);
+      });
 
     return ok({ suscripcion: paid.value, empresa: empresa.value });
   }

@@ -5,6 +5,8 @@ import { whatsappRoutes } from './webhooks/whatsapp.js';
 import { internalNotifyRoutes } from './routes/internalNotify.js';
 import { paymentWebhookRoutes } from './routes/paymentWebhook.js';
 import { posInterpretRoutes } from './routes/posInterpret.js';
+import { voiceRoutes } from './webhooks/voice.js';
+import { twilioVoiceRoutes } from './webhooks/twilioVoice.js';
 
 const app = Fastify({ logger: true, bodyLimit: 6 * 1024 * 1024 });
 
@@ -13,13 +15,17 @@ await app.register(cors, { origin: true });
 app.get('/health', async () => ({
   status: 'ok',
   service: 'pos-api-assistant',
-  version: '1.7.0',
+  version: '1.8.0',
   openAi: Boolean(config.openAiApiKey),
   metaSend: isMetaSendConfigured(),
   metaSignature: Boolean(config.metaAppSecret.trim()),
+  voiceDev: true,
+  twilioVoice: Boolean(config.twilioAuthToken.trim()),
 }));
 
 await whatsappRoutes(app);
+await voiceRoutes(app);
+await twilioVoiceRoutes(app);
 await internalNotifyRoutes(app);
 await paymentWebhookRoutes(app);
 await posInterpretRoutes(app);

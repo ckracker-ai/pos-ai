@@ -38,6 +38,7 @@ export interface Product {
   sku: string;
   category: string;
   categoryId?: string;
+  supplierId?: string;
   image?: string;
   isActive: boolean;
   /** Producto con fila en inventory_stock para la sucursal activa. */
@@ -88,10 +89,22 @@ export interface User {
   updatedAt: string;
 }
 
+export interface LegalAcceptancePayload {
+  termsVersion: string;
+  privacyVersion: string;
+  accepted: true;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
+  legalAcceptance?: LegalAcceptancePayload;
 }
+
+export type LoginLegalReauthBundle = {
+  terms: { version: string; title: string };
+  privacy: { version: string; title: string };
+};
 
 export interface AuthResponse {
   user: User;

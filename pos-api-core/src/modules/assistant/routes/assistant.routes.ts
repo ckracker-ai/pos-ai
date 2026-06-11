@@ -14,7 +14,13 @@ const mapError = (error: string): number => {
   ) {
     return 404;
   }
-  if (error.startsWith('ASSISTANT_PLAN_REQUIRED') || error === 'INSUFFICIENT_STOCK') return 403;
+  if (
+    error.startsWith('ASSISTANT_PLAN_REQUIRED') ||
+    error.startsWith('ASSISTANT_VOICE_PLAN_REQUIRED') ||
+    error === 'INSUFFICIENT_STOCK'
+  ) {
+    return 403;
+  }
   if (error === 'INSUFFICIENT_STOCK') return 409;
   if (error === 'SALE_NOT_ONLINE_PAYMENT' || error === 'SALE_ALREADY_CLOSED') return 409;
   if (error === 'CART_LOCKED_FOR_PAYMENT' || error === 'PENDING_ORDER_EXISTS_USE_APPEND') return 409;

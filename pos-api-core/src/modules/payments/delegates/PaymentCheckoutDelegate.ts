@@ -31,20 +31,24 @@ class PaymentCheckoutDelegate {
     }
 
     const provider = getPaymentProvider(input.provider ?? paymentConfig.defaultProvider);
-    const session = await provider.createCheckoutSession(
-      {
-        empresaId: input.empresaId,
-        kind,
-        returnBaseUrl: input.returnBaseUrl ?? paymentConfig.sandboxReturnBaseUrl,
-      },
-      {
-        amount: summary.value.totalClp,
-        currency: 'CLP',
-        razonSocial: summary.value.razonSocial,
-      }
-    );
-
-    return ok(session);
+    try {
+      const session = await provider.createCheckoutSession(
+        {
+          empresaId: input.empresaId,
+          kind,
+          returnBaseUrl: input.returnBaseUrl ?? paymentConfig.sandboxReturnBaseUrl,
+        },
+        {
+          amount: summary.value.totalClp,
+          currency: 'CLP',
+          razonSocial: summary.value.razonSocial,
+        }
+      );
+      return ok(session);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'CHECKOUT_SESSION_FAILED';
+      return fail(msg);
+    }
   }
 
   async completeWebpayTransaction(

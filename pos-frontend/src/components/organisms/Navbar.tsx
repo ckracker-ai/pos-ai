@@ -6,10 +6,12 @@ import { useAuthStore } from '@/store/auth';
 import { useState } from 'react';
 import { BranchSelector } from '@/components/molecules/BranchSelector';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
+import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 
 export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const { displayName: empresaName } = useTenantEmpresa();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -53,7 +55,17 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
             </Link>
           </div>
 
-          <BranchSelector />
+          <div className="hidden min-w-0 flex-1 flex-col items-end sm:flex md:max-w-[280px]">
+            {empresaName ? (
+              <p
+                className="truncate text-sm font-semibold text-brand-ink"
+                title={empresaName}
+              >
+                {empresaName}
+              </p>
+            ) : null}
+            <BranchSelector />
+          </div>
 
           <div className="flex items-center relative ml-2 sm:ml-4">
             <button

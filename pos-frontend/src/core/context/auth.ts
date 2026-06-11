@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { LoginRequest, User, UserRole } from '@/core/interfaces';
+import { LoginLegalReauthBundle, LoginRequest, User, UserRole } from '@/core/interfaces';
 import { getFriendlyApiError } from '@/core/api/api-error-messages';
 import { getRoleProfile } from '@/core/config/role-access';
 import { posProxyPath } from '@/core/constants/api-path';
@@ -105,6 +105,15 @@ export const useAuthStore = create<AuthStore>()(
                 'Estas credenciales son de super-admin plataforma. Usa http://localhost:8010/platform/login'
               );
             }
+            if (apiErr === 'LEGAL_REAUTH_REQUIRED' && payload.data) {
+              const legalErr = new Error('LEGAL_REAUTH_REQUIRED') as Error & {
+                code: 'LEGAL_REAUTH_REQUIRED';
+                legal: LoginLegalReauthBundle;
+              };
+              legalErr.code = 'LEGAL_REAUTH_REQUIRED';
+              legalErr.legal = payload.data as LoginLegalReauthBundle;
+              throw legalErr;
+            }
             throw new Error(apiErr);
           }
 
@@ -130,6 +139,13 @@ export const useAuthStore = create<AuthStore>()(
             useBranchStore.getState().setSelectedBranchId(effectiveBranchId);
           }
         } catch (error) {
+          if (
+            error instanceof Error &&
+            (error as Error & { code?: string }).code === 'LEGAL_REAUTH_REQUIRED'
+          ) {
+            set({ isLoading: false, isAuthenticated: false });
+            throw error;
+          }
           console.error('Login error:', error);
           const errorMessage = getFriendlyApiError(error, 'auth.login').message;
           set({

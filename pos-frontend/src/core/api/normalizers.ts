@@ -117,6 +117,11 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
   const categoryIdRaw = readProductScalar(raw, 'categoryId', 'category_id') ?? category?.id;
   const categoryId =
     categoryIdRaw != null && categoryIdRaw !== '' ? String(categoryIdRaw) : undefined;
+  const supplier = raw.supplier as { id?: string } | undefined;
+  const supplierIdRaw =
+    readProductScalar(raw, 'supplierId', 'supplier_id') ?? supplier?.id;
+  const supplierId =
+    supplierIdRaw != null && supplierIdRaw !== '' ? String(supplierIdRaw) : undefined;
 
   const embeddedStock = readProductScalar(raw, 'stock', 'stock');
   const resolvedStock =
@@ -143,6 +148,7 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
     sku: String(readProductScalar(raw, 'sku', 'sku') ?? ''),
     category: categoryName,
     categoryId,
+    supplierId,
     isActive: isActiveRaw !== false && isActiveRaw !== 0 && isActiveRaw !== '0',
     inBranch: Boolean(
       raw.stockRecordId ??

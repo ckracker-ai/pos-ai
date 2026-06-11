@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { platformFetch } from '@/core/context/platform-auth';
 import { PlatformPageHeader } from '@/components/molecules/PlatformPageHeader';
 import { Empresa, EmpresaEstado, SaasMetodoPago, SaasPlan, SaasPlanCodigo } from '@/core/interfaces';
@@ -393,7 +394,12 @@ export default function PlatformEmpresasPage() {
                 {empresas.map((e) => (
                   <tr key={e.id}>
                     <td>
-                      <div className="font-medium text-brand-ink">{e.nombreFantasia ?? e.razonSocial}</div>
+                      <Link
+                        href={`/platform/empresas/${e.id}`}
+                        className="font-medium text-brand-olive hover:underline"
+                      >
+                        {e.nombreFantasia ?? e.razonSocial}
+                      </Link>
                       <div className="text-xs text-brand-ink-muted">{e.razonSocial}</div>
                     </td>
                     <td>{e.rutEmpresa}</td>
@@ -452,6 +458,12 @@ export default function PlatformEmpresasPage() {
                     </td>
                     <td className="text-right">
                       <div className="flex flex-col items-end gap-1">
+                        <Link
+                          href={`/platform/empresas/${e.id}`}
+                          className="text-xs font-medium text-brand-olive hover:underline"
+                        >
+                          Gestionar
+                        </Link>
                         <button
                           type="button"
                           onClick={() => void patchSuscripcion(e.id, { extendDays: 30 })}

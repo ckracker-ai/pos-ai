@@ -14,9 +14,16 @@ const registerSchema = z.object({
   whatsappPhone: z.string().max(32).optional().nullable(),
 });
 
+const legalAcceptanceSchema = z.object({
+  termsVersion: z.string().min(1),
+  privacyVersion: z.string().min(1),
+  accepted: z.literal(true),
+});
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  legalAcceptance: legalAcceptanceSchema.optional(),
 });
 
 const userUpsertSchema = z.object({
@@ -42,12 +49,25 @@ const authRoutes = async (app: FastifyInstance) => {
   app.post('/login', async (request, reply) => {
     const body = loginSchema.parse(request.body);
     try {
-      const data = await authCore.login(body.email, body.password);
+      const data = await authCore.login({
+        email: body.email,
+        password: body.password,
+        legalAcceptance: body.legalAcceptance,
+      });
       return sendOk(reply, data);
-
-    } catch (e: any) {
-      const statusCode = e?.response?.status ?? 401;
-      const error = e?.response?.data?.error ?? 'Login failed';
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { error?: string; data?: unknown } } };
+      const statusCode = err?.response?.status ?? 401;
+      const payload = err?.response?.data;
+      const error = payload?.error ?? 'Login failed';
+      if (statusCode === 403 && error === 'LEGAL_REAUTH_REQUIRED' && payload?.data) {
+        return reply.status(403).send({
+          success: false,
+          error,
+          data: payload.data,
+          code: 403,
+        });
+      }
       return sendFail(reply, error, statusCode);
     }
   });

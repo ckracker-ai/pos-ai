@@ -113,7 +113,8 @@ const [products, setProducts] = useState<Product[]>([]);
   const isActionLocked = isSaving || isConfirming || !!confirmModal.open;
 
   const PRODUCT_PAGE_SIZE = 10;
-  const STOCK_PAGE_SIZE = 5;
+  const STOCK_PAGE_SIZE = 3;
+  const QUICK_STOCK_MIN_SEARCH = 2;
 
   const filteredProducts = useMemo(() => {
     const isAssignedToActiveBranch = (product: Product) =>
@@ -532,15 +533,16 @@ const [products, setProducts] = useState<Product[]>([]);
   };
 
   const quickStockProducts = useMemo(() => {
+    const q = quickSearchTerm.trim().toLowerCase();
+    if (q.length < QUICK_STOCK_MIN_SEARCH) return [];
+
     const source = onlyAssignedToBranch
       ? products.filter((p) => productHasStockInBranch(p))
       : products;
 
-    const q = quickSearchTerm.trim().toLowerCase();
     return source.filter((p) => {
       const categoryOk = quickCategoryFilter === 'all' || p.category === quickCategoryFilter;
       if (!categoryOk) return false;
-      if (!q) return true;
       return [p.name, p.sku, p.category, p.description].join(' ').toLowerCase().includes(q);
     });
   }, [products, onlyAssignedToBranch, quickSearchTerm, quickCategoryFilter]);
@@ -664,7 +666,14 @@ const [products, setProducts] = useState<Product[]>([]);
               <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-[#3d4532]">Inventario de productos</h2>
-                  <p className="text-sm app-text-muted">Busca, filtra y actualiza los productos.</p>
+                  <p className="text-sm app-text-muted">
+                    Busca, filtra y actualiza los productos.
+                    {filteredProducts.length > 0 && (
+                      <span className="ml-1 text-[#5c6650]">
+                        · {filteredProducts.length} en catálogo · {PRODUCT_PAGE_SIZE} por página
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="w-full md:w-[420px]">
                   <label className="mb-2 flex items-center gap-2 text-xs app-text-muted">
@@ -680,6 +689,7 @@ const [products, setProducts] = useState<Product[]>([]);
                     placeholder="Buscar por nombre, SKU o categoría"
                     items={filteredProducts}
                     searchKeys={['name', 'sku', 'category', 'description']}
+                    maxResults={8}
                     onSearch={handleSearch}
                     onSelect={(product) => setSelectedProduct(product)}
                     renderItem={(product) => (
@@ -770,134 +780,6 @@ const [products, setProducts] = useState<Product[]>([]);
                   onPageChange={setProductPage}
                 />
               </div>
-
-              <div className="app-panel mt-6 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-base font-semibold text-[#3d4532]">Edición rápida de stock</h3>
-                    <p className="mt-1 text-sm app-text-muted">
-                      Registra ingresos de stock en la sucursal activa (se suman al stock actual).
-                    </p>
-                    {quickNumericWarning && (
-                      <p className="mt-2 text-xs text-rose-700">{quickNumericWarning}</p>
-                    )}
-                  </div>
-                  <span className="rounded-full border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.08)] px-3 py-1 text-xs text-[#4a533c]">
-                    Sucursal: {activeBranchName}
-                  </span>
-                </div>
-
-                <div className="mt-4 overflow-x-auto">
-                  <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-                    <input
-                      type="text"
-                      value={quickSearchTerm}
-                      onChange={(e) => setQuickSearchTerm(e.target.value)}
-                      placeholder="Buscar por nombre, SKU o categoría"
-                      className="app-input md:max-w-sm"
-                    />
-                    <select
-                      value={quickCategoryFilter}
-                      onChange={(e) => setQuickCategoryFilter(e.target.value)}
-                      className="app-select md:w-64"
-                    >
-                      <option value="all">Todas las categorías</option>
-                      {Array.from(new Set(products.map((p) => p.category).filter(Boolean))).map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-xs text-[#6b7280]">
-                      {quickStockProducts.length} producto(s) · {STOCK_PAGE_SIZE} por página
-                    </span>
-                  </div>
-                  <table className="app-table min-w-full text-left text-sm">
-                    <thead>
-                      <tr>
-                        <th className="px-4 py-3">Producto</th>
-                        <th className="px-4 py-3">SKU</th>
-                        <th className="px-4 py-3">Stock actual</th>
-                        <th className="px-4 py-3">Mín. actual</th>
-                        <th className="px-4 py-3">Ingreso stock</th>
-                        <th className="px-4 py-3">Nuevo mín.</th>
-                        <th className="px-4 py-3">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedStockProducts.items.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-6 text-center text-xs text-[#6b7280]">
-                            No hay productos con ese filtro. Ajusta la búsqueda o categoría.
-                          </td>
-                        </tr>
-                      ) : (
-                      paginatedStockProducts.items.map((p) => {
-                        const draft = quickStockDraft[p.id];
-                        const minDraft = quickMinStockDraft[p.id];
-                        return (
-                          <tr key={p.id}>
-                            <td className="px-4 py-3">
-                              <p className="max-w-[180px] truncate font-semibold text-[#3d4532]">{p.name}</p>
-                            </td>
-                            <td className="px-4 py-3">{p.sku}</td>
-                            <td className="px-4 py-3">{p.stock ?? 0}</td>
-                            <td className="px-4 py-3">{p.minStock ?? 0}</td>
-                            <td className="px-4 py-3">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                className="app-input w-28"
-                                value={draft ?? '0'}
-                                onChange={(e) =>
-                                  handleQuickDigitsChange(e.target.value, setQuickStockDraft, p.id)
-                                }
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                className="app-input w-24"
-                                value={minDraft ?? String(p.minStock ?? 0)}
-                                onChange={(e) =>
-                                  handleQuickDigitsChange(e.target.value, setQuickMinStockDraft, p.id)
-                                }
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <button
-                                type="button"
-                                disabled={quickSavingId === p.id}
-                                onClick={() =>
-                                  askConfirmation(
-                                    'Aplicar cambio de stock',
-                                    `¿Confirmas el ingreso de stock para "${p.name}" en la sucursal activa?`,
-                                    'Aplicar',
-                                    'primary',
-                                    () => saveQuickStock(p)
-                                  )
-                                }
-                                className="app-btn-primary px-3 py-2 text-xs disabled:opacity-50"
-                              >
-                                {quickSavingId === p.id ? 'Guardando…' : 'Guardar'}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      }))}
-                    </tbody>
-                  </table>
-                  <TablePagination
-                    page={paginatedStockProducts.page}
-                    pageSize={STOCK_PAGE_SIZE}
-                    totalItems={quickStockProducts.length}
-                    onPageChange={setStockPage}
-                  />
-                </div>
-              </div>
             </section>
 
             <aside className="space-y-6">
@@ -916,9 +798,136 @@ const [products, setProducts] = useState<Product[]>([]);
                     <p className="mt-1 text-2xl font-semibold text-[#3d4532]">{products.length}</p>
                   </div>
                   <div className="app-panel p-4">
-                    <p className="text-sm app-text-muted">Producto activo</p>
+                    <p className="text-sm app-text-muted">Coinciden con filtro</p>
                     <p className="mt-1 text-2xl font-semibold text-[#3d4532]">{filteredProducts.length}</p>
                   </div>
+                </div>
+              </div>
+
+              <div className="app-card rounded-3xl p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="app-eyebrow text-[0.7rem] tracking-[0.28em]">Stock rápido</p>
+                    <p className="mt-2 text-sm leading-6 app-text-muted">
+                      Busca un producto y registra ingresos en la sucursal activa (máx. {STOCK_PAGE_SIZE} por vista).
+                    </p>
+                  </div>
+                </div>
+                {quickNumericWarning && (
+                  <p className="mt-2 text-xs text-rose-700">{quickNumericWarning}</p>
+                )}
+                <div className="mt-4 space-y-3">
+                  <input
+                    type="text"
+                    value={quickSearchTerm}
+                    onChange={(e) => setQuickSearchTerm(e.target.value)}
+                    placeholder="Buscar producto (mín. 2 letras)…"
+                    className="app-input w-full"
+                  />
+                  <select
+                    value={quickCategoryFilter}
+                    onChange={(e) => setQuickCategoryFilter(e.target.value)}
+                    className="app-select w-full"
+                  >
+                    <option value="all">Todas las categorías</option>
+                    {Array.from(new Set(products.map((p) => p.category).filter(Boolean))).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                  {quickSearchTerm.trim().length < QUICK_STOCK_MIN_SEARCH ? (
+                    <p className="app-panel px-4 py-5 text-center text-xs app-text-muted">
+                      Escribe al menos {QUICK_STOCK_MIN_SEARCH} caracteres para ver hasta {STOCK_PAGE_SIZE} productos
+                      y editar stock.
+                    </p>
+                  ) : (
+                    <>
+                      <table className="app-table min-w-full text-left text-sm">
+                        <thead>
+                          <tr>
+                            <th className="px-3 py-2">Producto</th>
+                            <th className="px-3 py-2">Stock</th>
+                            <th className="px-3 py-2">+Ingreso</th>
+                            <th className="px-3 py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedStockProducts.items.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-3 py-5 text-center text-xs text-[#6b7280]">
+                                Sin coincidencias. Prueba otro nombre o categoría.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedStockProducts.items.map((p) => {
+                              const draft = quickStockDraft[p.id];
+                              const minDraft = quickMinStockDraft[p.id];
+                              return (
+                                <tr key={p.id}>
+                                  <td className="px-3 py-3">
+                                    <p className="max-w-[120px] truncate font-semibold text-[#3d4532]">{p.name}</p>
+                                    <p className="text-xs text-[#6b7280]">mín. {p.minStock ?? 0}</p>
+                                  </td>
+                                  <td className="px-3 py-3">{p.stock ?? 0}</td>
+                                  <td className="px-3 py-3">
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      className="app-input w-16"
+                                      value={draft ?? '0'}
+                                      onChange={(e) =>
+                                        handleQuickDigitsChange(e.target.value, setQuickStockDraft, p.id)
+                                      }
+                                      aria-label={`Ingreso stock ${p.name}`}
+                                    />
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      className="app-input mt-1 w-16"
+                                      value={minDraft ?? String(p.minStock ?? 0)}
+                                      onChange={(e) =>
+                                        handleQuickDigitsChange(e.target.value, setQuickMinStockDraft, p.id)
+                                      }
+                                      aria-label={`Stock mínimo ${p.name}`}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <button
+                                      type="button"
+                                      disabled={quickSavingId === p.id}
+                                      onClick={() =>
+                                        askConfirmation(
+                                          'Aplicar cambio de stock',
+                                          `¿Confirmas el ingreso de stock para "${p.name}" en la sucursal activa?`,
+                                          'Aplicar',
+                                          'primary',
+                                          () => saveQuickStock(p)
+                                        )
+                                      }
+                                      className="app-btn-primary px-2 py-1.5 text-xs disabled:opacity-50"
+                                    >
+                                      {quickSavingId === p.id ? '…' : 'OK'}
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                      <TablePagination
+                        page={paginatedStockProducts.page}
+                        pageSize={STOCK_PAGE_SIZE}
+                        totalItems={quickStockProducts.length}
+                        onPageChange={setStockPage}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
 

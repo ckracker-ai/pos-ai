@@ -150,13 +150,17 @@ class SaasPlanDelegate {
     if (planId) {
       const byId = await SaasPlan.findOne({ where: { id: planId, isActive: true } });
       if (!byId) return fail('PLAN_NOT_FOUND');
-      return ok(String(byId.id));
+      const resolvedId = String(byId.getDataValue('id') ?? '');
+      if (!resolvedId) return fail('PLAN_NOT_FOUND');
+      return ok(resolvedId);
     }
 
     const codigo = (planCodigo || DEFAULT_SAAS_PLAN_CODIGO) as SaasPlanCodigo;
     const byCodigo = await SaasPlan.findOne({ where: { codigo, isActive: true } });
     if (!byCodigo) return fail('PLAN_NOT_FOUND');
-    return ok(String(byCodigo.id));
+    const resolvedId = String(byCodigo.getDataValue('id') ?? '');
+    if (!resolvedId) return fail('PLAN_NOT_FOUND');
+    return ok(resolvedId);
   }
 }
 

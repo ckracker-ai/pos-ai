@@ -71,6 +71,53 @@ export async function handleSessionBranch(request: FastifyRequest, reply: Fastif
   }
 }
 
+const simulateVoiceSchema = z.object({
+  from: z.string().min(8),
+  text: z.string().min(1),
+});
+
+export async function handleSimulateVoice(request: FastifyRequest, reply: FastifyReply) {
+  const body = simulateVoiceSchema.parse(request.body);
+  const from = body.from.replace(/\D/g, '');
+
+  try {
+    const res = await fetch(`${config.assistantApiBaseUrl}/webhooks/voice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, text: body.text.trim() }),
+    });
+
+    const assistantBody = (await res.json()) as {
+      success?: boolean;
+      reply?: string;
+      error?: string;
+      to?: string;
+    };
+
+    if (!res.ok) {
+      return sendFail(
+        reply,
+        assistantBody.error ?? 'Assistant voice service error',
+        res.status
+      );
+    }
+
+    return sendOk(reply, {
+      to: assistantBody.to ?? from,
+      reply: assistantBody.reply ?? '',
+      channel: 'VOZ',
+      success: assistantBody.success !== false,
+    });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Assistant unreachable';
+    return sendFail(
+      reply,
+      `No se pudo contactar pos-api-assistant (${config.assistantApiBaseUrl}). ${message}`,
+      503
+    );
+  }
+}
+
 export async function handleSimulate(request: FastifyRequest, reply: FastifyReply) {
   const body = simulateSchema.parse(request.body);
   const from = body.from.replace(/\D/g, '');
@@ -130,6 +177,7 @@ export async function registerPlatformAssistantRoutes(app: FastifyInstance) {
   app.get('/empresas/:empresaId/branches', handleListBranches);
   app.patch('/bindings/:bindingId/session-branch', handleSessionBranch);
   app.post('/simulate', handleSimulate);
+  app.post('/simulate-voice', handleSimulateVoice);
 }
 
 /** Rutas equivalentes bajo /platform/empresas (compat. BFF sin rebuild de assistant.js). */
@@ -138,4 +186,5 @@ export function registerPlatformAssistantEmpresaRoutes(app: FastifyInstance) {
   app.get('/:empresaId/branches', handleListBranches);
   app.patch('/assistant-bindings/:bindingId/session-branch', handleSessionBranch);
   app.post('/assistant/simulate', handleSimulate);
+  app.post('/assistant/simulate-voice', handleSimulateVoice);
 }

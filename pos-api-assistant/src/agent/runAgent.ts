@@ -1,6 +1,6 @@
 import config from '../config/index.js';
 
-import { coreClient, type AssistantContext } from '../core/coreClient.js';
+import { coreClient, type AssistantChannel, type AssistantContext } from '../core/coreClient.js';
 
 import { parsePedidoLines } from './orderText.js';
 import {
@@ -17,7 +17,9 @@ import {
   type ComunaOption,
 } from './territoryFlow.js';
 
-import { SYSTEM_PROMPT } from './systemPrompt.js';
+import { SYSTEM_PROMPT, VOICE_SYSTEM_PROMPT } from './systemPrompt.js';
+import { formatVoiceReply, isVoiceChannel } from './voiceFormat.js';
+import { voiceHelp } from './voiceMessages.js';
 import {
   wspHelp,
   wspNoPendingToConfirm,
@@ -340,13 +342,13 @@ async function handlePedidoCommand(
 
   }
 
-  if (session.lastSearch.length === 0) {
+  const parsedLines = parsePedidoLines(body);
+  if (parsedLines && session.lastSearch.length === 0) {
     return {
       text: 'Primero escribe *buscar …* para ver el listado numerado y luego *pedido 2x2*.',
     };
   }
 
-  const parsedLines = parsePedidoLines(body);
   if (parsedLines) {
     const resolved: Array<{ product: CatalogItem; qty: number }> = [];
     for (const line of parsedLines) {
@@ -517,9 +519,20 @@ async function ensureCategoryCatalog(session: Session): Promise<void> {
   }
 }
 
+function helpForChannel(session: Session): string {
+  return isVoiceChannel(session.context.channel)
+    ? voiceHelp(session.context.empresaNombre)
+    : wspHelp(session.context.empresaNombre);
+}
+
+function finalizeReply(session: Session, reply: AgentReply): AgentReply {
+  if (!isVoiceChannel(session.context.channel)) return reply;
+  return { text: formatVoiceReply(reply.text) };
+}
+
 /** Motor híbrido: reglas locales + OpenAI opcional. */
 
-export async function runAgent(session: Session, userText: string): Promise<AgentReply> {
+async function runAgentCore(session: Session, userText: string): Promise<AgentReply> {
 
   const text = userText.trim();
 
@@ -535,7 +548,7 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
     if (lower === 'ayuda' || lower === 'help' || lower === 'menu') {
 
-      return { text: wspHelp(context.empresaNombre) };
+      return { text: helpForChannel(session) };
 
     }
 
@@ -774,7 +787,7 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
 
 
-    return { text: wspHelp(context.empresaNombre) };
+    return { text: helpForChannel(session) };
 
   } catch (e) {
 
@@ -782,6 +795,11 @@ export async function runAgent(session: Session, userText: string): Promise<Agen
 
   }
 
+}
+
+export async function runAgent(session: Session, userText: string): Promise<AgentReply> {
+  const reply = await runAgentCore(session, userText);
+  return finalizeReply(session, reply);
 }
 
 
@@ -816,7 +834,10 @@ async function runOpenAi(session: Session, userText: string): Promise<AgentReply
 
       messages: [
 
-        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'system',
+          content: isVoiceChannel(session.context.channel) ? VOICE_SYSTEM_PROMPT : SYSTEM_PROMPT,
+        },
 
         {
 
@@ -850,9 +871,9 @@ async function runOpenAi(session: Session, userText: string): Promise<AgentReply
 
 
 
-export async function buildSession(phone: string): Promise<Session> {
+export async function buildSession(phone: string, channel: AssistantChannel = 'WHATSAPP'): Promise<Session> {
 
-  const context = await coreClient.resolvePhone(phone);
+  const context = await coreClient.resolvePhone(phone, channel);
 
   return {
 

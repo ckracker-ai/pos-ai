@@ -10,7 +10,8 @@
     "test": "tsx --test test/**/*.test.ts",
     "test:wsp-cart": "tsx --test test/wsp-multi-item-cart.test.ts",
     "test:wsp-territory": "tsx --test test/wsp-territory-flow.test.ts",
-    "test:pos-ai": "tsx --test test/pos-interpreter-rules.test.ts"
+    "test:pos-ai": "tsx --test test/pos-interpreter-rules.test.ts",
+    "test:voice": "tsx --test test/voice-format.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.2.0",

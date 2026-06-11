@@ -3,7 +3,7 @@ import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import legalDelegate from '../delegates/LegalDelegate';
 
 const mapErrorStatus = (error: string): number => {
-  if (error === 'LEGAL_DOCUMENTS_NOT_CONFIGURED') return 503;
+  if (error === 'LEGAL_DOCUMENTS_NOT_CONFIGURED' || error === 'LEGAL_SLA_NOT_CONFIGURED') return 503;
   if (error === 'LEGAL_DOCUMENT_NOT_FOUND') return 404;
   if (error === 'LEGAL_VERSION_MISMATCH') return 409;
   if (error === 'TERMS_NOT_ACCEPTED') return 400;
@@ -11,6 +11,25 @@ const mapErrorStatus = (error: string): number => {
 };
 
 export const legalPublicRoutes = Router();
+
+legalPublicRoutes.get('/documents/sla/current', async (req, res) => {
+  const locale = String(req.query.locale ?? 'es-CL');
+  const result = await legalDelegate.getCurrentSlaDocument(locale);
+  if (result.success) {
+    return sendOk(res, {
+      locale,
+      sla: {
+        id: result.value.id,
+        version: result.value.version,
+        title: result.value.title,
+        contentMd: result.value.contentMd,
+        contentHash: result.value.contentHash,
+        effectiveAt: result.value.effectiveAt,
+      },
+    });
+  }
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
 
 legalPublicRoutes.get('/documents/current', async (req, res) => {
   const locale = String(req.query.locale ?? 'es-CL');

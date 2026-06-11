@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/platform/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/platform/empresas', label: 'Empresas', icon: '🏢' },
   { href: '/platform/whatsapp', label: 'Simular WSP', icon: '💬' },
+  { href: '/platform/voice', label: 'Simular voz', icon: '🎙️' },
 ] as const;
 
 function navButtonClass(isActive: boolean) {

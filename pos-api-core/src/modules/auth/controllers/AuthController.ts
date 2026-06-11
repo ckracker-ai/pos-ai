@@ -13,9 +13,25 @@ class AuthController {
   };
 
   login = async (req: Request, res: Response): Promise<Response | void> => {
-    const result = await authDelegate.login(req.body);
+    const body = req.body ?? {};
+    const result = await authDelegate.login({
+      ...body,
+      ipAddress: req.ip,
+      userAgent: String(req.headers['user-agent'] ?? ''),
+    });
     if (result.success) return sendOk(res, result.value);
     const err = result.error;
+    if (!result.success && result.error === 'LEGAL_REAUTH_REQUIRED' && 'value' in result) {
+      return res.status(403).json({
+        success: false,
+        data: result.value,
+        error: result.error,
+        code: 403,
+      });
+    }
+    if (err === 'LEGAL_VERSION_MISMATCH') {
+      return sendFail(res, err, 409);
+    }
     if (err === 'EMPRESA_SUSPENDED' || err === 'EMPRESA_PENDING_ONBOARDING') {
       return sendFail(res, err, 403);
     }

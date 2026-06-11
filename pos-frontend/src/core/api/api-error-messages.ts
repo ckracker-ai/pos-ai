@@ -18,6 +18,7 @@ export type ApiErrorContext =
   | 'empresas.save'
   | 'empresas.formalizacion'
   | 'empresas.formalizar'
+  | 'empresas.privacidad'
   | 'categories.list'
   | 'categories.save'
   | 'categories.delete'
@@ -70,6 +71,7 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'empresas.save': 'No se pudo guardar el perfil de la empresa',
   'empresas.formalizacion': 'No se pudo guardar el progreso de formalización',
   'empresas.formalizar': 'No se pudo formalizar el negocio',
+  'empresas.privacidad': 'No se pudo completar la acción de privacidad',
   'categories.list': 'No se pudieron cargar las categorías',
   'categories.save': 'No se pudo guardar la categoría',
   'categories.delete': 'No se pudo eliminar la categoría',
@@ -131,6 +133,14 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   CATEGORY_NOT_LEAF:
     'El producto debe asignarse a una subcategoría (categoría hoja). Elige una subcategoría en el formulario o créala en Categorías.',
   CATEGORY_INACTIVE: 'La categoría seleccionada está inactiva. Elige otra o reactívala en Categorías.',
+  CATEGORY_NAME_TAKEN_SIBLING:
+    'Ya existe una subcategoría con ese nombre en la misma categoría padre. Elige otro nombre o edita la existente.',
+  CATEGORY_NAME_TAKEN_ROOT:
+    'Ya existe una categoría principal con ese nombre. Elige otro nombre.',
+  CATEGORY_NAME_DUPLICATE:
+    'Ya existe una categoría con ese nombre. Si es subcategoría, verifica que esté bajo la categoría padre correcta.',
+  DUPLICATE_ENTRY:
+    'Ese dato ya existe (nombre o identificador duplicado). Revisa e inténtalo de nuevo.',
   SALE_NOT_FOUND: 'No encontramos la venta.',
   STOCK_RECORD_NOT_FOUND: 'Este producto aún no tiene stock en la sucursal activa.',
   ERROR_UPDATING_PASSWORD: 'No se pudo actualizar la contraseña.',

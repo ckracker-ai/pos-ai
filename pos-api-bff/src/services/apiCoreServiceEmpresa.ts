@@ -70,4 +70,24 @@ export class ApiCoreServiceEmpresa extends ApiCoreBaseService {
     });
     return response.data;
   }
+
+  async getDataExport(id: string, token: string, internalKey: string, branchId: string) {
+    const response = await this.client.get(`/empresas/${id}/data-export`, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
+  async createDataDeletionRequest(
+    id: string,
+    input: { notes?: string | null },
+    token: string,
+    internalKey: string,
+    branchId: string
+  ) {
+    const response = await this.client.post(`/empresas/${id}/data-deletion-request`, input, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
 }

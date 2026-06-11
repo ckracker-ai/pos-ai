@@ -29,10 +29,13 @@ async function coreFetch<T>(
   return json.data;
 }
 
+export type AssistantChannel = 'WHATSAPP' | 'VOZ';
+
 export type AssistantContext = {
   bindingId: string;
   empresaId: string;
   empresaNombre: string;
+  channel: AssistantChannel;
   phone: string;
   sessionBranchId: string | null;
   defaultBranchId: string | null;
@@ -53,9 +56,9 @@ export type AssistantContext = {
 };
 
 export const coreClient = {
-  resolvePhone(phone: string) {
+  resolvePhone(phone: string, channel: AssistantChannel = 'WHATSAPP') {
     return coreFetch<{ context: AssistantContext }>(
-      `/assistant/resolve?phone=${encodeURIComponent(phone)}&channel=WHATSAPP`
+      `/assistant/resolve?phone=${encodeURIComponent(phone)}&channel=${channel}`
     ).then((d) => d.context);
   },
 

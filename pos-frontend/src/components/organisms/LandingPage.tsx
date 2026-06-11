@@ -372,6 +372,9 @@ function LandingFooter() {
           <Link href="/legal/privacidad" className="text-white/75 hover:text-white">
             Privacidad
           </Link>
+          <Link href="/legal/sla" className="text-white/75 hover:text-white">
+            SLA
+          </Link>
         </div>
       </div>
     </footer>

@@ -66,9 +66,12 @@ const statusForCategoryError = (error: string): number => {
   if (
     error === 'CATEGORY_PARENT_CYCLE' ||
     error === 'CATEGORY_MAX_DEPTH_EXCEEDED' ||
-    error === 'CATEGORY_NOT_LEAF'
+    error === 'CATEGORY_NOT_LEAF' ||
+    error === 'CATEGORY_NAME_TAKEN_SIBLING' ||
+    error === 'CATEGORY_NAME_TAKEN_ROOT' ||
+    error === 'SLUG_ALREADY_TAKEN'
   ) {
-    return 400;
+    return 409;
   }
   return 400;
 };

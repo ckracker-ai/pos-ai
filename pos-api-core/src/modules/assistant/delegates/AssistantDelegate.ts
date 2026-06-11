@@ -93,6 +93,11 @@ class AssistantDelegate {
       return fail('ASSISTANT_PLAN_REQUIRED');
     }
 
+    const voiceOk = features.assistantVoz || codigo === 'FULL';
+    if (!voiceOk && channel === 'VOZ') {
+      return fail('ASSISTANT_VOICE_PLAN_REQUIRED');
+    }
+
     return ok({
       bindingId: String(binding.getDataValue('id') ?? ''),
       empresaId: String(binding.getDataValue('empresaId') ?? ''),
@@ -490,21 +495,51 @@ class AssistantDelegate {
     );
   }
 
+  private async mapBindingsWithEmpresaNames(
+    rows: AssistantChannelBinding[],
+    extra?: (b: AssistantChannelBinding) => Record<string, unknown>
+  ): Promise<Record<string, unknown>[]> {
+    const empresaIds = [
+      ...new Set(rows.map((b) => String(b.getDataValue('empresaId') ?? '')).filter(Boolean)),
+    ];
+    const empresas =
+      empresaIds.length > 0
+        ? await Empresa.findAll({
+            where: { id: empresaIds },
+            attributes: ['id', 'nombreFantasia', 'razonSocial'],
+          })
+        : [];
+    const nameById = new Map(
+      empresas.map((e) => {
+        const id = String(e.getDataValue('id') ?? '');
+        const label =
+          String(e.getDataValue('nombreFantasia') || e.getDataValue('razonSocial') || '').trim() ||
+          'Sin nombre';
+        return [id, label] as const;
+      })
+    );
+
+    return rows.map((b) => {
+      const empresaId = String(b.getDataValue('empresaId') ?? '');
+      return {
+        id: String(b.getDataValue('id') ?? ''),
+        empresaId,
+        empresaNombre: nameById.get(empresaId) ?? 'Sin nombre',
+        channel: String(b.getDataValue('channel') ?? ''),
+        externalId: String(b.getDataValue('externalId') ?? ''),
+        defaultBranchId: b.getDataValue('defaultBranchId') ?? null,
+        sessionBranchId: b.getDataValue('sessionBranchId') ?? null,
+        ...(extra ? extra(b) : {}),
+      };
+    });
+  }
+
   async listAllBindings(): Promise<Result<Record<string, unknown>[]>> {
     const rows = await AssistantChannelBinding.findAll({
       where: { isActive: true },
       order: [['createdAt', 'DESC']],
     });
-    return ok(
-      rows.map((b) => ({
-        id: String(b.getDataValue('id') ?? ''),
-        empresaId: String(b.getDataValue('empresaId') ?? ''),
-        channel: String(b.getDataValue('channel') ?? ''),
-        externalId: String(b.getDataValue('externalId') ?? ''),
-        defaultBranchId: b.getDataValue('defaultBranchId') ?? null,
-        sessionBranchId: b.getDataValue('sessionBranchId') ?? null,
-      }))
-    );
+    return ok(await this.mapBindingsWithEmpresaNames(rows));
   }
 
   async listBindingsForEmpresa(empresaId: string): Promise<Result<Record<string, unknown>[]>> {
@@ -513,13 +548,7 @@ class AssistantDelegate {
       order: [['createdAt', 'DESC']],
     });
     return ok(
-      rows.map((b) => ({
-        id: String(b.getDataValue('id') ?? ''),
-        empresaId: String(b.getDataValue('empresaId') ?? ''),
-        channel: String(b.getDataValue('channel') ?? ''),
-        externalId: String(b.getDataValue('externalId') ?? ''),
-        defaultBranchId: b.getDataValue('defaultBranchId') ?? null,
-        sessionBranchId: b.getDataValue('sessionBranchId') ?? null,
+      await this.mapBindingsWithEmpresaNames(rows, (b) => ({
         isActive: Boolean(b.getDataValue('isActive')),
       }))
     );
@@ -613,6 +642,86 @@ class AssistantDelegate {
       externalId: phone,
       defaultBranchId,
       adminNotifyPhone: input.adminNotifyPhone ?? null,
+      created,
+    });
+  }
+
+  async upsertVoiceBinding(input: {
+    empresaId: string;
+    externalId: string;
+    defaultBranchId?: string | null;
+  }): Promise<Result<Record<string, unknown>>> {
+    const phone = normalizePhoneE164(input.externalId);
+    if (!phone) return fail('VALIDATION_ERROR: invalid phone');
+
+    const empresa = await Empresa.findByPk(input.empresaId);
+    if (!empresa) return fail('EMPRESA_NOT_FOUND');
+
+    const plan = await SaasPlan.findByPk(String(empresa.getDataValue('planId') ?? ''));
+    if (!plan) return fail('PLAN_NOT_FOUND');
+    const codigo = String(plan.getDataValue('codigo') ?? '').toUpperCase();
+    const features = parsePlanFeatures(plan.getDataValue('features'));
+    const voiceOk = features.assistantVoz || codigo === 'FULL';
+    if (!voiceOk) return fail('ASSISTANT_VOICE_PLAN_REQUIRED');
+
+    const phoneTaken = await AssistantChannelBinding.findOne({
+      where: { channel: 'VOZ', externalId: phone, isActive: true },
+    });
+    const phoneTakenEmpresaId = phoneTaken
+      ? String(phoneTaken.getDataValue('empresaId') ?? '')
+      : '';
+    if (phoneTaken && phoneTakenEmpresaId !== input.empresaId) {
+      return fail('ASSISTANT_PHONE_IN_USE');
+    }
+
+    let defaultBranchId = input.defaultBranchId ?? null;
+    if (defaultBranchId) {
+      const branch = await Branch.findOne({
+        where: { id: defaultBranchId, empresaId: input.empresaId, isActive: true },
+      });
+      if (!branch) return fail('BRANCH_NOT_FOUND');
+    } else {
+      const first = await Branch.findOne({
+        where: { empresaId: input.empresaId, isActive: true },
+        order: [['createdAt', 'ASC']],
+      });
+      defaultBranchId = first ? String(first.getDataValue('id') ?? '') : null;
+    }
+
+    const existingForEmpresa = await AssistantChannelBinding.findOne({
+      where: { empresaId: input.empresaId, channel: 'VOZ', isActive: true },
+      order: [['updatedAt', 'DESC']],
+    });
+
+    let created = false;
+    if (existingForEmpresa) {
+      await existingForEmpresa.update({
+        externalId: phone,
+        defaultBranchId,
+        isActive: true,
+      });
+    } else {
+      created = true;
+      await AssistantChannelBinding.create({
+        id: uuidv4(),
+        empresaId: input.empresaId,
+        channel: 'VOZ',
+        externalId: phone,
+        defaultBranchId,
+        sessionBranchId: null,
+        isActive: true,
+      });
+    }
+
+    const binding = await AssistantChannelBinding.findOne({
+      where: { channel: 'VOZ', externalId: phone, empresaId: input.empresaId },
+    });
+
+    return ok({
+      id: String(binding?.getDataValue('id') ?? ''),
+      externalId: phone,
+      defaultBranchId,
+      channel: 'VOZ',
       created,
     });
   }

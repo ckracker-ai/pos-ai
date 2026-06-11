@@ -339,6 +339,21 @@
   color: #047857;
 }
 
+@keyframes pos-action-alert-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pos-action-alert-enter {
+  animation: pos-action-alert-enter 0.2s ease-out;
+}
+
 .app-tab {
   border-radius: 1rem;
   padding: 0.5rem 1rem;
@@ -456,6 +471,11 @@
 .app-page-content [class*='text-slate-300'],
 .app-page-content [class*='text-slate-400'] {
   color: #3d4532 !important;
+}
+
+/* Simulador WSP: burbujas usuario y botón Enviar sobre olivo */
+.app-page-content .wsp-sim-panel .wsp-on-olive {
+  color: #fafaf9 !important;
 }
 
 .app-page-content [class*='hover:bg-slate-950'],

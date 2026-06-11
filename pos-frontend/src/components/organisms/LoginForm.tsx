@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { LoginRequest } from '@/core/interfaces';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
+import { LegalAcceptanceField } from '@/components/molecules/LegalAcceptanceField';
+import { LoginLegalReauthBundle, LoginRequest } from '@/core/interfaces';
+import type { PublicLegalCurrent } from '@/core/api/public-legal';
 
 export function LoginForm() {
   const router = useRouter();
@@ -12,6 +14,9 @@ export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
+  const [legalReauth, setLegalReauth] = useState<LoginLegalReauthBundle | null>(null);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [legalDocs, setLegalDocs] = useState<PublicLegalCurrent | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,10 +28,37 @@ export function LoginForm() {
       return;
     }
 
+    if (legalReauth && !acceptedLegal) {
+      setLocalError('Debes aceptar los Términos de Servicio y la Política de Privacidad.');
+      return;
+    }
+
+    const payload: LoginRequest = { email, password };
+    if (legalReauth && acceptedLegal) {
+      payload.legalAcceptance = {
+        termsVersion: legalDocs?.terms.version ?? legalReauth.terms.version,
+        privacyVersion: legalDocs?.privacy.version ?? legalReauth.privacy.version,
+        accepted: true,
+      };
+    }
+
     try {
-      await login({ email, password } as LoginRequest);
+      await login(payload);
+      setLegalReauth(null);
+      setAcceptedLegal(false);
       router.push('/dashboard');
     } catch (err: unknown) {
+      if (
+        err instanceof Error &&
+        (err as Error & { code?: string; legal?: LoginLegalReauthBundle }).code ===
+          'LEGAL_REAUTH_REQUIRED'
+      ) {
+        const bundle = (err as Error & { legal?: LoginLegalReauthBundle }).legal ?? null;
+        setLegalReauth(bundle);
+        setAcceptedLegal(false);
+        setLocalError('');
+        return;
+      }
       if (err instanceof Error) {
         setLocalError(err.message);
       } else {
@@ -46,6 +78,12 @@ export function LoginForm() {
           <p className="text-sm text-brand-ink-muted">Punto de venta Inteligente</p>
           <p className="mt-1 text-xs text-brand-ink-muted/80">Ingresa a tu cuenta</p>
         </div>
+
+        {legalReauth ? (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Actualizamos los términos legales. Revisa y acepta para continuar.
+          </div>
+        ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {(error || localError) && (
@@ -86,9 +124,18 @@ export function LoginForm() {
             />
           </div>
 
+          {legalReauth ? (
+            <LegalAcceptanceField
+              initialLegal={null}
+              accepted={acceptedLegal}
+              onAcceptedChange={setAcceptedLegal}
+              onLegalReady={setLegalDocs}
+            />
+          ) : null}
+
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || (Boolean(legalReauth) && !acceptedLegal)}
             className="w-full rounded-lg bg-brand-olive py-2.5 px-4 font-semibold text-white transition hover:bg-[#3d4532] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-brand-olive/40 focus:ring-offset-2"
           >
             {isLoading ? (
@@ -100,15 +147,24 @@ export function LoginForm() {
                   viewBox="0 0 24 24"
                   aria-hidden
                 >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
                   <path
                     className="opacity-75"
                     fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Iniciando sesión...
+                {legalReauth ? 'Confirmando…' : 'Iniciando sesión...'}
               </span>
+            ) : legalReauth ? (
+              'Aceptar y continuar'
             ) : (
               'Iniciar sesión'
             )}

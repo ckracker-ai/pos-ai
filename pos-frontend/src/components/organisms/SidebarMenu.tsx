@@ -10,6 +10,7 @@ import {
   getRoleLabel,
   resolveUserRole,
 } from '@/core/config/role-access';
+import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 
 function NavIcon({ children }: { children: string }) {
   return (
@@ -29,6 +30,7 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
+  const { displayName: empresaName } = useTenantEmpresa();
   const currentRole = resolveUserRole(user?.role);
 
   const navSections = useMemo(() => getNavSectionsForRole(currentRole), [currentRole]);
@@ -60,7 +62,12 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
     <div className="app-sidebar flex h-full min-h-0 flex-col">
       <div className="flex-shrink-0 border-b border-white/10 p-4 sm:p-5">
         <p className="text-xs uppercase tracking-widest text-brand-linen/80">Sesión</p>
-        <p className="mt-2 truncate text-sm font-semibold text-white">{user.name}</p>
+        {empresaName ? (
+          <p className="mt-2 truncate text-xs font-medium text-brand-linen/90" title={empresaName}>
+            {empresaName}
+          </p>
+        ) : null}
+        <p className="mt-1 truncate text-sm font-semibold text-white">{user.name}</p>
         <p className="text-xs text-brand-linen/90">{getRoleLabel(currentRole)}</p>
         <p className="mt-1 truncate text-xs text-white/55">{user.email}</p>
       </div>

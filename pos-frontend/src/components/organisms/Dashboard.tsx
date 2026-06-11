@@ -9,6 +9,7 @@ import {
   getRoleProfile,
 } from '@/core/config/role-access';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
+import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -18,6 +19,7 @@ export function Dashboard() {
   const role = user?.role;
   const profile = useMemo(() => getRoleProfile(role), [role]);
   const { activeBranchName, branchId, canSwitchBranch } = useActiveBranch();
+  const { displayName: empresaName } = useTenantEmpresa();
   const [pendingShrinkagesCount, setPendingShrinkagesCount] = useState(0);
 
   const dashboardModules = useMemo(() => getDashboardModulesForRole(role), [role]);
@@ -76,6 +78,12 @@ export function Dashboard() {
 
         <p className="mt-4 text-sm text-brand-ink-muted">
           Hola, <span className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</span>
+          {empresaName ? (
+            <>
+              {' · '}
+              <span className="font-semibold text-brand-ink">{empresaName}</span>
+            </>
+          ) : null}
           {' · '}
           Sucursal: <span className="font-semibold">{activeBranchName}</span>
           {canSwitchBranch && (

@@ -14,6 +14,7 @@ import { useAuthStore } from '@/core/context/auth';
 import { getRoleProfile } from '@/core/config/role-access';
 import { notifyApiError, notifySuccess } from '@/store/ui';
 import { EmpresaFormalizarPanel } from '@/components/molecules/EmpresaFormalizarPanel';
+import { EmpresaPrivacidadPanel } from '@/components/molecules/EmpresaPrivacidadPanel';
 import { WspTransferPreview } from '@/components/molecules/WspTransferPreview';
 
 const ESTADO_LABELS: Record<EmpresaEstado, string> = {
@@ -30,7 +31,7 @@ const ESTADO_STYLES: Record<EmpresaEstado, string> = {
 
 const ACCOUNT_TYPES = ['Cuenta vista', 'Cuenta corriente', 'Cuenta RUT', 'Cuenta ahorro'] as const;
 
-type EmpresaTab = 'general' | 'formalizar' | 'facturacion' | 'transferencia' | 'plan';
+type EmpresaTab = 'general' | 'formalizar' | 'facturacion' | 'transferencia' | 'plan' | 'privacidad';
 
 type EmpresaForm = {
   razonSocial: string;
@@ -162,8 +163,11 @@ export default function EmpresasPage() {
       { id: 'transferencia', label: 'Transferencia (IA)' },
       { id: 'plan', label: 'Plan y suscripción' }
     );
+    if (canManageEmpresa) {
+      tabs.push({ id: 'privacidad', label: 'Privacidad y datos' });
+    }
     return tabs;
-  }, [showFormalizarTab]);
+  }, [showFormalizarTab, canManageEmpresa]);
 
   const transferComplete = useMemo(() => {
     return (
@@ -500,6 +504,10 @@ export default function EmpresasPage() {
                     </>
                   )}
 
+                  {activeTab === 'privacidad' && empresa && canManageEmpresa && (
+                    <EmpresaPrivacidadPanel empresaId={empresa.id} />
+                  )}
+
                   {activeTab === 'plan' && (
                     <div className="rounded-lg border border-brand-olive/20 bg-brand-vanilla/50 p-5">
                       <p className="text-xs font-semibold uppercase tracking-wide text-brand-olive">
@@ -548,7 +556,7 @@ export default function EmpresasPage() {
                   )}
                 </div>
 
-                {canManageEmpresa && activeTab !== 'plan' && (
+                {canManageEmpresa && activeTab !== 'plan' && activeTab !== 'privacidad' && (
                   <div className="flex flex-wrap gap-3 border-t border-brand-linen/60 px-4 py-4 sm:px-6">
                     <button
                       type="submit"

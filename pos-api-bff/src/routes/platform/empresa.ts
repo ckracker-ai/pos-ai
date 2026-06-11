@@ -28,6 +28,32 @@ const assistantBindingSchema = z.object({
   adminNotifyPhone: z.string().min(8).nullable().optional(),
 });
 
+const createTenantUserSchema = z.object({
+  fullName: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8),
+  roleCodigo: z.enum(['ADMIN', 'AUDITOR', 'SELLER', 'COMANDA']).optional(),
+  roleId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional(),
+});
+
+const resetTenantPasswordSchema = z.object({
+  password: z.string().min(8),
+});
+
+const createTenantBranchSchema = z.object({
+  name: z.string().min(1),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+});
+
+const patchTenantBranchSchema = z.object({
+  name: z.string().min(1).optional(),
+  address: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
 const updatePlatformSchema = z.object({
   razonSocial: z.string().min(1).optional(),
   nombreFantasia: z.string().nullable().optional(),
@@ -60,6 +86,43 @@ const platformEmpresaRoutes = async (app: FastifyInstance) => {
 
   registerPlatformAssistantEmpresaRoutes(app);
 
+  app.get('/:empresaId/checkout', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    try {
+      const data = await core.getCheckout(empresaId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to fetch checkout summary'),
+        err.response?.status ?? 500
+      );
+    }
+  });
+
+  app.post('/:empresaId/checkout/confirm-payment', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = z
+      .object({
+        provider: z.string().min(1).default('SANDBOX'),
+        reference: z.string().min(1),
+        extendDays: z.number().int().positive().optional(),
+      })
+      .parse(request.body ?? {});
+    try {
+      const data = await core.confirmCheckout(empresaId, body);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to confirm checkout payment'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
   app.patch('/:empresaId/suscripcion', async (request, reply) => {
     const { empresaId } = request.params as { empresaId: string };
     const body = z
@@ -80,6 +143,22 @@ const platformEmpresaRoutes = async (app: FastifyInstance) => {
         reply,
         extractCoreError(e, 'Failed to update subscription'),
         err.response?.status ?? 500
+      );
+    }
+  });
+
+  app.post('/:empresaId/voice-bindings', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = assistantBindingSchema.parse(request.body);
+    try {
+      const data = await core.upsertVoiceBinding(empresaId, body);
+      return sendOk(reply, data, 201);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to save voice binding'),
+        err.response?.status ?? 400
       );
     }
   });
@@ -107,6 +186,115 @@ const platformEmpresaRoutes = async (app: FastifyInstance) => {
     } catch (e: unknown) {
       const err = e as { response?: { status?: number } };
       return sendFail(reply, extractCoreError(e, 'Failed to list empresas'), err.response?.status ?? 500);
+    }
+  });
+
+  app.post('/:empresaId/branches', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = createTenantBranchSchema.parse(request.body);
+    try {
+      const data = await core.createTenantBranch(empresaId, body);
+      return sendOk(reply, data, 201);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to create tenant branch'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.patch('/:empresaId/branches/:branchId', async (request, reply) => {
+    const { empresaId, branchId } = request.params as { empresaId: string; branchId: string };
+    const body = patchTenantBranchSchema.parse(request.body);
+    try {
+      const data = await core.patchTenantBranch(empresaId, branchId, body);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to update tenant branch'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.get('/:empresaId/users', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    try {
+      const data = await core.listTenantUsers(empresaId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to list tenant users'),
+        err.response?.status ?? 500
+      );
+    }
+  });
+
+  app.post('/:empresaId/users', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = createTenantUserSchema.parse(request.body);
+    try {
+      const data = await core.createTenantUser(empresaId, body);
+      return sendOk(reply, data, 201);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to create tenant user'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.patch('/:empresaId/users/:userId/password', async (request, reply) => {
+    const { empresaId, userId } = request.params as { empresaId: string; userId: string };
+    const body = resetTenantPasswordSchema.parse(request.body);
+    try {
+      const data = await core.resetTenantUserPassword(empresaId, userId, body.password);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to reset tenant password'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:empresaId/users/:userId/legal-reset', async (request, reply) => {
+    const { empresaId, userId } = request.params as { empresaId: string; userId: string };
+    try {
+      const data = await core.resetTenantUserLegal(empresaId, userId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to reset legal acceptances'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:empresaId/users/:userId/legal-grant', async (request, reply) => {
+    const { empresaId, userId } = request.params as { empresaId: string; userId: string };
+    try {
+      const data = await core.grantTenantUserLegal(empresaId, userId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to grant legal acceptances'),
+        err.response?.status ?? 400
+      );
     }
   });
 

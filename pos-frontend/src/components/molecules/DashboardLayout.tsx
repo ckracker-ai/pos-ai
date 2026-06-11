@@ -9,12 +9,15 @@ interface DashboardLayoutProps {
   children: ReactNode;
   sidebar?: ReactNode;
   header?: ReactNode;
+  /** Consola plataforma: no hay sucursal tenant activa */
+  hideBranchBar?: boolean;
 }
 
 export function DashboardLayout({
   children,
   sidebar,
   header,
+  hideBranchBar = false,
 }: DashboardLayoutProps) {
   const branchId = useBranchStore((s) => s.selectedBranchId);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -83,7 +86,7 @@ export function DashboardLayout({
         {header && (
           <header className="border-b border-brand-linen/60 bg-white shadow-sm">
             {headerNode}
-            <ActiveBranchBar />
+            {!hideBranchBar ? <ActiveBranchBar /> : null}
           </header>
         )}
         <main key={branchId} className="app-surface-page flex-1 overflow-auto">

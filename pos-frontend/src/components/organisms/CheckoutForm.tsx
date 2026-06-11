@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
+import { LegalAcceptanceField } from '@/components/molecules/LegalAcceptanceField';
 import { posProxyPath } from '@/core/constants/api-path';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
 import { CHILE_IVA_LABEL } from '@/core/constants/tax';
@@ -36,10 +37,19 @@ function mapCheckoutError(error: string): string {
   if (error.includes('TERMS_NOT_ACCEPTED')) {
     return 'Debes aceptar los Términos de Servicio y la Política de Privacidad.';
   }
+  if (error.includes('SUBSCRIPTION_ALREADY_ACTIVE')) {
+    return 'Esta suscripción ya está activa. Puedes iniciar sesión.';
+  }
+  if (error.includes('WEBPAY_CREATE_FAILED') || error.includes('WEBPAY_COMMIT_FAILED')) {
+    return 'No se pudo conectar con Webpay. Prueba «Simular pago directo» o reintenta en unos segundos.';
+  }
+  if (error.includes('socket hang up') || error.includes('ECONNRESET')) {
+    return 'El servidor se reinició durante el pago. Espera unos segundos e intenta de nuevo.';
+  }
   return error;
 }
 
-export function CheckoutForm({ legal }: CheckoutFormProps) {
+export function CheckoutForm({ legal: initialLegal }: CheckoutFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const empresaId = searchParams.get('empresaId') ?? '';
@@ -51,6 +61,7 @@ export function CheckoutForm({ legal }: CheckoutFormProps) {
   const [error, setError] = useState('');
   const [paid, setPaid] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [legal, setLegal] = useState<PublicLegalCurrent | null>(initialLegal);
 
   const loadCheckout = useCallback(async () => {
     if (!empresaId) {
@@ -235,41 +246,12 @@ export function CheckoutForm({ legal }: CheckoutFormProps) {
 
             {checkout.canPay ? (
               <>
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-linen/80 bg-brand-surface/30 px-4 py-3 text-sm text-brand-ink">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 rounded border-brand-linen accent-brand-olive"
-                    checked={acceptedLegal}
-                    onChange={(e) => setAcceptedLegal(e.target.checked)}
-                    disabled={!legal}
-                    required
-                  />
-                  <span>
-                    He leído y acepto los{' '}
-                    <Link
-                      href="/legal/terminos"
-                      target="_blank"
-                      className="font-medium text-brand-olive hover:underline"
-                    >
-                      Términos de Servicio
-                    </Link>{' '}
-                    y la{' '}
-                    <Link
-                      href="/legal/privacidad"
-                      target="_blank"
-                      className="font-medium text-brand-olive hover:underline"
-                    >
-                      Política de Privacidad
-                    </Link>
-                    {legal ? (
-                      <span className="block text-xs text-brand-ink-muted">
-                        Versión {legal.terms.version} / {legal.privacy.version}
-                      </span>
-                    ) : (
-                      <span className="block text-xs text-amber-800">Cargando documentos legales…</span>
-                    )}
-                  </span>
-                </label>
+                <LegalAcceptanceField
+                  initialLegal={initialLegal}
+                  accepted={acceptedLegal}
+                  onAcceptedChange={setAcceptedLegal}
+                  onLegalReady={setLegal}
+                />
 
                 <button
                   type="button"

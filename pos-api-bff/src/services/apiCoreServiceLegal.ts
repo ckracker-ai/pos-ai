@@ -26,6 +26,13 @@ export class ApiCoreServiceLegal extends ApiCoreBaseService {
     return response.data;
   }
 
+  async getCurrentSlaDocument(locale = 'es-CL') {
+    const response = await this.client.get('/legal/documents/sla/current', {
+      params: { locale },
+    });
+    return response.data;
+  }
+
   async recordAcceptances(input: RecordLegalAcceptanceInput) {
     const response = await this.client.post('/legal/acceptances', input, {
       headers: this.coreHeaders(),

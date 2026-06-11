@@ -39,6 +39,14 @@ function toDto(row: LegalDocument): LegalDocumentDto {
 }
 
 class LegalDelegate {
+  async getCurrentSlaDocument(locale = 'es-CL'): Promise<Result<LegalDocumentDto>> {
+    const row = await LegalDocument.findOne({
+      where: { locale, isCurrent: true, docType: 'SLA' },
+    });
+    if (!row) return fail('LEGAL_SLA_NOT_CONFIGURED');
+    return ok(toDto(row));
+  }
+
   async getCurrentDocuments(locale = 'es-CL'): Promise<Result<LegalCurrentBundle>> {
     const rows = await LegalDocument.findAll({
       where: { locale, isCurrent: true, docType: ['TOS', 'PRIVACY'] },
@@ -118,6 +126,38 @@ class LegalDelegate {
     }
 
     return ok({ acceptanceIds });
+  }
+
+  async userHasCurrentAcceptances(userId: string): Promise<Result<boolean>> {
+    const current = await this.getCurrentDocuments();
+    if (!current.success) return current;
+
+    for (const doc of [current.value.terms, current.value.privacy]) {
+      const row = await LegalAcceptance.findOne({
+        where: {
+          userId,
+          documentId: doc.id,
+          documentVersion: doc.version,
+        },
+      });
+      if (!row) return ok(false);
+    }
+
+    return ok(true);
+  }
+
+  async getLoginReauthBundle(): Promise<
+    Result<{
+      terms: { version: string; title: string };
+      privacy: { version: string; title: string };
+    }>
+  > {
+    const current = await this.getCurrentDocuments();
+    if (!current.success) return current;
+    return ok({
+      terms: { version: current.value.terms.version, title: current.value.terms.title },
+      privacy: { version: current.value.privacy.version, title: current.value.privacy.title },
+    });
   }
 }
 

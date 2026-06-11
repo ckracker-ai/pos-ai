@@ -142,6 +142,18 @@ export class ApiCoreServicePlatformEmpresa extends ApiCoreBaseService {
     return response.data;
   }
 
+  async upsertVoiceBinding(
+    empresaId: string,
+    input: { externalId: string; defaultBranchId?: string | null }
+  ) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/voice-bindings`,
+      input,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
   async listBranchesForEmpresa(empresaId: string) {
     const response = await this.client.get(`/empresas/platform/${empresaId}/branches`, {
       headers: this.corePlatformHeaders(),
@@ -153,6 +165,82 @@ export class ApiCoreServicePlatformEmpresa extends ApiCoreBaseService {
     const response = await this.client.patch(
       `/empresas/platform/assistant-bindings/${bindingId}/session-branch`,
       { branchId },
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async listTenantUsers(empresaId: string) {
+    const response = await this.client.get(`/empresas/platform/${empresaId}/users`, {
+      headers: this.corePlatformHeaders(),
+    });
+    return response.data;
+  }
+
+  async createTenantUser(
+    empresaId: string,
+    input: {
+      fullName: string;
+      email: string;
+      password: string;
+      roleCodigo?: string;
+      roleId?: string;
+      branchId?: string;
+    }
+  ) {
+    const response = await this.client.post(`/empresas/platform/${empresaId}/users`, input, {
+      headers: this.corePlatformHeaders(),
+    });
+    return response.data;
+  }
+
+  async resetTenantUserPassword(empresaId: string, userId: string, password: string) {
+    const response = await this.client.patch(
+      `/empresas/platform/${empresaId}/users/${userId}/password`,
+      { password },
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async createTenantBranch(
+    empresaId: string,
+    input: { name: string; address?: string; phone?: string }
+  ) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/branches`,
+      input,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async patchTenantBranch(
+    empresaId: string,
+    branchId: string,
+    input: { name?: string; address?: string | null; phone?: string | null; isActive?: boolean }
+  ) {
+    const response = await this.client.patch(
+      `/empresas/platform/${empresaId}/branches/${branchId}`,
+      input,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async resetTenantUserLegal(empresaId: string, userId: string) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/users/${userId}/legal-reset`,
+      {},
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async grantTenantUserLegal(empresaId: string, userId: string) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/users/${userId}/legal-grant`,
+      {},
       { headers: this.corePlatformHeaders() }
     );
     return response.data;
