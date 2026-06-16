@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { LandingContactForm } from '@/components/molecules/LandingContactForm';
 import { LandingFeatureCarousel } from '@/components/molecules/LandingFeatureCarousel';
+import { LandingHeroVideo } from '@/components/molecules/LandingHeroVideo';
 import {
   LANDING_AI_PILLARS,
   LANDING_AI_STEPS,
@@ -78,25 +79,7 @@ function LandingHeroImageFrame({ priority = false, className = '' }: { priority?
 }
 
 function LandingHeroVideoFrame({ className = '' }: { className?: string }) {
-  return (
-    <div
-      className={`relative aspect-[3/2] w-full overflow-hidden rounded-2xl border border-white/15 bg-brand-ink shadow-[0_24px_64px_rgba(0,0,0,0.35)] ${className}`}
-    >
-      <video
-        className="h-full w-full object-cover"
-        autoPlay
-        muted
-        loop
-        playsInline
-        controls
-        preload="metadata"
-        poster={LANDING_MEDIA.videoPoster}
-        aria-label="Video promocional POS-AI"
-      >
-        <source src={LANDING_MEDIA.video} type="video/mp4" />
-      </video>
-    </div>
-  );
+  return <LandingHeroVideo className={className} />;
 }
 
 function HeroSection() {
