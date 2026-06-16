@@ -15,24 +15,7 @@ import { LANDING_MODULES } from '@/core/constants/landing-plans';
 
 type LandingPageProps = {
   plans: LandingPlan[];
-  /** default: imagen en hero, video abajo · video-hero: invertido (solo preview) */
-  mediaLayout?: 'default' | 'video-hero';
-  showPreviewBanner?: boolean;
 };
-
-function LandingPreviewBanner() {
-  return (
-    <div className="fixed inset-x-0 top-[4.25rem] z-40 border-b border-amber-200/40 bg-amber-50/95 px-4 py-2 text-center text-sm text-amber-950 backdrop-blur-sm">
-      <span className="font-medium">Vista previa alternativa</span>
-      <span className="mx-2 text-amber-800/60">·</span>
-      <span className="text-amber-900/90">Layout anterior: imagen en hero, video en sección media</span>
-      <span className="mx-2 hidden text-amber-800/60 sm:inline">·</span>
-      <Link href="/" className="font-semibold text-brand-olive underline-offset-2 hover:underline">
-        Volver a landing actual
-      </Link>
-    </div>
-  );
-}
 
 function LandingNav() {
   return (
@@ -42,7 +25,7 @@ function LandingNav() {
           <PosAiLogo height={40} width={72} priority className="brightness-0 invert" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm font-medium text-white/85 md:flex">
-          <a href="#video" className="transition hover:text-white">
+          <a href="#producto" className="transition hover:text-white">
             Producto
           </a>
           <a href="#ia" className="transition hover:text-white">
@@ -74,28 +57,6 @@ function LandingNav() {
         </div>
       </div>
     </header>
-  );
-}
-
-function LandingPromoVideo({ className = '' }: { className?: string }) {
-  return (
-    <div
-      className={`landing-video-wrap relative mx-auto w-full overflow-hidden rounded-2xl border border-brand-linen/80 bg-brand-ink shadow-2xl shadow-brand-olive/15 ${className}`}
-    >
-      <video
-        className="aspect-video w-full object-cover"
-        autoPlay
-        muted
-        loop
-        playsInline
-        controls
-        preload="metadata"
-        poster={LANDING_MEDIA.videoPoster}
-        aria-label="Video promocional POS-AI"
-      >
-        <source src={LANDING_MEDIA.video} type="video/mp4" />
-      </video>
-    </div>
   );
 }
 
@@ -138,17 +99,9 @@ function LandingHeroVideoFrame({ className = '' }: { className?: string }) {
   );
 }
 
-function HeroSection({
-  mediaLayout = 'default',
-  withPreviewBanner = false,
-}: {
-  mediaLayout?: 'default' | 'video-hero';
-  withPreviewBanner?: boolean;
-}) {
+function HeroSection() {
   return (
-    <section
-      className={`landing-hero relative overflow-hidden ${withPreviewBanner ? 'pt-[7rem]' : 'pt-[4.25rem]'}`}
-    >
+    <section className="landing-hero relative overflow-hidden pt-[4.25rem]">
       <div className="landing-hero-base pointer-events-none absolute inset-0" aria-hidden />
       <div className="landing-hero-mesh pointer-events-none absolute inset-0" aria-hidden />
       <div className="landing-hero-orb landing-hero-orb--1" aria-hidden />
@@ -172,11 +125,7 @@ function HeroSection({
           </div>
 
           <div className="landing-hero-visual mx-auto flex w-full max-w-xl flex-col gap-6 lg:max-w-none lg:justify-self-end">
-            {mediaLayout === 'video-hero' ? (
-              <LandingHeroVideoFrame />
-            ) : (
-              <LandingHeroImageFrame priority />
-            )}
+            <LandingHeroVideoFrame />
             <Link
               href="/registro"
               className="inline-flex w-full items-center justify-center rounded-full bg-brand-linen px-8 py-3.5 text-base font-semibold text-brand-olive shadow-lg transition hover:bg-white sm:w-auto sm:self-start"
@@ -201,31 +150,21 @@ function HeroSection({
   );
 }
 
-function VideoSection({ mediaLayout = 'default' }: { mediaLayout?: 'default' | 'video-hero' }) {
+function ProductImageSection() {
   return (
-    <section id="video" className="border-t border-brand-linen/60 bg-brand-surface px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+    <section id="producto" className="border-t border-brand-linen/60 bg-brand-surface px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="mx-auto max-w-6xl text-center">
         <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
-          {mediaLayout === 'video-hero' ? 'Vista del producto' : 'Conoce POS-AI'}
+          Vista del producto
         </p>
         <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
-          {mediaLayout === 'video-hero'
-            ? 'El POS que piensa, aprende y hace crecer tu negocio'
-            : 'Tu negocio, potenciado con IA'}
+          El POS que piensa, aprende y hace crecer tu negocio
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-brand-ink-muted">
-          {mediaLayout === 'video-hero'
-            ? 'Arte promocional con IA en el core, WhatsApp, telefonía y ERP completo.'
-            : 'Caja inteligente, WhatsApp con stock real y operación en la nube — diseñado para PYMEs chilenas.'}
+          IA en el core, WhatsApp, telefonía y ERP completo — diseñado para PYMEs chilenas.
         </p>
-        <div className="mt-10">
-          {mediaLayout === 'video-hero' ? (
-            <div className="mx-auto max-w-4xl">
-              <LandingHeroImageFrame className="border-brand-linen/80 shadow-xl shadow-brand-olive/10" />
-            </div>
-          ) : (
-            <LandingPromoVideo className="max-w-4xl" />
-          )}
+        <div className="mx-auto mt-10 max-w-4xl">
+          <LandingHeroImageFrame className="border-brand-linen/80 shadow-xl shadow-brand-olive/10" />
         </div>
       </div>
     </section>
@@ -484,18 +423,13 @@ function LandingFooter() {
   );
 }
 
-export function LandingPage({
-  plans,
-  mediaLayout = 'video-hero',
-  showPreviewBanner = false,
-}: LandingPageProps) {
+export function LandingPage({ plans }: LandingPageProps) {
   return (
     <div className="landing-page min-h-screen">
       <LandingNav />
-      {showPreviewBanner ? <LandingPreviewBanner /> : null}
       <main>
-        <HeroSection mediaLayout={mediaLayout} withPreviewBanner={showPreviewBanner} />
-        <VideoSection mediaLayout={mediaLayout} />
+        <HeroSection />
+        <ProductImageSection />
         <FeatureSlidesSection />
         <AiSection />
         <ModulesSection />
