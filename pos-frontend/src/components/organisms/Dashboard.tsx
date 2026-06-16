@@ -10,6 +10,7 @@ import {
 } from '@/core/config/role-access';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -47,17 +48,12 @@ export function Dashboard() {
 
   return (
     <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-olive">
-              {profile.label}
-            </p>
-            <h2 className="mt-2 font-serif text-3xl font-semibold text-brand-ink">{profile.panelTitle}</h2>
-            <p className="mt-2 max-w-2xl text-sm text-brand-ink-muted">{profile.panelDescription}</p>
-          </div>
-
-          {profile.canApproveShrinkages && (
+      <AppPageHeader
+        kicker={profile.label}
+        title={profile.panelTitle}
+        description={profile.panelDescription}
+        actions={
+          profile.canApproveShrinkages ? (
             <button
               type="button"
               onClick={() => router.push('/mermas')}
@@ -73,27 +69,28 @@ export function Dashboard() {
                 </span>
               )}
             </button>
-          )}
-        </div>
-
-        <p className="mt-4 text-sm text-brand-ink-muted">
-          Hola, <span className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</span>
-          {empresaName ? (
-            <>
-              {' · '}
-              <span className="font-semibold text-brand-ink">{empresaName}</span>
-            </>
-          ) : null}
-          {' · '}
-          Sucursal: <span className="font-semibold">{activeBranchName}</span>
-          {canSwitchBranch && (
-            <span className="text-brand-ink-muted/80">
-              {' '}
-              (cambia la sucursal en el encabezado para ver otra)
-            </span>
-          )}
-        </p>
-      </div>
+          ) : undefined
+        }
+        meta={
+          <>
+            Hola, <span className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</span>
+            {empresaName ? (
+              <>
+                {' · '}
+                <span className="font-semibold text-brand-ink">{empresaName}</span>
+              </>
+            ) : null}
+            {' · '}
+            Sucursal: <span className="font-semibold text-brand-ink">{activeBranchName}</span>
+            {canSwitchBranch ? (
+              <span className="text-brand-ink-muted/80">
+                {' '}
+                (cambia la sucursal en el encabezado para ver otra)
+              </span>
+            ) : null}
+          </>
+        }
+      />
 
       {dashboardModules.length === 0 ? (
         <div className="rounded-xl border border-dashed border-brand-linen bg-white/80 p-8 text-center">

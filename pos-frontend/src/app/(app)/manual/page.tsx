@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { Navbar } from '@/components/organisms/Navbar';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { useAuthStore } from '@/store/auth';
@@ -279,14 +280,16 @@ export default function ManualPage() {
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="app-card mb-6 rounded-3xl p-6">
-          <p className="app-eyebrow">Centro de ayuda</p>
-          <h1 className="mt-2 text-2xl font-semibold text-[#3D4532]">
-            Manual operativo por rol
-          </h1>
-          <p className="mt-2 text-sm text-brand-ink-muted">
-            Perfil activo: <span className="font-semibold">{roleLabel(user?.role)}</span>. Solo ves
-            secciones aplicables a tu rol. Versión: {APP_VERSION_LABEL}.
-          </p>
+          <AppPageHeader
+            kicker="Centro de ayuda"
+            title="Manual operativo por rol"
+            description={
+              <>
+                Perfil activo: <span className="font-semibold text-brand-ink">{roleLabel(user?.role)}</span>.
+                Solo ves secciones aplicables a tu rol. Versión: {APP_VERSION_LABEL}.
+              </>
+            }
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">

@@ -34,7 +34,7 @@ export function ConfirmActionModal({
     <div className="app-modal-overlay !z-[70]">
       <div className="app-modal-panel w-full max-w-md rounded-[2rem] p-7 shadow-2xl">
         <h3 className="text-lg font-semibold text-[#3D4532]">{title}</h3>
-        <p className="mt-3 text-sm text-slate-600">{message}</p>
+        <p className="mt-3 text-sm text-brand-ink-muted">{message}</p>
 
         <div className="mt-8 flex justify-end gap-3">
           <button

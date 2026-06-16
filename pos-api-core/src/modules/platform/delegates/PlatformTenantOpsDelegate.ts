@@ -1,4 +1,5 @@
 import * as argon2 from 'argon2';
+import * as jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import User from '../../auth/models/User.model';
 import Role from '../../auth/models/Role.model';
@@ -11,6 +12,7 @@ import { branchListInclude, presentBranch } from '../../branch/utils/branchPrese
 import { assertCanAddActiveBranch } from '../../saas/utils/planLimits';
 import { readModelString } from '../../../utils/modelAttributes';
 import { Result, ok, fail } from '../../../types/result';
+import { invalidateAuthUserCache } from '../../../lib/authUserCache';
 
 const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
   type: argon2.argon2id,
@@ -135,6 +137,7 @@ class PlatformTenantOpsDelegate {
 
     const passwordHash = await argon2.hash(trimmed, ARGON2_OPTIONS);
     await user.update({ password: passwordHash, isActive: true });
+    await invalidateAuthUserCache(String(user.id));
     return ok({ updated: true });
   }
 
@@ -308,6 +311,56 @@ class PlatformTenantOpsDelegate {
 
     const deleted = await LegalAcceptance.destroy({ where: { userId } });
     return ok({ deleted });
+  }
+
+  async createSupportAccess(
+    empresaId: string
+  ): Promise<Result<{ token: string; user: PlatformTenantUserRow; expiresIn: string }>> {
+    const empresaResult = await this.assertEmpresa(empresaId);
+    if (!empresaResult.success) return empresaResult;
+
+    const adminRole = await Role.findOne({ where: { name: 'ADMIN' } });
+    if (!adminRole) return fail('ROLE_NOT_FOUND');
+    const adminRoleId = readModelString(adminRole, 'id');
+    if (!adminRoleId) return fail('ROLE_NOT_FOUND');
+
+    const adminUser = await User.findOne({
+      where: { empresaId, roleId: adminRoleId, isActive: true },
+      order: [['createdAt', 'ASC']],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name'] },
+        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
+      ],
+    });
+    if (!adminUser) return fail('SUPPORT_ACCESS_NO_ADMIN');
+
+    const users = await this.listUsers(empresaId);
+    if (!users.success) return users;
+    const adminUserId = readModelString(adminUser, 'id');
+    const row = users.value.find((u) => u.id === adminUserId);
+    if (!row) return fail('USER_NOT_FOUND');
+
+    const roleName = String((adminUser as { role?: { name?: string } }).role?.name ?? 'ADMIN');
+    const branchId = String(readModelString(adminUser, 'branchId') ?? row.branchId ?? '');
+
+    const tokenPayload = {
+      userId: adminUserId,
+      fullName: row.fullName,
+      email: row.email,
+      roleId: row.roleId,
+      roleName,
+      empresaId,
+      branchId,
+      isActive: true,
+      supportSession: true,
+    };
+
+    const expiresIn = '2h';
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET ?? 'default_secret', {
+      expiresIn,
+    });
+
+    return ok({ token, user: row, expiresIn });
   }
 
   async grantUserLegal(

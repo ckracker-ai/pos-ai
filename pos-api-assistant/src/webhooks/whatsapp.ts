@@ -9,10 +9,18 @@ import {
   isPaymentClaimText,
 } from './handlePaymentProof.js';
 import { parseIncomingMessage } from './parseIncoming.js';
+import { getAssistantSession, setAssistantSession } from '../session/store.js';
+import type { Session } from '../agent/runAgent.js';
 
 type RequestWithRawBody = FastifyRequest & { rawBody?: Buffer };
 
-const sessions = new Map<string, Awaited<ReturnType<typeof buildSession>>>();
+function isStaleAssistantSession(session: Session | null): boolean {
+  return (
+    !session?.context?.empresaId ||
+    session.context.empresaId === 'undefined' ||
+    session.context.bindingId === 'undefined'
+  );
+}
 
 export async function whatsappRoutes(app: FastifyInstance) {
   await app.register(async (scope) => {
@@ -89,17 +97,14 @@ export async function whatsappRoutes(app: FastifyInstance) {
           return replyToUser(text);
         }
 
-        let session = sessions.get(from);
-        const stale =
-          !session?.context?.empresaId ||
-          session.context.empresaId === 'undefined' ||
-          session.context.bindingId === 'undefined';
-        if (!session || stale) {
+        let session = await getAssistantSession('WSP', from);
+        if (!session || isStaleAssistantSession(session)) {
           session = await buildSession(from);
-          sessions.set(from, session);
+          await setAssistantSession('WSP', from, session);
         }
 
         const agentReply = await runAgent(session, incoming.text);
+        await setAssistantSession('WSP', from, session);
         return replyToUser(agentReply.text);
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Error';

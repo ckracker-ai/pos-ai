@@ -6,8 +6,16 @@ import {
   voicePlanRequired,
 } from '../agent/voiceMessages.js';
 import { isPaymentClaimText } from './handlePaymentProof.js';
+import { getAssistantSession, setAssistantSession } from '../session/store.js';
+import type { Session } from '../agent/runAgent.js';
 
-const sessions = new Map<string, Awaited<ReturnType<typeof buildSession>>>();
+function isStaleAssistantSession(session: Session | null): boolean {
+  return (
+    !session?.context?.empresaId ||
+    session.context.empresaId === 'undefined' ||
+    session.context.bindingId === 'undefined'
+  );
+}
 
 type VoiceDevBody = {
   from?: string;
@@ -43,17 +51,14 @@ export async function voiceRoutes(app: FastifyInstance) {
         });
       }
 
-      let session = sessions.get(from);
-      const stale =
-        !session?.context?.empresaId ||
-        session.context.empresaId === 'undefined' ||
-        session.context.bindingId === 'undefined';
-      if (!session || stale) {
+      let session = await getAssistantSession('VOZ', from);
+      if (!session || isStaleAssistantSession(session)) {
         session = await buildSession(from, 'VOZ');
-        sessions.set(from, session);
+        await setAssistantSession('VOZ', from, session);
       }
 
       const agentReply = await runAgent(session, text);
+      await setAssistantSession('VOZ', from, session);
       return reply.send({
         success: true,
         to: from,

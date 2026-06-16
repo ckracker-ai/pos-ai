@@ -7,6 +7,9 @@ import EmpresaSuscripcion, {
 } from '../models/EmpresaSuscripcion.model';
 import Empresa from '../../tenant/models/Empresa.model';
 import { Result, ok, fail } from '../../../types/result';
+import { SUBSCRIPTION_GRACE_DAYS } from '../constants/billing';
+import { computeExpiryTransition } from '../utils/subscriptionExpiry';
+import subscriptionBillingNotificationDelegate from '../../notifications/delegates/SubscriptionBillingNotificationDelegate';
 
 export type SuscripcionSummary = {
   id: string;
@@ -90,21 +93,75 @@ class SuscripcionDelegate {
     return ok(this.toSummary(row));
   }
 
-  private async refreshVencimiento(row: EmpresaSuscripcion): Promise<EmpresaSuscripcion> {
+  private async applyExpiryTransition(
+    row: EmpresaSuscripcion,
+    options?: { notify?: boolean }
+  ): Promise<'none' | 'grace' | 'vencida'> {
     const now = new Date();
-    const vence = row.getDataValue('venceEn') as Date | null;
-    const estado = String(row.getDataValue('estado') ?? '') as SuscripcionEstado;
-    if (
-      vence &&
-      now > vence &&
-      (estado === 'ACTIVA' || estado === 'PILOTO' || estado === 'GRACIA')
-    ) {
-      const grace = row.getDataValue('graceHasta') as Date | null;
-      if (!grace || now > grace) {
-        await row.update({ estado: 'VENCIDA' });
+    const plan = computeExpiryTransition({
+      now,
+      venceEn: (row.getDataValue('venceEn') as Date | null) ?? null,
+      estado: String(row.getDataValue('estado') ?? 'PILOTO') as SuscripcionEstado,
+      graceHasta: (row.getDataValue('graceHasta') as Date | null) ?? null,
+      graceDays: SUBSCRIPTION_GRACE_DAYS,
+    });
+
+    if (plan.transition === 'none') {
+      if (plan.nextEstado) {
+        await row.update({ estado: plan.nextEstado });
       }
+      return 'none';
     }
+
+    const patch: Partial<{
+      estado: SuscripcionEstado;
+      graceHasta: Date | null;
+    }> = {};
+    if (plan.nextEstado) patch.estado = plan.nextEstado;
+    if (plan.nextGraceHasta !== undefined) patch.graceHasta = plan.nextGraceHasta;
+    await row.update(patch);
+
+    if (options?.notify && plan.transition === 'grace') {
+      await row.reload();
+      const empresaId = String(row.getDataValue('empresaId') ?? '');
+      const empresa = await Empresa.findByPk(empresaId, {
+        attributes: ['nombreFantasia', 'razonSocial'],
+      });
+      const negocio =
+        String(empresa?.getDataValue('nombreFantasia') ?? '').trim() ||
+        String(empresa?.getDataValue('razonSocial') ?? '').trim() ||
+        'Tu negocio';
+      void subscriptionBillingNotificationDelegate
+        .notifyGracePeriod({
+          empresaId,
+          negocio,
+          suscripcion: this.toSummary(row),
+        })
+        .catch((err: unknown) => console.warn('[EMAIL] grace notify error:', err));
+    }
+
+    return plan.transition;
+  }
+
+  private async refreshVencimiento(row: EmpresaSuscripcion): Promise<EmpresaSuscripcion> {
+    await this.applyExpiryTransition(row);
     return row;
+  }
+
+  private async suspendEmpresaIfNeeded(empresaId: string): Promise<boolean> {
+    const empresa = await Empresa.findByPk(empresaId, { attributes: ['id', 'estado', 'nombreFantasia', 'razonSocial'] });
+    if (!empresa) return false;
+    const estado = String(empresa.getDataValue('estado') ?? '');
+    if (estado !== 'ACTIVO') return false;
+    await empresa.update({ estado: 'SUSPENDIDO' });
+    const negocio =
+      String(empresa.getDataValue('nombreFantasia') ?? '').trim() ||
+      String(empresa.getDataValue('razonSocial') ?? '').trim() ||
+      'Tu negocio';
+    void subscriptionBillingNotificationDelegate
+      .notifySuspended({ empresaId, negocio })
+      .catch((err: unknown) => console.warn('[EMAIL] suspend notify error:', err));
+    return true;
   }
 
   async assertAllowsTenantAccess(empresaId: string): Promise<Result<true>> {
@@ -132,11 +189,11 @@ class SuscripcionDelegate {
       return fail('SUBSCRIPTION_CANCELLED');
     }
 
+    if (estado === 'GRACIA') {
+      return ok(true);
+    }
+
     if (estado === 'VENCIDA') {
-      const grace = row.getDataValue('graceHasta') as Date | null;
-      if (grace && new Date() <= grace) {
-        return ok(true);
-      }
       return fail('SUBSCRIPTION_EXPIRED');
     }
 
@@ -227,29 +284,65 @@ class SuscripcionDelegate {
       notas,
     });
 
+    await Empresa.update(
+      { estado: 'ACTIVO' },
+      { where: { id: empresaId, estado: { [Op.in]: ['SUSPENDIDO'] } } }
+    );
+
     return ok(this.toSummary(row));
   }
 
-  async refreshAllExpired(): Promise<Result<{ scanned: number; markedVencida: number }>> {
+  async refreshAllExpired(): Promise<
+    Result<{
+      scanned: number;
+      enteredGrace: number;
+      markedVencida: number;
+      suspendedEmpresas: number;
+    }>
+  > {
+    return this.processBillingLifecycle();
+  }
+
+  /** Job diario: gracia automática → VENCIDA → suspende empresa. */
+  async processBillingLifecycle(): Promise<
+    Result<{
+      scanned: number;
+      enteredGrace: number;
+      markedVencida: number;
+      suspendedEmpresas: number;
+    }>
+  > {
     const now = new Date();
     const candidates = await EmpresaSuscripcion.findAll({
       where: {
         venceEn: { [Op.lt]: now },
         estado: { [Op.in]: ['ACTIVA', 'PILOTO', 'GRACIA'] as SuscripcionEstado[] },
       },
+      limit: 200,
     });
 
+    let enteredGrace = 0;
     let markedVencida = 0;
+    let suspendedEmpresas = 0;
+
     for (const row of candidates) {
-      const before = String(row.getDataValue('estado') ?? '');
-      const refreshed = await this.refreshVencimiento(row);
-      const after = String(refreshed.getDataValue('estado') ?? '');
-      if (before !== 'VENCIDA' && after === 'VENCIDA') {
+      const transition = await this.applyExpiryTransition(row, { notify: true });
+      if (transition === 'grace') enteredGrace += 1;
+      if (transition === 'vencida') {
         markedVencida += 1;
+        const empresaId = String(row.getDataValue('empresaId') ?? '');
+        if (await this.suspendEmpresaIfNeeded(empresaId)) {
+          suspendedEmpresas += 1;
+        }
       }
     }
 
-    return ok({ scanned: candidates.length, markedVencida });
+    return ok({
+      scanned: candidates.length,
+      enteredGrace,
+      markedVencida,
+      suspendedEmpresas,
+    });
   }
 }
 

@@ -61,15 +61,43 @@ const parseJsonResponse = async (response: Response) => {
   return text ? JSON.parse(text) : {};
 };
 
-const readBranchIdFromToken = (token: string): string | undefined => {
+type AuthTokenPayload = {
+  branchId?: string;
+  email?: string;
+  supportSession?: boolean;
+  exp?: number;
+};
+
+const readTokenPayload = (token: string): AuthTokenPayload | null => {
   try {
     const segment = token.split('.')[1];
-    if (!segment) return undefined;
-    const payload = JSON.parse(atob(segment)) as { branchId?: string };
-    return payload.branchId?.trim() || undefined;
+    if (!segment) return null;
+    return JSON.parse(atob(segment)) as AuthTokenPayload;
   } catch {
-    return undefined;
+    return null;
   }
+};
+
+const readBranchIdFromToken = (token: string): string | undefined => {
+  const payload = readTokenPayload(token);
+  return payload?.branchId?.trim() || undefined;
+};
+
+export type SupportSessionInfo = {
+  active: boolean;
+  email?: string;
+  expiresAt?: Date;
+};
+
+export const readSupportSessionFromToken = (token: string | null): SupportSessionInfo => {
+  if (!token) return { active: false };
+  const payload = readTokenPayload(token);
+  if (!payload?.supportSession) return { active: false };
+  return {
+    active: true,
+    email: payload.email?.trim() || undefined,
+    expiresAt: payload.exp ? new Date(payload.exp * 1000) : undefined,
+  };
 };
 
 export const useAuthStore = create<AuthStore>()(

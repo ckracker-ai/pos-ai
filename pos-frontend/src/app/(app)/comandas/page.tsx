@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -69,24 +70,22 @@ export default function ComandasPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Cocina</p>
-              <h1 className="app-heading-page">Comandas en vivo</h1>
-              <p className="mt-2 max-w-2xl app-text-muted">
-                Pedidos pendientes de preparación. Se actualiza automáticamente cada {POLL_MS / 1000}s.
-              </p>
-              {branchLoadError && (
-                <p className="mt-2 text-xs text-[#8C6A2B]">{branchLoadError}</p>
-              )}
-              {isFetching && !isLoading && (
-                <p className="mt-2 text-xs text-[#4A533C]">Actualizando...</p>
-              )}
-            </div>
-            <span className="inline-flex rounded-full border border-[rgba(176,138,76,0.5)] bg-[rgba(176,138,76,0.1)] px-4 py-2 text-sm font-semibold text-[#8C6A2B]">
-              Pendientes: {isLoading ? '…' : sortedOrders.length}
-            </span>
-          </div>
+          <AppPageHeader
+            kicker="Cocina"
+            title="Comandas en vivo"
+            description={`Pedidos pendientes de preparación. Se actualiza automáticamente cada ${POLL_MS / 1000}s.`}
+            meta={
+              <>
+                {branchLoadError ? <p className="text-amber-800">{branchLoadError}</p> : null}
+                {isFetching && !isLoading ? <p className="text-brand-olive">Actualizando...</p> : null}
+              </>
+            }
+            actions={
+              <span className="inline-flex rounded-full border border-brand-linen bg-brand-surface px-4 py-2 text-sm font-semibold text-brand-olive">
+                Pendientes: {isLoading ? '…' : sortedOrders.length}
+              </span>
+            }
+          />
 
           {(errorMessage || loadErrorMessage) && (
             <p className="mb-6 app-alert-error">{errorMessage ?? loadErrorMessage}</p>

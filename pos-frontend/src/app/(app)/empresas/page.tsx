@@ -6,6 +6,7 @@ import { extractEntity, normalizeEmpresa, unwrapApiEnvelope } from '@/core/api/n
 import { Empresa, EmpresaEstado, UpdateEmpresaInput } from '@/core/interfaces';
 import { formatPlanValor, getPlanDisplayName, METODO_PAGO_LABELS } from '@/core/constants/saas-plan';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { TabList } from '@/components/molecules/TabList';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
@@ -248,13 +249,10 @@ export default function EmpresasPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent narrow>
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-brand-ink">Perfil de empresa</h1>
-            <p className="mt-1 text-sm text-brand-ink-muted">
-              Organiza la información por sección. Los datos de transferencia alimentan al asistente IA
-              para validar comprobantes de pago.
-            </p>
-          </div>
+          <AppPageHeader
+            title="Perfil de empresa"
+            description="Organiza la información por sección. Los datos de transferencia alimentan al asistente IA para validar comprobantes de pago."
+          />
 
           {errorMessage && (
             <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

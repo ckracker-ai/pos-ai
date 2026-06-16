@@ -49,11 +49,11 @@ export function ProductQuickPicker({
           setTimeout(() => setOpen(false), 150);
         }}
         placeholder="Buscar producto por nombre o SKU..."
-        className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-amber-400"
+        className="app-input w-full rounded-2xl px-4 py-3 text-brand-ink outline-none focus:border-brand-olive focus:ring-2 focus:ring-brand-olive/20"
       />
 
       {open && filtered.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-3xl border border-slate-800 bg-slate-950/95 shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-brand-linen bg-white shadow-lg">
           {filtered.map((p) => (
             <button
               key={p.id}
@@ -64,12 +64,12 @@ export function ProductQuickPicker({
                 setQuery('');
                 setOpen(false);
               }}
-              className={`w-full text-left px-4 py-3 hover:bg-slate-900/90 transition ${
-                p.id === selectedProductId ? 'bg-slate-900/80' : ''
+              className={`w-full px-4 py-3 text-left transition hover:bg-brand-vainilla/90 ${
+                p.id === selectedProductId ? 'bg-brand-olive/10' : ''
               }`}
             >
-              <div className="text-sm font-semibold text-white">{p.name}</div>
-              <div className="text-xs text-slate-400">
+              <div className="text-sm font-semibold text-brand-ink">{p.name}</div>
+              <div className="text-xs text-brand-ink-muted">
                 {p.sku ? `SKU: ${p.sku}` : p.category}
                 {typeof p.stock === 'number' ? ` · Stock: ${p.stock}` : ''}
               </div>
@@ -79,7 +79,7 @@ export function ProductQuickPicker({
       )}
 
       {open && filtered.length === 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-3xl border border-slate-800 bg-slate-950/95 p-4 text-sm text-slate-400">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border border-brand-linen bg-white p-4 text-sm text-brand-ink-muted shadow-lg">
           Sin coincidencias
         </div>
       )}

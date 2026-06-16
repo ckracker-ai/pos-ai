@@ -71,7 +71,11 @@ services:
     networks:
       - public_gateway
 
+  pos-api-assistant:
+    ports: !reset
+
   pos-ai-db-mysql:
+    ports: !reset
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-pos-ai-db}

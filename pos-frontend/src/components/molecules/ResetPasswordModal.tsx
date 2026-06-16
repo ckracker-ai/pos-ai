@@ -37,7 +37,7 @@ function PasswordField({
   placeholder?: string;
 }) {
   return (
-    <label className="block text-sm text-slate-600">
+    <label className="block text-sm text-brand-ink-muted">
       {label}
       <div className="relative mt-2">
         <input
@@ -51,7 +51,7 @@ function PasswordField({
         <button
           type="button"
           onClick={onToggleVisible}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-2xl px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[rgba(74,83,60,0.08)]"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-2xl px-3 py-1.5 text-xs font-medium text-brand-ink-muted hover:bg-[rgba(74,83,60,0.08)]"
         >
           {visible ? 'Ocultar' : 'Ver'}
         </button>
@@ -143,8 +143,8 @@ export function ResetPasswordModal({
     <div className="app-modal-overlay">
       <div className="app-modal-panel w-full max-w-md rounded-[2rem] p-8 shadow-2xl">
         <h2 className="text-xl font-semibold text-[#3D4532]">Restablecer contraseña</h2>
-        <p className="mt-2 text-sm text-slate-600">{userEmail}</p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-2 text-sm text-brand-ink-muted">{userEmail}</p>
+        <p className="mt-1 text-xs text-brand-ink-muted/80">
           Define una clave temporal segura y entrégala al usuario por un canal privado.
         </p>
 
@@ -180,7 +180,7 @@ export function ResetPasswordModal({
           {password.length > 0 && (
             <div className="rounded-2xl border border-[rgba(74,83,60,0.2)] bg-[rgba(74,83,60,0.06)] px-4 py-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">Fortaleza</span>
+                <span className="text-brand-ink-muted">Fortaleza</span>
                 <span
                   className={
                     validation.strength === 'good'
@@ -200,7 +200,7 @@ export function ResetPasswordModal({
                 {validation.checks.map((check) => (
                   <li
                     key={check.label}
-                    className={check.ok ? 'text-[#4A533C]' : 'text-slate-500'}
+                    className={check.ok ? 'text-[#4A533C]' : 'text-brand-ink-muted/80'}
                   >
                     {check.ok ? '✓' : '○'} {check.label}
                   </li>

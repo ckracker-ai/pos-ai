@@ -16,13 +16,13 @@ const OPTIONS: { value: StatusFilterValue; label: string }[] = [
 
 export function StatusFilterSelect({ value, onChange, disabled }: StatusFilterSelectProps) {
   return (
-    <label className="flex flex-col gap-1 text-xs text-slate-400">
+    <label className="flex flex-col gap-1 text-xs text-brand-ink-muted">
       Estado
       <select
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value as StatusFilterValue)}
-        className="rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-xl border border-brand-linen bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-olive focus:ring-2 focus:ring-brand-olive/20 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

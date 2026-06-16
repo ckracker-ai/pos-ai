@@ -14,6 +14,7 @@ import { useBranchStore } from '@/store/branch';
 import { useAuthStore } from '@/store/auth';
 import { getRoleProfile } from '@/core/config/role-access';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -268,34 +269,32 @@ export default function MermasPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Mermas</p>
-              <h1 className="app-heading-page">Registro de mermas</h1>
-              <p className="mt-2 app-text-muted">Sucursal activa: {activeBranchName}</p>
-              <p className="mt-1 text-sm text-[#6b7280]">
-                Las mermas quedan pendientes hasta que un administrador las apruebe y descuente stock.
-              </p>
-              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
-              {successMessage && (
-                <p className="mt-3 rounded-2xl border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.1)] px-4 py-3 text-sm text-[#4A533C]">
-                  {successMessage}
-                </p>
-              )}
-              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando mermas...</p>}
-            </div>
-            <button
-              onClick={() => {
-                setErrorMessage(null);
-                setQuantityError(null);
-                setForm((c) => ({ ...c, quantity: '1' }));
-                setShowModal(true);
-              }}
-              className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold"
-            >
-              + Registrar merma
-            </button>
-          </div>
+          <AppPageHeader
+            kicker="Mermas"
+            title="Registro de mermas"
+            description="Las mermas quedan pendientes hasta que un administrador las apruebe y descuente stock."
+            meta={<p>Sucursal activa: {activeBranchName}</p>}
+            actions={
+              <button
+                onClick={() => {
+                  setErrorMessage(null);
+                  setQuantityError(null);
+                  setForm((c) => ({ ...c, quantity: '1' }));
+                  setShowModal(true);
+                }}
+                className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold"
+              >
+                + Registrar merma
+              </button>
+            }
+          />
+          {errorMessage && <p className="mb-4 app-alert-error">{errorMessage}</p>}
+          {successMessage && (
+            <p className="mb-4 rounded-2xl border border-brand-linen bg-brand-surface px-4 py-3 text-sm text-brand-olive">
+              {successMessage}
+            </p>
+          )}
+          {isLoading && <p className="mb-4 text-sm text-brand-ink-muted">Cargando mermas...</p>}
 
           <div className="app-table-wrap overflow-x-auto">
             <table className="app-table min-w-full text-left text-sm">

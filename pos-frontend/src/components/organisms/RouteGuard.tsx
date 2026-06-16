@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { canAccessPath } from '@/core/config/role-access';
+import { consumeSupportHandoff } from '@/core/context/support-handoff';
 
 /** Solo envuelve rutas en `app/(app)/*` — marketing y platform tienen layout propio. */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,12 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handoffId = new URLSearchParams(window.location.search).get('support');
+      if (handoffId && consumeSupportHandoff(handoffId)) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
     hydrate();
     setIsHydrated(true);
   }, [hydrate]);

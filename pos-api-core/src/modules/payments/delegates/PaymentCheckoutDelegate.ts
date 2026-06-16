@@ -6,11 +6,8 @@ import { Result, ok, fail } from '../../../types/result';
 import type { CreateCheckoutSessionResult } from '../providers/types.js';
 import { verifyCheckoutSessionToken } from '../utils/checkoutSessionToken.js';
 import paymentWebhookDelegate from './PaymentWebhookDelegate.js';
-import {
-  isWebpayAuthorized,
-  isWebpayIntegrationConfigured,
-  webpayCommitTransaction,
-} from '../providers/webpay/webpayClient.js';
+import paymentSessionDelegate from './PaymentSessionDelegate.js';
+import { isWebpayIntegrationConfigured } from '../providers/webpay/webpayClient.js';
 
 class PaymentCheckoutDelegate {
   async createSession(input: {
@@ -44,6 +41,20 @@ class PaymentCheckoutDelegate {
           razonSocial: summary.value.razonSocial,
         }
       );
+
+      if (session.webpayToken && !session.sandbox) {
+        const pending = await paymentSessionDelegate.createPending({
+          provider: session.provider,
+          externalId: session.externalId,
+          kind,
+          amount: session.amount,
+          currency: session.currency,
+          empresaId: input.empresaId,
+          tbkToken: session.webpayToken,
+        });
+        if (!pending.success) return pending;
+      }
+
       return ok(session);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'CHECKOUT_SESSION_FAILED';
@@ -57,30 +68,7 @@ class PaymentCheckoutDelegate {
     if (!isWebpayIntegrationConfigured()) {
       return fail('WEBPAY_INTEGRATION_NOT_CONFIGURED');
     }
-    let commit;
-    try {
-      commit = await webpayCommitTransaction(tokenWs);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'WEBPAY_COMMIT_FAILED';
-      return fail(msg);
-    }
-    if (!isWebpayAuthorized(commit)) {
-      return fail(`WEBPAY_NOT_AUTHORIZED: ${commit.status}`);
-    }
-    const empresaId = commit.sessionId;
-    if (!empresaId) return fail('VALIDATION_ERROR: missing session_id from Webpay');
-
-    return paymentWebhookDelegate.handleInbound({
-      provider: 'WEBPAY',
-      externalId: commit.buyOrder,
-      status: 'APPROVED',
-      amount: commit.amount,
-      currency: 'CLP',
-      metadata: {
-        kind: 'SAAS_SUB',
-        empresaId,
-      },
-    });
+    return paymentSessionDelegate.commitWebpayReturn(tokenWs);
   }
 
   async completeSandboxSession(token: string): Promise<Result<import('./PaymentWebhookDelegate.js').PaymentWebhookResult>> {

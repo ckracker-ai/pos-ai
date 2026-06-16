@@ -6,6 +6,7 @@ import { authenticateToken, requireAdmin, requireAuditor, AuthenticatedRequest }
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import User from '../models/User.model';
 import Role from '../models/Role.model';
+import { invalidateAuthUserCache } from '../../../lib/authUserCache';
 
 const router = Router();
 
@@ -68,6 +69,7 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req: Authentica
       ...(isActive !== undefined ? { isActive } : {}),
       ...(normalizedWhatsapp !== undefined ? { whatsappPhone: normalizedWhatsapp } : {}),
     });
+    await invalidateAuthUserCache(String(user.id));
 
     const updated = await User.findOne({ where: { id: req.params.id, empresaId } });
     return sendOk(res, { user: updated });
@@ -95,6 +97,7 @@ router.patch('/users/:id/password', authenticateToken, requireAdmin, async (req:
 
     const passwordHash = await argon2.hash(newPassword, ARGON2_OPTIONS);
     await user.update({ password: passwordHash, isActive: true });
+    await invalidateAuthUserCache(String(user.id));
     return sendOk(res, { updated: true });
   } catch {
     return res.status(400).json({ success: false, data: null, error: 'ERROR_UPDATING_PASSWORD', code: 400 });

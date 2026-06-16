@@ -6,8 +6,7 @@ import {
   voicePlanRequired,
 } from '../agent/voiceMessages.js';
 import { verifyTwilioSignature } from '../telephony/verifyTwilio.js';
-
-const sessions = new Map<string, Awaited<ReturnType<typeof buildSession>>>();
+import { getAssistantSession, setAssistantSession } from '../session/store.js';
 
 function twimlSay(message: string, gather = true): string {
   const escaped = message
@@ -55,12 +54,13 @@ async function handleSpeech(
   }
 
   try {
-    let session = sessions.get(from);
+    let session = await getAssistantSession('VOZ', from);
     if (!session) {
       session = await buildSession(from, 'VOZ');
-      sessions.set(from, session);
+      await setAssistantSession('VOZ', from, session);
     }
     const agentReply = await runAgent(session, text);
+    await setAssistantSession('VOZ', from, session);
     return reply.status(200).send(twimlSay(agentReply.text));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Error';

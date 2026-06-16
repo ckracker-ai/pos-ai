@@ -19,6 +19,7 @@ import {
 } from '@/core/utils/category-filter';
 import { Product } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -488,17 +489,17 @@ export default function PosPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent className="overflow-x-hidden">
-          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-olive">POS</p>
-              <h1 className="mt-3 text-3xl font-semibold text-brand-ink">Registrar Venta</h1>
-              <p className="mt-2 max-w-2xl text-brand-ink-muted">Sucursal activa: {activeBranchName}</p>
-            </div>
-            <div className="app-card rounded-2xl px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-brand-ink-muted">Vendedor</p>
-              <p className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</p>
-            </div>
-          </div>
+          <AppPageHeader
+            kicker="POS"
+            title="Registrar Venta"
+            meta={<p>Sucursal activa: {activeBranchName}</p>}
+            actions={
+              <div className="app-card rounded-2xl px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-ink-muted">Vendedor</p>
+                <p className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</p>
+              </div>
+            }
+          />
 
           <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
             <div className="space-y-6">

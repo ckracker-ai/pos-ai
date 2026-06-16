@@ -11,7 +11,7 @@ services:
         NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ''
         BFF_INTERNAL_URL: http://pos-api-bff:2020
-        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.4.0}
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.9.2026-06-08}
     container_name: pos-ai-frontend
     restart: unless-stopped
     ports:
@@ -19,7 +19,7 @@ services:
     environment:
       BFF_INTERNAL_URL: http://pos-api-bff:2020
       AUTH_URL: http://pos-api-bff:2020
-      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.4.0}
+      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.9.2026-06-08}
     networks:
       - public_gateway
     depends_on:
@@ -58,7 +58,7 @@ services:
       - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
       - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-pos_ai_jwt_refresh_secret_2026}
-      - APP_VERSION=${APP_VERSION:-1.4.0}
+      - APP_VERSION=${APP_VERSION:-1.9.2026-06-08}
     volumes:
       - ./pos-api-bff:/usr/src/app
       - /usr/src/app/node_modules
@@ -98,11 +98,14 @@ services:
       - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
       - META_APP_SECRET=${META_APP_SECRET:-}
       - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
+      - REDIS_URL=${REDIS_URL:-redis://pos-ai-redis:6379}
     networks:
       - internal_backend
       - public_gateway
     depends_on:
       pos-api-core:
+        condition: service_healthy
+      pos-ai-redis:
         condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3030/health']
@@ -149,7 +152,9 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-POS-AI <noreply@pos-ai.local>}
-      - APP_VERSION=${APP_VERSION:-1.4.0}
+      - APP_VERSION=${APP_VERSION:-1.9.2026-06-08}
+      - REDIS_URL=${REDIS_URL:-redis://pos-ai-redis:6379}
+      - AUTH_USER_CACHE_TTL_SEC=${AUTH_USER_CACHE_TTL_SEC:-600}
       - PAYMENT_LINK_BASE_URL=${PAYMENT_LINK_BASE_URL:-https://pay.pos-ai.local/p}
       - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-WEBPAY}
       - WEBPAY_MODE=${WEBPAY_MODE:-integration}
@@ -176,12 +181,30 @@ services:
     depends_on:
       pos-ai-db-mysql:
         condition: service_healthy
+      pos-ai-redis:
+        condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:1010/health']
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # ==========================================
+  # Redis — cache auth, job locks, sesiones assistant (6379 interno)
+  # ==========================================
+  pos-ai-redis:
+    image: redis:7-alpine
+    container_name: pos-ai-redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    networks:
+      - internal_backend
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # ==========================================
   # MySQL — pos-ai-db (3306 interno; host 3308 por defecto)

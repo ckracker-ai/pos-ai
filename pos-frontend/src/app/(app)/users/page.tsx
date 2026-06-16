@@ -14,6 +14,7 @@ import { Branch, RoleOption, User } from '@/core/interfaces';
 import { Navbar } from '@/components/organisms/Navbar';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TableActions } from '@/components/molecules/TableActions';
@@ -331,53 +332,53 @@ export default function UsersPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Usuarios</p>
-              <h1 className="app-heading-page">Mantenedor de usuarios</h1>
-              <p className="mt-2 max-w-2xl app-text-muted">
-                Desactiva a quien ya no trabaja en la empresa con el botón Desactivar en cada fila.
-                No se borra el registro: ventas y reportes históricos conservan su nombre. Usa el filtro
-                Inactivos para ver o restaurar cuentas.
-              </p>
-              {!canManageUserLifecycle && (
-                <p className="mt-2 text-sm text-amber-800">
-                  Modo consulta: solo el administrador puede crear, editar, desactivar o restaurar usuarios.
-                </p>
-              )}
-              {currentUser && (
-                <p className="mt-3 text-sm text-[#6b7280]">
-                  Sesión: {currentUser.name} ({roleLabels[currentUser.role] ?? currentUser.role})
-                </p>
-              )}
-              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
-              {successMessage && <p className="mt-3 app-alert-success">{successMessage}</p>}
-              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando usuarios desde BFF...</p>}
-            </div>
-            {canManageUserLifecycle && (
-              <button
-                onClick={() => {
-                  setEditingUser(null);
-                  setForm({
-                    name: '',
-                    email: '',
-                    password: '',
-                    roleId: roles[0]?.id ?? '',
-                    branchId: assignableBranches[0]?.id ?? '',
-                    whatsappPhone: '',
-                    isActive: true,
-                  });
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                  setShowModal(true);
-                }}
-                disabled={isActionLocked}
-                className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                + Nuevo Usuario
-              </button>
-            )}
-          </div>
+          <AppPageHeader
+            kicker="Usuarios"
+            title="Mantenedor de usuarios"
+            description="Desactiva a quien ya no trabaja en la empresa con el botón Desactivar en cada fila. No se borra el registro: ventas y reportes históricos conservan su nombre. Usa el filtro Inactivos para ver o restaurar cuentas."
+            meta={
+              <>
+                {!canManageUserLifecycle && (
+                  <p className="text-amber-800">
+                    Modo consulta: solo el administrador puede crear, editar, desactivar o restaurar usuarios.
+                  </p>
+                )}
+                {currentUser ? (
+                  <p>
+                    Sesión: {currentUser.name} ({roleLabels[currentUser.role] ?? currentUser.role})
+                  </p>
+                ) : null}
+              </>
+            }
+            actions={
+              canManageUserLifecycle ? (
+                <button
+                  onClick={() => {
+                    setEditingUser(null);
+                    setForm({
+                      name: '',
+                      email: '',
+                      password: '',
+                      roleId: roles[0]?.id ?? '',
+                      branchId: assignableBranches[0]?.id ?? '',
+                      whatsappPhone: '',
+                      isActive: true,
+                    });
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                    setShowModal(true);
+                  }}
+                  disabled={isActionLocked}
+                  className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  + Nuevo Usuario
+                </button>
+              ) : undefined
+            }
+          />
+          {errorMessage && <p className="mb-4 app-alert-error">{errorMessage}</p>}
+          {successMessage && <p className="mb-4 app-alert-success">{successMessage}</p>}
+          {isLoading && <p className="mb-4 text-sm text-brand-ink-muted">Cargando usuarios desde BFF...</p>}
 
           <section className="app-card rounded-3xl p-6 shadow-lg">
             <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

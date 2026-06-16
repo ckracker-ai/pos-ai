@@ -363,11 +363,18 @@ export const api = {
     getApiClient().post(`/pos/proxy/empresas/${id}/formalizar`, data, config),
   getEmpresaDataExport: (id: string, config?: AxiosRequestConfig) =>
     getApiClient().get(`/pos/proxy/empresas/${id}/data-export`, config),
+  getEmpresaDataDeletionStatus: (id: string, config?: AxiosRequestConfig) =>
+    getApiClient().get(`/pos/proxy/empresas/${id}/data-deletion-status`, config),
   createEmpresaDataDeletionRequest: (
     id: string,
-    data?: { notes?: string },
+    data: { confirmationPhrase: string; notes?: string },
     config?: AxiosRequestConfig
-  ) => getApiClient().post(`/pos/proxy/empresas/${id}/data-deletion-request`, data ?? {}, config),
+  ) => getApiClient().post(`/pos/proxy/empresas/${id}/data-deletion-request`, data, config),
+  cancelEmpresaDataDeletionRequest: (
+    id: string,
+    data?: { requestId?: string },
+    config?: AxiosRequestConfig
+  ) => getApiClient().post(`/pos/proxy/empresas/${id}/data-deletion-cancel`, data ?? {}, config),
 
   // Comprobantes WSP (plan Estándar)
   getPaymentProofs: (status: 'pending' | 'all' = 'pending', config?: AxiosRequestConfig) =>

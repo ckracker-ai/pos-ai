@@ -57,7 +57,7 @@ export default function PlatformDashboardPage() {
         { label: 'Suspendidas', value: stats.empresasSuspendidas, tone: 'text-rose-700' },
         { label: 'Pendiente onboarding', value: stats.empresasPendientes, tone: 'text-amber-700' },
         { label: 'Bindings WhatsApp', value: stats.bindingsWhatsapp, tone: 'text-brand-olive' },
-        { label: 'Comprobantes pendientes', value: stats.comprobantesPendientes, tone: 'text-violet-700' },
+        { label: 'Comprobantes pendientes', value: stats.comprobantesPendientes, tone: 'text-brand-olive' },
         { label: 'Suscripciones vencidas', value: stats.suscripcionesVencidas, tone: 'text-rose-700' },
         { label: 'Suscripciones en gracia', value: stats.suscripcionesEnGracia, tone: 'text-amber-700' },
       ]

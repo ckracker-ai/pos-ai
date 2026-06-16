@@ -10,6 +10,7 @@ import {
 } from '@/core/api/normalizers';
 import { useBranchStore } from '@/store/branch';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -207,19 +208,19 @@ export default function ComprobantesPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-        <header>
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-olive">
-            Plan Estándar · WhatsApp
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold text-brand-ink">Comprobantes de transferencia</h1>
-          <p className="mt-2 max-w-2xl text-sm text-brand-ink-muted">
-            Valida pagos enviados por clientes por WhatsApp en{' '}
-            <strong className="text-brand-ink">{activeBranchName ?? 'tu sucursal'}</strong>.
-            Al confirmar, el pedido pasa a completado; al rechazar, se cancela y se libera stock. Los
-            registros antiguos sin botones suelen ser duplicados o pedidos ya cerrados: actívalos en{' '}
-            <strong className="text-brand-ink">historial</strong> y usa <strong>Descartar</strong>.
-          </p>
-        </header>
+        <AppPageHeader
+          kicker="Plan Estándar · WhatsApp"
+          title="Comprobantes de transferencia"
+          description={
+            <>
+              Valida pagos enviados por clientes por WhatsApp en{' '}
+              <strong className="text-brand-ink">{activeBranchName ?? 'tu sucursal'}</strong>. Al confirmar,
+              el pedido pasa a completado; al rechazar, se cancela y se libera stock. Los registros antiguos
+              sin botones suelen ser duplicados o pedidos ya cerrados: actívalos en{' '}
+              <strong className="text-brand-ink">historial</strong> y usa <strong>Descartar</strong>.
+            </>
+          }
+        />
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-brand-ink-muted">

@@ -34,8 +34,9 @@ export default function PlatformLoginPage() {
         <div className="login-card rounded-2xl bg-white/95 p-8 backdrop-blur-sm">
           <div className="mb-6 flex flex-col items-center text-center">
             <PosAiLogo width={200} priority className="mb-3" />
-            <h1 className="text-lg font-semibold text-brand-olive">Plataforma</h1>
-            <p className="mt-1 text-sm text-brand-ink-muted">Super-admin — gestión de empresas tenant</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-olive">Plataforma</p>
+            <h1 className="mt-2 font-serif text-xl font-semibold text-brand-ink">Consola super-admin</h1>
+            <p className="mt-1 text-sm text-brand-ink-muted">Gestión de empresas tenant</p>
           </div>
 
           <p className="rounded-lg border border-brand-linen bg-brand-surface/80 px-3 py-2 text-xs text-brand-ink-muted">

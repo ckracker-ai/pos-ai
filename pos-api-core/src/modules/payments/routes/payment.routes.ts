@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import paymentWebhookDelegate from '../delegates/PaymentWebhookDelegate';
 import paymentCheckoutDelegate from '../delegates/PaymentCheckoutDelegate';
+import paymentSessionDelegate from '../delegates/PaymentSessionDelegate';
 
 const router = Router();
 
@@ -39,6 +40,12 @@ router.post('/checkout/sandbox-complete', async (req, res) => {
   const result = await paymentCheckoutDelegate.completeSandboxSession(token);
   if (!result.success) return sendFail(res, result.error, 400);
   return sendOk(res, result.value);
+});
+
+router.post('/jobs/expire-sessions', async (_req, res) => {
+  const result = await paymentSessionDelegate.expirePendingSessions();
+  if (!result.success) return sendFail(res, result.error, 400);
+  return sendOk(res, { job: 'expire-payment-sessions', ...result.value });
 });
 
 router.post('/webhooks/inbound', async (req, res) => {

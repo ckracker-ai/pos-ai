@@ -14,6 +14,7 @@ import {
 } from '@/core/api/normalizers';
 import { Category, Product, Supplier } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -610,56 +611,55 @@ const [products, setProducts] = useState<Product[]>([]);
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent className="overflow-x-hidden">
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Productos</p>
-              <h1 className="app-heading-page">Mantenedor de productos</h1>
-              <p className="mt-2 max-w-2xl app-text-muted">
-                Catálogo e inventario por sucursal (selector en la barra superior). Stock según sucursal activa.
-              </p>
-              <p className="mt-1 text-sm text-[#6b7280]">Sucursal: {activeBranchName}</p>
-              {currentUser && (
-                <p className="mt-3 text-sm text-[#6b7280]">Sesión iniciada como: {currentUser.name}</p>
-              )}
-              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
-              {successMessage && <p className="mt-3 app-alert-success">{successMessage}</p>}
-              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando productos desde BFF...</p>}
-            </div>
-
-            <button
-              onClick={() => {
-                if (!categories.length) {
-                  setFormFeedback(
-                    'No hay subcategorías disponibles. Crea una subcategoría en Categorías antes de agregar productos.'
-                  );
-                  return;
-                }
-                if (!suppliers.length) {
-                  setFormFeedback('No hay proveedores. Crea al menos uno en Proveedores.');
-                  return;
-                }
-                setEditingProduct(null);
-                setForm({
-                  name: '',
-                  sku: suggestedSku,
-                  categoryId: categories[0]?.id ?? '',
-                  supplierId: suppliers[0]?.id ?? '',
-                  price: '',
-                  cost: '',
-                  stock: '0',
-                  minStock: '0',
-                });
-                setSuccessMessage(null);
-                setModalError(null);
-                setFormNumericWarning(null);
-                setShowModal(true);
-              }}
-              disabled={isActionLocked}
-              className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              + Nuevo producto
-            </button>
-          </div>
+          <AppPageHeader
+            kicker="Productos"
+            title="Mantenedor de productos"
+            description="Catálogo e inventario por sucursal (selector en la barra superior). Stock según sucursal activa."
+            meta={
+              <>
+                <p>Sucursal: {activeBranchName}</p>
+                {currentUser ? <p>Sesión iniciada como: {currentUser.name}</p> : null}
+              </>
+            }
+            actions={
+              <button
+                onClick={() => {
+                  if (!categories.length) {
+                    setFormFeedback(
+                      'No hay subcategorías disponibles. Crea una subcategoría en Categorías antes de agregar productos.'
+                    );
+                    return;
+                  }
+                  if (!suppliers.length) {
+                    setFormFeedback('No hay proveedores. Crea al menos uno en Proveedores.');
+                    return;
+                  }
+                  setEditingProduct(null);
+                  setForm({
+                    name: '',
+                    sku: suggestedSku,
+                    categoryId: categories[0]?.id ?? '',
+                    supplierId: suppliers[0]?.id ?? '',
+                    price: '',
+                    cost: '',
+                    stock: '0',
+                    minStock: '0',
+                  });
+                  setSuccessMessage(null);
+                  setModalError(null);
+                  setFormNumericWarning(null);
+                  setShowModal(true);
+                }}
+                disabled={isActionLocked}
+                className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Nuevo producto
+              </button>
+            }
+          />
+          {errorMessage && <p className="mb-4 app-alert-error">{errorMessage}</p>}
+          {successMessage && <p className="mb-4 app-alert-success">{successMessage}</p>}
+          {isLoading && <p className="mb-4 text-sm text-brand-ink-muted">Cargando productos desde BFF...</p>}
 
           <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
             <section className="app-card rounded-3xl p-6">

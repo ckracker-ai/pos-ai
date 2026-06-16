@@ -78,14 +78,34 @@ export class ApiCoreServiceEmpresa extends ApiCoreBaseService {
     return response.data;
   }
 
+  async getDataDeletionStatus(id: string, token: string, internalKey: string, branchId: string) {
+    const response = await this.client.get(`/empresas/${id}/data-deletion-status`, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
   async createDataDeletionRequest(
     id: string,
-    input: { notes?: string | null },
+    input: { confirmationPhrase: string; notes?: string | null },
     token: string,
     internalKey: string,
     branchId: string
   ) {
     const response = await this.client.post(`/empresas/${id}/data-deletion-request`, input, {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
+  async cancelDataDeletionRequest(
+    id: string,
+    input: { requestId?: string },
+    token: string,
+    internalKey: string,
+    branchId: string
+  ) {
+    const response = await this.client.post(`/empresas/${id}/data-deletion-cancel`, input, {
       headers: this.authHeaders(token, internalKey, branchId),
     });
     return response.data;

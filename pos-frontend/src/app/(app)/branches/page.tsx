@@ -8,6 +8,7 @@ import { api } from '@/core/api/api-client';
 import { extractList, extractEntity, normalizeBranch, normalizeUser, unwrapApiEnvelope } from '@/core/api/normalizers';
 import { Branch, TerritoryComuna, TerritoryRegion } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -291,59 +292,61 @@ export default function BranchesPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Sucursales</p>
-              <h1 className="mt-3 text-3xl font-semibold text-[#3D4532]">Mantenedor de sucursales</h1>
-              <p className="mt-2 max-w-2xl text-brand-ink-muted/80">
-                {canManageBranches
-                  ? 'Administra sucursales fijas y puestos temporales (eventos). Usa Desactivar cuando una sucursal cierra: deja de aparecer en ventas nuevas, pero ventas, inventario y reportes históricos se conservan. Restaura desde el filtro Inactivos.'
-                  : 'Consulta sucursales para auditoría. Solo el administrador puede crear, editar o desactivar locales.'}
-              </p>
-              {!canManageBranches && (
-                <p className="mt-2 text-sm text-amber-300/90">
-                  Modo solo lectura: puedes cambiar la sucursal activa en el encabezado, no desde aquí.
-                </p>
-              )}
-              {currentUser && (
-                <p className="mt-3 text-sm text-brand-ink-muted">Sesión iniciada como: {currentUser.name}</p>
-              )}
-              {errorMessage && (
-                <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {errorMessage}
-                </p>
-              )}
-              {successMessage && (
-                <p className="mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  {successMessage}
-                </p>
-              )}
-              {isLoading && <p className="mt-3 text-sm text-brand-ink-muted">Cargando sucursales desde BFF...</p>}
-            </div>
-            {canManageBranches && (
-              <button
-                onClick={() => {
-                  setEditingBranch(null);
-                  setForm({
-        name: '',
-        code: '',
-        regionId: '',
-        comunaId: '',
-        codigoPostal: '',
-        address: '',
-        phone: '',
-      });
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                  setShowModal(true);
-                }}
-                disabled={isActionLocked}
-                className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                + Nueva sucursal
-              </button>
-            )}
-          </div>
+          <AppPageHeader
+            kicker="Sucursales"
+            title="Mantenedor de sucursales"
+            description={
+              canManageBranches
+                ? 'Administra sucursales fijas y puestos temporales (eventos). Usa Desactivar cuando una sucursal cierra: deja de aparecer en ventas nuevas, pero ventas, inventario y reportes históricos se conservan. Restaura desde el filtro Inactivos.'
+                : 'Consulta sucursales para auditoría. Solo el administrador puede crear, editar o desactivar locales.'
+            }
+            meta={
+              <>
+                {!canManageBranches && (
+                  <p className="text-amber-800">
+                    Modo solo lectura: puedes cambiar la sucursal activa en el encabezado, no desde aquí.
+                  </p>
+                )}
+                {currentUser ? <p>Sesión iniciada como: {currentUser.name}</p> : null}
+              </>
+            }
+            actions={
+              canManageBranches ? (
+                <button
+                  onClick={() => {
+                    setEditingBranch(null);
+                    setForm({
+                      name: '',
+                      code: '',
+                      regionId: '',
+                      comunaId: '',
+                      codigoPostal: '',
+                      address: '',
+                      phone: '',
+                    });
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                    setShowModal(true);
+                  }}
+                  disabled={isActionLocked}
+                  className="app-btn-primary inline-flex items-center justify-center rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  + Nueva sucursal
+                </button>
+              ) : undefined
+            }
+          />
+          {errorMessage && (
+            <p className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-800">
+              {errorMessage}
+            </p>
+          )}
+          {successMessage && (
+            <p className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
+              {successMessage}
+            </p>
+          )}
+          {isLoading && <p className="mb-4 text-sm text-brand-ink-muted">Cargando sucursales desde BFF...</p>}
 
           <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
             <section className="app-card rounded-3xl p-6 shadow-lg">

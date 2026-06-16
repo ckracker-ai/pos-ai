@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { getRoleProfile } from '@/core/config/role-access';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -358,34 +359,33 @@ export default function ReportesPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="app-eyebrow">Reportes</p>
-              <h1 className="app-heading-page">Panel general</h1>
-              <p className="mt-2 app-text-muted">
-                {globalView && canGlobal
-                  ? 'Resumen de todas las sucursales'
-                  : `Resumen de ${activeBranchName}`}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {canGlobal && (
-                <label className="flex items-center gap-2 rounded-2xl border border-[rgba(209,199,189,0.9)] bg-white px-4 py-2 text-sm text-[#3d4532]">
-                  <input
-                    type="checkbox"
-                    checked={globalView}
-                    onChange={(e) => setGlobalView(e.target.checked)}
-                    className="rounded border-[rgba(209,199,189,0.9)]"
-                  />
-                  Vista global
-                </label>
-              )}
-              <button type="button" onClick={loadReports} className="app-btn-secondary">
-                Actualizar
-              </button>
-            </div>
-          </div>
+          <AppPageHeader
+            kicker="Reportes"
+            title="Panel general"
+            description={
+              globalView && canGlobal
+                ? 'Resumen de todas las sucursales'
+                : `Resumen de ${activeBranchName}`
+            }
+            actions={
+              <div className="flex flex-wrap items-center gap-3">
+                {canGlobal && (
+                  <label className="flex items-center gap-2 rounded-2xl border border-brand-linen bg-white px-4 py-2 text-sm text-brand-ink">
+                    <input
+                      type="checkbox"
+                      checked={globalView}
+                      onChange={(e) => setGlobalView(e.target.checked)}
+                      className="rounded border-brand-linen accent-brand-olive"
+                    />
+                    Vista global
+                  </label>
+                )}
+                <button type="button" onClick={loadReports} className="app-btn-secondary">
+                  Actualizar
+                </button>
+              </div>
+            }
+          />
 
           {errorMessage && <p className="mb-6 app-alert-error">{errorMessage}</p>}
 

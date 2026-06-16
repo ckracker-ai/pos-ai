@@ -4,10 +4,9 @@ import { useEffect } from 'react';
 import { useUiStore } from '@/store/ui';
 
 const styleByType: Record<string, string> = {
-  success:
-    'border-emerald-500/50 bg-slate-900 text-emerald-100 shadow-lg shadow-black/30',
-  error: 'border-rose-500/60 bg-slate-900 text-rose-50 shadow-lg shadow-black/30',
-  info: 'border-sky-500/50 bg-slate-900 text-sky-100 shadow-lg shadow-black/30',
+  success: 'border-emerald-200/90 bg-white text-brand-ink shadow-lg shadow-brand-olive/10',
+  error: 'border-rose-200 bg-white text-brand-ink shadow-lg shadow-rose-900/5',
+  info: 'border-sky-200 bg-white text-brand-ink shadow-lg shadow-sky-900/5',
 };
 
 export function ToastViewport() {
@@ -34,13 +33,13 @@ export function ToastViewport() {
             <div>
               <p className="text-sm font-semibold">{toast.title}</p>
               {toast.message ? (
-                <p className="mt-1 text-xs leading-relaxed text-slate-300">{toast.message}</p>
+                <p className="mt-1 text-xs leading-relaxed text-brand-ink-muted">{toast.message}</p>
               ) : null}
             </div>
             <button
               type="button"
               onClick={() => removeToast(toast.id)}
-              className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-white/10 hover:text-slate-200"
+              className="rounded-lg px-2 py-1 text-xs text-brand-ink-muted hover:bg-brand-vainilla hover:text-brand-ink"
               aria-label="Cerrar"
             >
               ✕
@@ -57,7 +56,7 @@ export function ToastViewport() {
                   /* el llamador muestra el error */
                 }
               }}
-              className="mt-3 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
+              className="mt-3 rounded-xl border border-brand-linen bg-brand-vainilla px-3 py-1.5 text-xs font-semibold text-brand-olive hover:bg-brand-linen/40"
             >
               {toast.action.label}
             </button>

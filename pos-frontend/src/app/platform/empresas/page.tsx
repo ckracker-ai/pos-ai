@@ -27,11 +27,11 @@ const ESTADO_STYLES: Record<EmpresaEstado, string> = {
 };
 
 const SUB_ESTADO_STYLES: Record<string, string> = {
-  PILOTO: 'bg-sky-100 text-sky-800',
+  PILOTO: 'bg-brand-olive/15 text-brand-olive',
   ACTIVA: 'bg-emerald-100 text-emerald-800',
   GRACIA: 'bg-amber-100 text-amber-900',
   VENCIDA: 'bg-rose-100 text-rose-800',
-  CANCELADA: 'bg-slate-200 text-slate-600',
+  CANCELADA: 'bg-brand-muted/60 text-brand-ink-muted',
 };
 
 function formatSubDate(iso: string | null | undefined): string {
@@ -436,7 +436,7 @@ export default function PlatformEmpresasPage() {
                         <>
                           <span
                             className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${
-                              SUB_ESTADO_STYLES[e.suscripcion.estado] ?? 'bg-slate-200 text-slate-700'
+                              SUB_ESTADO_STYLES[e.suscripcion.estado] ?? 'bg-brand-muted/60 text-brand-ink-muted'
                             }`}
                           >
                             {e.suscripcion.estado}
@@ -467,7 +467,7 @@ export default function PlatformEmpresasPage() {
                         <button
                           type="button"
                           onClick={() => void patchSuscripcion(e.id, { extendDays: 30 })}
-                          className="text-xs font-medium text-sky-700 hover:underline"
+                          className="text-xs font-medium text-brand-olive hover:underline"
                         >
                           +30d piloto
                         </button>
@@ -675,7 +675,7 @@ export default function PlatformEmpresasPage() {
                     <td>
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          p.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                          p.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-muted/60 text-brand-ink-muted'
                         }`}
                       >
                         {p.activo ? 'Activo' : 'Inactivo'}

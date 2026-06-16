@@ -1,9 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/core/api/api-client';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
 import { notifyApiError, notifySuccess } from '@/store/ui';
+import { TenantDataDeletionModal } from '@/components/molecules/TenantDataDeletionModal';
+
+type DeletionStatus = {
+  requestId: string;
+  status: string;
+  scheduledPurgeAt: string;
+  rollbackHours: number;
+  canCancel: boolean;
+  initiatedByPlatform: boolean;
+};
 
 type Props = {
   empresaId: string;
@@ -11,8 +21,27 @@ type Props = {
 
 export function EmpresaPrivacidadPanel({ empresaId }: Props) {
   const [exporting, setExporting] = useState(false);
-  const [deletionNotes, setDeletionNotes] = useState('');
+  const [deletion, setDeletion] = useState<DeletionStatus | null>(null);
+  const [loadingDeletion, setLoadingDeletion] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
   const [requestingDeletion, setRequestingDeletion] = useState(false);
+
+  const loadDeletionStatus = useCallback(async () => {
+    setLoadingDeletion(true);
+    try {
+      const res = await api.getEmpresaDataDeletionStatus(empresaId);
+      const data = unwrapApiEnvelope(res.data) as { deletion?: DeletionStatus | null };
+      setDeletion(data.deletion ?? null);
+    } catch (error) {
+      notifyApiError('empresas.privacidad', error);
+    } finally {
+      setLoadingDeletion(false);
+    }
+  }, [empresaId]);
+
+  useEffect(() => {
+    void loadDeletionStatus();
+  }, [loadDeletionStatus]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -37,24 +66,50 @@ export function EmpresaPrivacidadPanel({ empresaId }: Props) {
     }
   };
 
-  const handleDeletionRequest = async () => {
+  const handleDeletionConfirm = async (input: { confirmationPhrase: string; notes: string }) => {
     setRequestingDeletion(true);
     try {
       const res = await api.createEmpresaDataDeletionRequest(empresaId, {
-        notes: deletionNotes.trim() || undefined,
+        confirmationPhrase: input.confirmationPhrase,
+        notes: input.notes || undefined,
       });
-      const data = unwrapApiEnvelope(res.data) as { requestId?: string };
+      const data = unwrapApiEnvelope(res.data) as DeletionStatus;
+      const purgeAt = data.scheduledPurgeAt
+        ? new Date(data.scheduledPurgeAt).toLocaleString('es-CL')
+        : '24 h';
       notifySuccess(
-        'Solicitud registrada',
-        data.requestId
-          ? `Ticket ${data.requestId.slice(0, 8)}… — soporte contactará en hasta 10 días hábiles.`
-          : 'Soporte revisará tu solicitud de eliminación.'
+        'Eliminación programada',
+        `Puedes cancelar hasta ${purgeAt}. Pasado ese plazo se suspenderá la cuenta.`
       );
-      setDeletionNotes('');
+      setModalOpen(false);
+      await loadDeletionStatus();
     } catch (error) {
       notifyApiError('empresas.privacidad', error);
     } finally {
       setRequestingDeletion(false);
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    if (!deletion?.canCancel) return;
+    if (!confirm('¿Cancelar la eliminación programada de los datos de tu empresa?')) return;
+    setRequestingDeletion(true);
+    try {
+      await api.cancelEmpresaDataDeletionRequest(empresaId, { requestId: deletion.requestId });
+      notifySuccess('Eliminación cancelada', 'Tu empresa sigue activa con normalidad.');
+      await loadDeletionStatus();
+    } catch (error) {
+      notifyApiError('empresas.privacidad', error);
+    } finally {
+      setRequestingDeletion(false);
+    }
+  };
+
+  const formatDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString('es-CL');
+    } catch {
+      return iso;
     }
   };
 
@@ -77,27 +132,62 @@ export function EmpresaPrivacidadPanel({ empresaId }: Props) {
       </div>
 
       <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-5">
-        <h3 className="text-sm font-semibold text-amber-950">Solicitud de eliminación</h3>
+        <h3 className="text-sm font-semibold text-amber-950">Eliminación de datos</h3>
         <p className="mt-2 text-sm text-amber-900/90">
-          Crea un ticket para cancelación/eliminación de datos del tenant. No borra la cuenta de
-          inmediato; el equipo valida retención legal (ventas, pagos) antes del purge.
+          Si deseas eliminar todos los datos de la empresa, puedes programarlo aquí. Tendrás{' '}
+          <strong className="font-semibold">24 horas</strong> para cancelar antes de que se suspenda la
+          cuenta y se cancele la suscripción.
         </p>
-        <textarea
-          className="mt-3 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-brand-ink outline-none focus:border-brand-olive focus:ring-2 focus:ring-brand-olive/20"
-          rows={3}
-          placeholder="Motivo o alcance (opcional)"
-          value={deletionNotes}
-          onChange={(e) => setDeletionNotes(e.target.value)}
-        />
-        <button
-          type="button"
-          onClick={handleDeletionRequest}
-          disabled={requestingDeletion}
-          className="mt-3 rounded-lg border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-60"
-        >
-          {requestingDeletion ? 'Enviando…' : 'Solicitar eliminación de datos'}
-        </button>
+
+        {loadingDeletion ? (
+          <p className="mt-3 text-sm text-brand-ink-muted">Cargando estado…</p>
+        ) : deletion &&
+          (deletion.status === 'SCHEDULED' ||
+            deletion.status === 'PENDING' ||
+            deletion.status === 'IN_PROGRESS') ? (
+          <div className="mt-4 rounded-lg border border-amber-300 bg-white/80 p-4 text-sm">
+            <p className="font-semibold text-amber-950">
+              {deletion.status === 'IN_PROGRESS'
+                ? 'Eliminación en ejecución'
+                : 'Eliminación programada'}
+            </p>
+            <p className="mt-1 text-amber-900/90">
+              {deletion.status === 'IN_PROGRESS'
+                ? 'Suspendiendo empresa y cancelando suscripción…'
+                : `Fecha de ejecución: ${formatDate(deletion.scheduledPurgeAt)}`}
+              {deletion.initiatedByPlatform ? ' · solicitada por soporte plataforma' : ''}
+            </p>
+            {deletion.canCancel ? (
+              <button
+                type="button"
+                onClick={() => void handleCancelDeletion()}
+                disabled={requestingDeletion}
+                className="mt-3 rounded-lg border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-60"
+              >
+                {requestingDeletion ? 'Cancelando…' : 'Cancelar eliminación'}
+              </button>
+            ) : (
+              <p className="mt-2 text-xs text-amber-800">El plazo de cancelación ya venció.</p>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="mt-4 rounded-lg border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+          >
+            Solicitar eliminación de datos
+          </button>
+        )}
       </div>
+
+      <TenantDataDeletionModal
+        open={modalOpen}
+        rollbackHours={deletion?.rollbackHours ?? 24}
+        isProcessing={requestingDeletion}
+        onCancel={() => setModalOpen(false)}
+        onConfirm={(input) => void handleDeletionConfirm(input)}
+      />
 
       <p className="text-xs text-brand-ink-muted">
         Más información en{' '}

@@ -14,6 +14,7 @@ import planRoutes from '../../saas/routes/plan.routes';
 import assistantDelegate from '../../assistant/delegates/AssistantDelegate';
 import suscripcionDelegate from '../../saas/delegates/SuscripcionDelegate';
 import { countPlatformStats } from '../../saas/utils/planLimits';
+import { withJobLock } from '../../../lib/jobLock';
 
 const router = Router();
 
@@ -35,6 +36,11 @@ const mapErrorStatus = (error: string): number => {
   if (error.startsWith('TRIBUTARIO_FORMAL_REQUIRED')) return 403;
   if (error.startsWith('PLAN_LIMIT_')) return 403;
   if (error === 'DATA_DELETION_REQUEST_ALREADY_OPEN') return 409;
+  if (error === 'DELETION_CONFIRMATION_MISMATCH') return 422;
+  if (error === 'DATA_DELETION_REQUEST_NOT_FOUND') return 404;
+  if (error === 'DATA_DELETION_REQUEST_NOT_CANCELLABLE') return 409;
+  if (error === 'DATA_DELETION_ROLLBACK_EXPIRED') return 409;
+  if (error === 'SUPPORT_ACCESS_NO_ADMIN') return 404;
   return 400;
 };
 
@@ -221,7 +227,13 @@ router.patch('/platform/:empresaId/suscripcion', async (req, res) => {
 });
 
 router.post('/platform/jobs/refresh-subscriptions', async (_req, res) => {
-  const result = await suscripcionDelegate.refreshAllExpired();
+  const locked = await withJobLock('refresh-subscriptions', 300, () =>
+    suscripcionDelegate.refreshAllExpired()
+  );
+  if (!locked.acquired) {
+    return sendOk(res, { job: 'refresh-subscriptions', skipped: true, reason: locked.reason });
+  }
+  const result = locked.value;
   if (result.success) return sendOk(res, { job: 'refresh-subscriptions', ...result.value });
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
@@ -240,6 +252,52 @@ router.post('/platform/:empresaId/checkout/confirm-payment', async (req, res) =>
     extendDays: body.extendDays != null ? Number(body.extendDays) : undefined,
   });
   if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.get('/platform/:empresaId/data-deletion-status', async (req, res) => {
+  const result = await dataSubjectDelegate.getDeletionStatus(req.params.empresaId);
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/data-deletion-request', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await dataSubjectDelegate.createDeletionRequest({
+    empresaId: req.params.empresaId,
+    confirmationPhrase: String(body.confirmationPhrase ?? ''),
+    notes: body.notes != null ? String(body.notes) : null,
+    initiatedByPlatform: true,
+  });
+  if (result.success) return sendOk(res, result.value, 201);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/data-deletion-cancel', async (req, res) => {
+  const body = req.body ?? {};
+  const result = await dataSubjectDelegate.cancelDeletionRequest({
+    empresaId: req.params.empresaId,
+    requestId: body.requestId != null ? String(body.requestId) : undefined,
+  });
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/:empresaId/support-access', async (req, res) => {
+  const result = await platformTenantOpsDelegate.createSupportAccess(req.params.empresaId);
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/platform/jobs/process-data-deletions', async (_req, res) => {
+  const locked = await withJobLock('process-data-deletions', 300, () =>
+    dataSubjectDelegate.processScheduledDeletions()
+  );
+  if (!locked.acquired) {
+    return sendOk(res, { job: 'process-data-deletions', skipped: true, reason: locked.reason });
+  }
+  const result = locked.value;
+  if (result.success) return sendOk(res, { job: 'process-data-deletions', ...result.value });
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
@@ -308,15 +366,36 @@ router.get('/:id/data-export', requireAdmin, async (req: AuthenticatedRequest, r
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 
+router.get('/:id/data-deletion-status', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const result = await dataSubjectDelegate.getDeletionStatus(
+    req.params.id,
+    getEffectiveEmpresaId(req)
+  );
+  if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
 router.post('/:id/data-deletion-request', requireAdmin, async (req: AuthenticatedRequest, res) => {
   const body = req.body ?? {};
   const result = await dataSubjectDelegate.createDeletionRequest({
     empresaId: req.params.id,
     tenantEmpresaId: getEffectiveEmpresaId(req),
     requestedBy: req.user!.userId,
+    confirmationPhrase: String(body.confirmationPhrase ?? ''),
     notes: body.notes != null ? String(body.notes) : null,
   });
   if (result.success) return sendOk(res, result.value, 201);
+  return sendFail(res, result.error, mapErrorStatus(result.error));
+});
+
+router.post('/:id/data-deletion-cancel', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const body = req.body ?? {};
+  const result = await dataSubjectDelegate.cancelDeletionRequest({
+    empresaId: req.params.id,
+    tenantEmpresaId: getEffectiveEmpresaId(req),
+    requestId: body.requestId != null ? String(body.requestId) : undefined,
+  });
+  if (result.success) return sendOk(res, result.value);
   return sendFail(res, result.error, mapErrorStatus(result.error));
 });
 

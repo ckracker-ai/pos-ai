@@ -15,7 +15,9 @@ const config: Config = {
         brand: {
           olive: '#4A533C',
           linen: '#D1C7BD',
+          lino: '#D1C7BD',
           surface: '#F4F4F3',
+          vainilla: '#F4F4F3',
           muted: '#D8D8D3',
           ink: '#3D4532',
           'ink-muted': '#6B7362',

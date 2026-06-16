@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { platformFetch } from '@/core/context/platform-auth';
 import { PlatformPageHeader } from '@/components/molecules/PlatformPageHeader';
+import { PlatformEmpresaPrivacidadPanel } from '@/components/molecules/PlatformEmpresaPrivacidadPanel';
 import { Empresa, EmpresaEstado, SaasPlanCodigo } from '@/core/interfaces';
 import { normalizeEmpresa, unwrapApiEnvelope } from '@/core/api/normalizers';
 import { formatPlanValor, getPlanDisplayName } from '@/core/constants/saas-plan';
 
 type ApiEnvelope<T> = { success: boolean; data: T; error: string | null; code: number };
 
-type TabId = 'general' | 'usuarios' | 'sucursales' | 'suscripcion';
+type TabId = 'general' | 'usuarios' | 'sucursales' | 'suscripcion' | 'privacidad';
 
 type PlatformTenantUser = {
   id: string;
@@ -63,6 +64,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'usuarios', label: 'Usuarios' },
   { id: 'sucursales', label: 'Sucursales' },
   { id: 'suscripcion', label: 'Suscripción' },
+  { id: 'privacidad', label: 'Privacidad' },
 ];
 
 const ROLE_OPTIONS = ['ADMIN', 'AUDITOR', 'SELLER', 'COMANDA'] as const;
@@ -84,6 +86,16 @@ function mapOpsError(error: string): string {
   if (error.includes('PLAN_LIMIT_BRANCHES')) return 'Límite de sucursales activas del plan alcanzado.';
   if (error.includes('BRANCH_NOT_FOUND')) return 'Sucursal no encontrada.';
   if (error.includes('LEGAL_')) return 'Error en documentos legales — revisa migraciones S7.';
+  if (error.includes('DELETION_CONFIRMATION_MISMATCH')) {
+    return 'Frase incorrecta. Escribe: confirmar eliminacion empresa';
+  }
+  if (error.includes('SUPPORT_ACCESS_NO_ADMIN')) {
+    return 'No hay administrador activo en este tenant.';
+  }
+  if (error.includes('ECONNREFUSED') || error.includes('socket hang up') || error.includes('ECONNRESET')) {
+    return 'El servidor API no respondió. Espera unos segundos e intenta de nuevo.';
+  }
+  if (error.includes('DATA_DELETION_')) return error.replace(/_/g, ' ').toLowerCase();
   return error;
 }
 
@@ -126,6 +138,7 @@ export default function PlatformEmpresaDetailPage() {
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
   const [branchDraft, setBranchDraft] = useState({ name: '', address: '', phone: '' });
   const [savingBranch, setSavingBranch] = useState(false);
+  const [supportLoading, setSupportLoading] = useState(false);
 
   const loadEmpresa = useCallback(async () => {
     const res = await platformFetch<ApiEnvelope<{ empresa: Record<string, unknown> }>>(
@@ -405,6 +418,69 @@ export default function PlatformEmpresaDetailPage() {
     }
   };
 
+  const handleSupportAccess = async () => {
+    if (
+      !confirm(
+        'Abrirás una sesión de soporte en el tenant (como admin, 2 h). Se abrirá el panel en una nueva pestaña.'
+      )
+    ) {
+      return;
+    }
+
+    const {
+      openSupportPlaceholderTab,
+      stashSupportHandoff,
+      navigateSupportTab,
+      closeSupportTab,
+    } = await import('@/core/context/support-handoff');
+
+    const supportTab = openSupportPlaceholderTab();
+    if (!supportTab) {
+      setOpsError(
+        'El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e intenta de nuevo.'
+      );
+      return;
+    }
+
+    setOpsError(null);
+    setSupportLoading(true);
+    try {
+      const res = await platformFetch<
+        ApiEnvelope<{ token: string; user: PlatformTenantUser; expiresIn: string }>
+      >(`platform/empresas/${empresaId}/support-access`, { method: 'POST', body: '{}' });
+      const data = unwrapApiEnvelope(res) as {
+        token?: string;
+        user?: PlatformTenantUser;
+      };
+      if (!data.token || !data.user) {
+        throw new Error('Respuesta de soporte incompleta');
+      }
+
+      const handoffId = stashSupportHandoff({
+        token: data.token,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.fullName,
+          role: 'admin',
+          branchId: data.user.branchId,
+          isActive: data.user.isActive,
+          createdAt: data.user.createdAt,
+          updatedAt: data.user.updatedAt,
+        },
+        branchId: data.user.branchId,
+      });
+
+      navigateSupportTab(supportTab, handoffId);
+      flashOk(`Sesión de soporte como ${data.user.email} (2 h).`);
+    } catch (err) {
+      closeSupportTab(supportTab);
+      setOpsError(mapOpsError(err instanceof Error ? err.message : 'Error de acceso soporte'));
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
   const handleLifecycle = async (action: 'suspend' | 'activate') => {
     const msg =
       action === 'suspend'
@@ -571,9 +647,31 @@ export default function PlatformEmpresaDetailPage() {
               >
                 Ver usuarios
               </button>
+              <button
+                type="button"
+                disabled={supportLoading}
+                onClick={() => void handleSupportAccess()}
+                className="rounded-lg border border-brand-olive/40 bg-brand-olive/10 px-3 py-2 text-xs font-semibold text-brand-olive hover:bg-brand-olive/20 disabled:opacity-60"
+              >
+                {supportLoading ? 'Abriendo…' : 'Ingresar como soporte'}
+              </button>
             </div>
+            <p className="mt-3 text-[11px] text-brand-ink-muted">
+              Acceso de soporte: entra al ERP del tenant aunque esté suspendido (sesión temporal 2 h).
+            </p>
           </section>
         </div>
+      )}
+
+      {tab === 'privacidad' && (
+        <PlatformEmpresaPrivacidadPanel
+          empresaId={empresaId}
+          onMessage={(msg, isError) => {
+            if (!msg) return;
+            if (isError) setOpsError(mapOpsError(msg));
+            else flashOk(msg);
+          }}
+        />
       )}
 
       {tab === 'usuarios' && (
@@ -681,7 +779,7 @@ export default function PlatformEmpresaDetailPage() {
                       <td>
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            u.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                            u.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-muted/60 text-brand-ink-muted'
                           }`}
                         >
                           {u.isActive ? 'Activo' : 'Inactivo'}
@@ -755,7 +853,7 @@ export default function PlatformEmpresaDetailPage() {
                               setResetPassword('');
                               setOpsError(null);
                             }}
-                            className="text-xs font-medium text-sky-700 hover:underline"
+                            className="text-xs font-medium text-brand-olive hover:underline"
                           >
                             Reset contraseña
                           </button>
@@ -892,7 +990,7 @@ export default function PlatformEmpresaDetailPage() {
                       <td>
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            b.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                            b.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-muted/60 text-brand-ink-muted'
                           }`}
                         >
                           {b.isActive ? 'Activa' : 'Inactiva'}
@@ -922,7 +1020,7 @@ export default function PlatformEmpresaDetailPage() {
                             <button
                               type="button"
                               onClick={() => startEditBranch(b)}
-                              className="text-xs font-medium text-sky-700 hover:underline"
+                              className="text-xs font-medium text-brand-olive hover:underline"
                             >
                               Editar
                             </button>
@@ -985,7 +1083,7 @@ export default function PlatformEmpresaDetailPage() {
               <button
                 type="button"
                 onClick={() => void patchSuscripcion({ extendDays: 30 })}
-                className="rounded-lg border border-sky-200 px-3 py-2 text-xs font-medium text-sky-800 hover:bg-sky-50"
+                className="rounded-lg border border-brand-linen px-3 py-2 text-xs font-medium text-brand-olive hover:bg-brand-surface"
               >
                 +30 días piloto
               </button>

@@ -353,6 +353,73 @@ const platformEmpresaRoutes = async (app: FastifyInstance) => {
       return sendFail(reply, extractCoreError(e, 'Failed to activate empresa'), err.response?.status ?? 400);
     }
   });
+
+  app.get('/:empresaId/data-deletion-status', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    try {
+      const data = await core.getDataDeletionStatus(empresaId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to fetch deletion status'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:empresaId/data-deletion-request', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = z
+      .object({
+        confirmationPhrase: z.string().min(1),
+        notes: z.string().max(2000).optional().nullable(),
+      })
+      .parse(request.body ?? {});
+    try {
+      const data = await core.createDataDeletionRequest(empresaId, body);
+      return sendOk(reply, data, 201);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to schedule data deletion'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:empresaId/data-deletion-cancel', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    const body = z.object({ requestId: z.string().uuid().optional() }).parse(request.body ?? {});
+    try {
+      const data = await core.cancelDataDeletionRequest(empresaId, body);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to cancel data deletion'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:empresaId/support-access', async (request, reply) => {
+    const { empresaId } = request.params as { empresaId: string };
+    try {
+      const data = await core.createSupportAccess(empresaId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to create support access'),
+        err.response?.status ?? 400
+      );
+    }
+  });
 };
 
 export default platformEmpresaRoutes;

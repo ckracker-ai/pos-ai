@@ -29,6 +29,8 @@ import { APP_NAME, APP_VERSION } from './version';
 import territoryRoutes from './modules/territory/routes/territory.routes';
 import paymentRoutes from './modules/payments/routes/payment.routes';
 import { legalPublicRoutes, legalProtectedRoutes } from './modules/legal/routes/legal.routes';
+import { startTenantDeletionJob } from './jobs/tenantDeletionJob';
+import { getRedis, isRedisConfigured } from './lib/redis';
 
 
 const internalKeyGuard = (req: Request, res: Response, next: express.NextFunction) => {
@@ -83,6 +85,12 @@ async function bootstrap(): Promise<void> {
     await seedBootstrapDemoUsers();
     await seedBootstrapPlatformAdmin();
     await seedCutChile();
+
+    if (isRedisConfigured()) {
+      await getRedis();
+    } else {
+      console.info('[redis] REDIS_URL not set — auth cache and job locks run in single-instance mode');
+    }
   } catch (err) {
     console.error('❌  Unable to connect to the database:', err);
     process.exit(1);
@@ -126,6 +134,7 @@ async function bootstrap(): Promise<void> {
   const PORT = Number(process.env.PORT ?? process.env.CORE_PORT ?? 1010);
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀  ${APP_NAME} v${APP_VERSION} listening on port ${PORT}`);
+    startTenantDeletionJob();
   });
 }
 

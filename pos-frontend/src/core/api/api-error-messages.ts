@@ -119,7 +119,7 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   EMPRESA_SUSPENDED: 'La empresa está suspendida. Contacta al soporte de la plataforma.',
   EMPRESA_PENDING_ONBOARDING: 'La empresa aún no completó el onboarding.',
   SUBSCRIPTION_EXPIRED:
-    'La suscripción de tu empresa venció. Contacta al soporte de la plataforma para renovar.',
+    'La suscripción venció. Renueva desde el checkout o contacta soporte si ya pagaste.',
   SUBSCRIPTION_CANCELLED: 'La suscripción fue cancelada. Contacta al soporte de la plataforma.',
   SLUG_ALREADY_TAKEN: 'Ese identificador (slug) ya está en uso. Elige otro.',
   RUT_ALREADY_REGISTERED: 'Ese RUT ya está registrado en la plataforma.',
@@ -157,6 +157,13 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   INSUFFICIENT_STOCK: 'No hay stock suficiente para completar la operación.',
   PLAN_LIMIT_BRANCHES: 'Límite de sucursales del plan alcanzado. Mejora el plan en plataforma.',
   PLAN_LIMIT_USERS: 'Límite de usuarios del plan alcanzado. Mejora el plan en plataforma.',
+  DELETION_CONFIRMATION_MISMATCH:
+    'La frase de confirmación no coincide. Escribe exactamente: confirmar eliminacion empresa',
+  DATA_DELETION_REQUEST_ALREADY_OPEN: 'Ya hay una eliminación programada o en curso para esta empresa.',
+  DATA_DELETION_REQUEST_NOT_FOUND: 'No hay una solicitud de eliminación activa.',
+  DATA_DELETION_REQUEST_NOT_CANCELLABLE: 'Esta solicitud ya no se puede cancelar.',
+  DATA_DELETION_ROLLBACK_EXPIRED: 'El plazo de 24 h para cancelar la eliminación ya venció.',
+  SUPPORT_ACCESS_NO_ADMIN: 'Este tenant no tiene un administrador activo para acceso de soporte.',
   SHRINKAGE_NOT_FOUND: 'No encontramos esa merma en la sucursal activa.',
   SHRINKAGE_NOT_PENDING: 'Esta merma ya fue aprobada o rechazada.',
   SHRINKAGE_BRANCH_MISMATCH:

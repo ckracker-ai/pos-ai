@@ -11,6 +11,7 @@ import {
 } from '@/core/api/normalizers';
 import { Category } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -219,42 +220,39 @@ export default function CategoriesPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Catálogo</p>
-              <h1 className="app-heading-page">Categorías y subcategorías</h1>
-              <p className="mt-2 max-w-2xl text-sm app-text-muted">
-                Crea categorías principales (Pizzas, Sushi) y subcategorías bajo cada una. Los productos
-                se asignan a subcategorías sin hijos.
-              </p>
-              {errorMessage && <p className="mt-3 app-alert-error">{errorMessage}</p>}
-              {successMessage && <p className="mt-3 app-alert-success">{successMessage}</p>}
-              {isLoading && <p className="mt-3 text-sm text-[#6b7280]">Cargando categorías...</p>}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => openCreate('')}
-                disabled={isActionLocked}
-                className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                + Categoría principal
-              </button>
-              <button
-                type="button"
-                onClick={() => openCreate(rootCategories[0]?.id ?? '')}
-                disabled={isActionLocked || rootCategories.length === 0}
-                className="app-btn-secondary rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
-                title={
-                  rootCategories.length === 0
-                    ? 'Crea primero una categoría principal'
-                    : 'Abre el formulario con padre preseleccionado'
-                }
-              >
-                + Subcategoría
-              </button>
-            </div>
-          </div>
+          <AppPageHeader
+            kicker="Catálogo"
+            title="Categorías y subcategorías"
+            description="Crea categorías principales (Pizzas, Sushi) y subcategorías bajo cada una. Los productos se asignan a subcategorías sin hijos."
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => openCreate('')}
+                  disabled={isActionLocked}
+                  className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  + Categoría principal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openCreate(rootCategories[0]?.id ?? '')}
+                  disabled={isActionLocked || rootCategories.length === 0}
+                  className="app-btn-secondary rounded-3xl px-6 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                  title={
+                    rootCategories.length === 0
+                      ? 'Crea primero una categoría principal'
+                      : 'Abre el formulario con padre preseleccionado'
+                  }
+                >
+                  + Subcategoría
+                </button>
+              </div>
+            }
+          />
+          {errorMessage && <p className="mb-4 app-alert-error">{errorMessage}</p>}
+          {successMessage && <p className="mb-4 app-alert-success">{successMessage}</p>}
+          {isLoading && <p className="mb-4 text-sm text-brand-ink-muted">Cargando categorías...</p>}
 
           <section className="app-card rounded-3xl p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

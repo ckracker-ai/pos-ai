@@ -16,9 +16,9 @@ export function BranchSelector() {
     const current = branches.find((b) => b.id === selectedBranchId);
     return (
       <div className="hidden sm:block text-right">
-        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-500">Sucursal activa</p>
+        <p className="text-[10px] uppercase tracking-wider text-brand-ink-muted">Sucursal activa</p>
         <p
-          className="text-sm font-medium text-gray-800 dark:text-slate-200 max-w-[220px] break-words"
+          className="max-w-[220px] break-words text-sm font-medium text-brand-ink"
           title={current?.name ?? activeBranchName}
         >
           {current?.name ?? activeBranchName}
@@ -29,14 +29,17 @@ export function BranchSelector() {
 
   return (
     <div className="flex flex-col sm:items-end">
-      <label htmlFor="branch-selector" className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-500 mb-1">
+      <label
+        htmlFor="branch-selector"
+        className="mb-1 text-[10px] uppercase tracking-wider text-brand-ink-muted"
+      >
         Sucursal activa
       </label>
       <select
         id="branch-selector"
         value={selectedBranchId}
         onChange={(e) => setSelectedBranchId(e.target.value)}
-        className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-white min-w-[160px] max-w-[220px]"
+        className="min-w-[160px] max-w-[220px] rounded-xl border border-brand-linen bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-olive focus:ring-2 focus:ring-brand-olive/20"
       >
         {branches.length === 0 ? (
           <option value={selectedBranchId}>Cargando...</option>
@@ -48,7 +51,7 @@ export function BranchSelector() {
           ))
         )}
       </select>
-      {error && <p className="mt-1 text-xs text-rose-500 max-w-[220px]">{error}</p>}
+      {error && <p className="mt-1 max-w-[220px] text-xs text-rose-600">{error}</p>}
     </div>
   );
 }

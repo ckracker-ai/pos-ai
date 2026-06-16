@@ -5,6 +5,7 @@ import { api } from '@/core/api/api-client';
 import { extractList, extractEntity, normalizeSupplier, unwrapApiEnvelope } from '@/core/api/normalizers';
 import { Supplier } from '@/core/interfaces';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
@@ -211,30 +212,30 @@ export default function SuppliersPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent>
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="app-eyebrow">Proveedores</p>
-              <h1 className="mt-3 text-3xl font-semibold text-[#3D4532]">Mantenedor de proveedores</h1>
-              {errorMessage && (
-                <p className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {errorMessage}
-                </p>
-              )}
-              {successMessage && (
-                <p className="mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  {successMessage}
-                </p>
-              )}
-              {isLoading && <p className="mt-3 text-sm text-brand-ink-muted">Cargando proveedores...</p>}
-            </div>
-            <button
-              onClick={openCreate}
-              disabled={isActionLocked}
-              className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              + Nuevo proveedor
-            </button>
-          </div>
+          <AppPageHeader
+            kicker="Proveedores"
+            title="Mantenedor de proveedores"
+            actions={
+              <button
+                onClick={openCreate}
+                disabled={isActionLocked}
+                className="app-btn-primary rounded-3xl px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Nuevo proveedor
+              </button>
+            }
+          />
+          {errorMessage && (
+            <p className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-800">
+              {errorMessage}
+            </p>
+          )}
+          {successMessage && (
+            <p className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
+              {successMessage}
+            </p>
+          )}
+          {isLoading && <p className="mb-4 text-sm text-brand-ink-muted">Cargando proveedores...</p>}
 
           <section className="app-card rounded-3xl p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

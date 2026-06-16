@@ -6,15 +6,43 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { posProxyPath } from '@/core/constants/api-path';
 
+type WebpayCommitPayload = {
+  duplicate?: boolean;
+  status?: string;
+  data?: {
+    empresa?: { id?: string };
+    suscripcion?: unknown;
+  };
+};
+
+function extractEmpresaId(payload: WebpayCommitPayload | null | undefined): string {
+  if (!payload?.data?.empresa?.id) return '';
+  return String(payload.data.empresa.id);
+}
+
+function mapWebpayReturnError(error: string): string {
+  if (error.includes('WEBPAY_NOT_AUTHORIZED')) {
+    return 'Transbank no autorizó el pago. Puedes reintentar desde el checkout.';
+  }
+  if (error.includes('WEBPAY_COMMIT_FAILED')) {
+    return 'No se pudo confirmar con Transbank. Si ya pagaste, espera unos segundos e intenta iniciar sesión.';
+  }
+  if (error.includes('SUBSCRIPTION_ALREADY_ACTIVE')) {
+    return 'Tu suscripción ya está activa. Puedes iniciar sesión.';
+  }
+  return error;
+}
+
 export function CheckoutWebpayReturn() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tokenWs = searchParams.get('token_ws') ?? '';
   const [error, setError] = useState('');
+  const [rejected, setRejected] = useState(false);
 
   useEffect(() => {
     if (!tokenWs) {
-      setError('Falta token_ws de Transbank.');
+      setError('Falta token_ws de Transbank. Si cancelaste el pago, vuelve al checkout.');
       return;
     }
     let cancelled = false;
@@ -27,12 +55,28 @@ export function CheckoutWebpayReturn() {
         });
         const json = await res.json();
         if (cancelled) return;
+
+        const payload = (json.data ?? json) as WebpayCommitPayload;
+        const status = String(payload?.status ?? '').toUpperCase();
+
         if (!res.ok || !json.success) {
-          setError(String(json.error ?? 'Transbank no autorizó el pago'));
+          const msg = mapWebpayReturnError(String(json.error ?? 'Transbank no autorizó el pago'));
+          setRejected(true);
+          setError(msg);
           return;
         }
-        const inner = (json.data as { data?: { empresa?: { id?: string } } })?.data;
-        const empresaId = String(inner?.empresa?.id ?? '');
+
+        if (status === 'REJECTED' || status === 'CANCELLED' || status === 'EXPIRED') {
+          setRejected(true);
+          setError(
+            status === 'EXPIRED'
+              ? 'La sesión de pago expiró. Vuelve al checkout e intenta de nuevo.'
+              : 'El pago no fue autorizado. Puedes reintentar desde el checkout.'
+          );
+          return;
+        }
+
+        const empresaId = extractEmpresaId(payload);
         const q = empresaId ? `?paid=1&empresaId=${encodeURIComponent(empresaId)}` : '?paid=1';
         router.replace(`/login${q}`);
       } catch {
@@ -51,8 +95,11 @@ export function CheckoutWebpayReturn() {
       </Link>
       {error ? (
         <>
-          <p className="text-sm text-red-800">{error}</p>
-          <Link href="/checkout" className="mt-4 inline-block text-brand-olive font-medium hover:underline">
+          <p className={`text-sm ${rejected ? 'text-brand-ink' : 'text-red-800'}`}>{error}</p>
+          <Link
+            href="/checkout"
+            className="mt-4 inline-block text-brand-olive font-medium hover:underline"
+          >
             Volver al checkout
           </Link>
         </>

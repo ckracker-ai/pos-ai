@@ -12,6 +12,7 @@ import { Result, ok, fail, failWith, type Fail, type FailWithValue, type Ok } fr
 import legalDelegate from '../../legal/delegates/LegalDelegate';
 import { assertCanAddActiveUser } from '../../saas/utils/planLimits';
 import { normalizePhoneE164 } from '../../assistant/delegates/AssistantDelegate';
+import { invalidateAuthUserCache } from '../../../lib/authUserCache';
 
 export interface RegisterInput {
   fullName: string;
@@ -131,6 +132,7 @@ class AuthDelegate {
           isActive: true,
           whatsappPhone,
         });
+        await invalidateAuthUserCache(String(existing.id));
         return ok(this.toPayload(existing, role.name));
       }
 
@@ -296,9 +298,11 @@ class AuthDelegate {
     if (roleName === 'ADMIN') {
       const adminRole = await Role.findOne({ where: { name: 'ADMIN' } });
       if (adminRole) {
+        const adminRoleId = String(adminRole.getDataValue('id') ?? readModelString(adminRole, 'id'));
+        if (!adminRoleId) return fail('CANNOT_DEACTIVATE_LAST_ADMIN');
         const activeAdmins = await User.count({
           where: {
-            roleId: adminRole.id,
+            roleId: adminRoleId,
             isActive: true,
             ...(empresaId ? { empresaId } : {}),
           },
@@ -310,6 +314,7 @@ class AuthDelegate {
     }
 
     await user.update({ isActive: false });
+    await invalidateAuthUserCache(String(user.id));
     return ok({ deactivated: true });
   }
 
@@ -328,6 +333,7 @@ class AuthDelegate {
     }
 
     await user.update({ isActive: true });
+    await invalidateAuthUserCache(String(user.id));
     const roleName = String(
       (user as { role?: { name?: string } }).role?.name ?? 'UNKNOWN'
     );

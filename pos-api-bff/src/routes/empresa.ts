@@ -135,17 +135,43 @@ const empresaRoutes = async (app: FastifyInstance) => {
     }
   });
 
+  app.get('/:id/data-deletion-status', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    try {
+      const data = await empresaCore.getDataDeletionStatus(
+        id,
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId
+      );
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to fetch data deletion status'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
   app.post('/:id/data-deletion-request', { preHandler: [requireSeller] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
 
-    const body = (request.body ?? {}) as { notes?: string };
+    const body = (request.body ?? {}) as { confirmationPhrase?: string; notes?: string };
 
     try {
       const data = await empresaCore.createDataDeletionRequest(
         id,
-        { notes: body.notes },
+        {
+          confirmationPhrase: String(body.confirmationPhrase ?? ''),
+          notes: body.notes,
+        },
         ctx.token,
         ctx.internalKey,
         ctx.branchId
@@ -156,6 +182,32 @@ const empresaRoutes = async (app: FastifyInstance) => {
       return sendFail(
         reply,
         extractCoreError(e, 'Failed to create data deletion request'),
+        err.response?.status ?? 400
+      );
+    }
+  });
+
+  app.post('/:id/data-deletion-cancel', { preHandler: [requireSeller] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+
+    const body = (request.body ?? {}) as { requestId?: string };
+
+    try {
+      const data = await empresaCore.cancelDataDeletionRequest(
+        id,
+        { requestId: body.requestId },
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId
+      );
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(
+        reply,
+        extractCoreError(e, 'Failed to cancel data deletion request'),
         err.response?.status ?? 400
       );
     }

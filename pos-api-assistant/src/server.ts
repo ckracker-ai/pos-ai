@@ -7,8 +7,15 @@ import { paymentWebhookRoutes } from './routes/paymentWebhook.js';
 import { posInterpretRoutes } from './routes/posInterpret.js';
 import { voiceRoutes } from './webhooks/voice.js';
 import { twilioVoiceRoutes } from './webhooks/twilioVoice.js';
+import { getRedis, isRedisConfigured } from './lib/redis.js';
 
 const app = Fastify({ logger: true, bodyLimit: 6 * 1024 * 1024 });
+
+if (isRedisConfigured()) {
+  await getRedis();
+} else {
+  app.log.info('REDIS_URL not set — assistant sessions use in-memory fallback');
+}
 
 await app.register(cors, { origin: true });
 

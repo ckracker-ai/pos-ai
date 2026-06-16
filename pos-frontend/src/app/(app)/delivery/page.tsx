@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
+import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
 import { posProxyPath } from '@/core/constants/api-path';
@@ -109,12 +110,11 @@ export default function DeliveryPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-brand-olive">Envíos en curso</h1>
-          <p className="mt-1 text-sm text-brand-ink-muted">
-            Pedidos con delivery de la sucursal activa. Estados: creado → asignado → en ruta → entregado.
-          </p>
-        </div>
+        <AppPageHeader
+          kicker="Delivery"
+          title="Envíos en curso"
+          description="Pedidos con delivery de la sucursal activa. Estados: creado → asignado → en ruta → entregado."
+        />
 
         {error ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>

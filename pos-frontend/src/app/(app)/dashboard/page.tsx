@@ -8,9 +8,7 @@ import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 export default function DashboardPage() {
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
-      <div className="app-surface-page min-h-screen">
-        <Dashboard />
-      </div>
+      <Dashboard />
     </DashboardLayout>
   );
 }

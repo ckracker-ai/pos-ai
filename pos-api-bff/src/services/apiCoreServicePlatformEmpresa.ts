@@ -245,4 +245,42 @@ export class ApiCoreServicePlatformEmpresa extends ApiCoreBaseService {
     );
     return response.data;
   }
+
+  async getDataDeletionStatus(empresaId: string) {
+    const response = await this.client.get(
+      `/empresas/platform/${empresaId}/data-deletion-status`,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async createDataDeletionRequest(
+    empresaId: string,
+    input: { confirmationPhrase: string; notes?: string | null }
+  ) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/data-deletion-request`,
+      input,
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async cancelDataDeletionRequest(empresaId: string, input?: { requestId?: string }) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/data-deletion-cancel`,
+      input ?? {},
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
+
+  async createSupportAccess(empresaId: string) {
+    const response = await this.client.post(
+      `/empresas/platform/${empresaId}/support-access`,
+      {},
+      { headers: this.corePlatformHeaders() }
+    );
+    return response.data;
+  }
 }

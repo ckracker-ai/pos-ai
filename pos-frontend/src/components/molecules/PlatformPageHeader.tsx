@@ -12,7 +12,7 @@ export function PlatformPageHeader({ title, description, actions }: PlatformPage
       <p className="text-xs font-semibold uppercase tracking-wide text-brand-olive">Plataforma POS-AI</p>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold text-brand-ink sm:text-3xl">{title}</h1>
+          <h1 className="font-serif text-2xl font-semibold text-brand-ink sm:text-3xl">{title}</h1>
           {description ? (
             <p className="mt-2 max-w-3xl text-sm text-brand-ink-muted">{description}</p>
           ) : null}

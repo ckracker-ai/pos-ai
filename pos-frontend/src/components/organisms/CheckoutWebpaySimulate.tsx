@@ -48,12 +48,12 @@ export function CheckoutWebpaySimulate() {
         <Link href="/">
           <PosAiLogo width={140} className="mb-3" />
         </Link>
-        <h1 className="text-lg font-semibold text-[#6B3FA0]">Webpay Plus — simulador</h1>
+        <h1 className="text-lg font-semibold text-brand-olive">Webpay Plus — simulador</h1>
         <p className="mt-1 text-sm text-brand-ink-muted">
           Entorno de integración POS-AI (sin cargo real)
         </p>
       </div>
-      <div className="rounded-xl border border-[#6B3FA0]/20 bg-[#6B3FA0]/5 px-4 py-3 text-sm text-brand-ink">
+      <div className="rounded-xl border border-brand-olive/20 bg-brand-olive/5 px-4 py-3 text-sm text-brand-ink">
         <p>Confirma el pago simulado con el token de sesión emitido al crear la transacción.</p>
         <p className="mt-2 text-xs text-brand-ink-muted">
           Con credenciales Transbank (`WEBPAY_MODE=integration`) este paso se omite y el retorno es
@@ -69,7 +69,7 @@ export function CheckoutWebpaySimulate() {
         type="button"
         disabled={busy || !token}
         onClick={handleApprove}
-        className="mt-6 w-full rounded-lg bg-[#6B3FA0] py-3 text-sm font-semibold text-white transition hover:bg-[#5a3588] disabled:opacity-60"
+        className="mt-6 w-full rounded-lg bg-brand-olive py-3 text-sm font-semibold text-white transition hover:bg-[#3d4532] disabled:opacity-60"
       >
         {busy ? 'Autorizando…' : 'Simular pago aprobado (TBK)'}
       </button>
