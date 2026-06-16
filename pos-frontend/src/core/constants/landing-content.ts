@@ -7,6 +7,30 @@ export const LANDING_BRAND = {
   heroAccent: '/images/landing-hero-abstract.png',
 } as const;
 
+/** Assets de marketing (composite 2×2 + video). */
+export const LANDING_MEDIA = {
+  video: '/videos/pos-ai.mp4',
+  videoPoster: '/images/landing-slide-1.png',
+  heroSlide: '/images/landing-slide-1.png',
+  featureSlides: [
+    {
+      src: '/images/landing-slide-2.png',
+      alt: 'Inteligencia Artificial en cada proceso — POS-AI',
+      label: 'IA en el core',
+    },
+    {
+      src: '/images/landing-slide-3.png',
+      alt: 'Conecta por WhatsApp con IA — POS-AI',
+      label: 'WhatsApp IA',
+    },
+    {
+      src: '/images/landing-slide-4.png',
+      alt: 'IA Telefónica que trabaja por ti — POS-AI',
+      label: 'IA telefónica',
+    },
+  ] as const,
+} as const;
+
 /** Titulares por sección → un slide o post por bloque al replicar en redes. */
 export const LANDING_SOCIAL_BLOCKS = [
   { id: 'hero', headline: 'POS inteligente para la próxima generación de PYMEs', cta: 'Crear mi negocio' },

@@ -2,10 +2,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { LandingContactForm } from '@/components/molecules/LandingContactForm';
+import { LandingFeatureCarousel } from '@/components/molecules/LandingFeatureCarousel';
 import {
   LANDING_AI_PILLARS,
   LANDING_AI_STEPS,
   LANDING_BRAND,
+  LANDING_MEDIA,
   LANDING_STATS,
 } from '@/core/constants/landing-content';
 import type { LandingPlan } from '@/core/constants/landing-plans';
@@ -13,7 +15,24 @@ import { LANDING_MODULES } from '@/core/constants/landing-plans';
 
 type LandingPageProps = {
   plans: LandingPlan[];
+  /** default: imagen en hero, video abajo · video-hero: invertido (solo preview) */
+  mediaLayout?: 'default' | 'video-hero';
+  showPreviewBanner?: boolean;
 };
+
+function LandingPreviewBanner() {
+  return (
+    <div className="fixed inset-x-0 top-[4.25rem] z-40 border-b border-amber-200/40 bg-amber-50/95 px-4 py-2 text-center text-sm text-amber-950 backdrop-blur-sm">
+      <span className="font-medium">Vista previa alternativa</span>
+      <span className="mx-2 text-amber-800/60">·</span>
+      <span className="text-amber-900/90">Layout anterior: imagen en hero, video en sección media</span>
+      <span className="mx-2 hidden text-amber-800/60 sm:inline">·</span>
+      <Link href="/" className="font-semibold text-brand-olive underline-offset-2 hover:underline">
+        Volver a landing actual
+      </Link>
+    </div>
+  );
+}
 
 function LandingNav() {
   return (
@@ -23,6 +42,9 @@ function LandingNav() {
           <PosAiLogo height={40} width={72} priority className="brightness-0 invert" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm font-medium text-white/85 md:flex">
+          <a href="#video" className="transition hover:text-white">
+            Producto
+          </a>
           <a href="#ia" className="transition hover:text-white">
             Inteligencia
           </a>
@@ -55,92 +77,118 @@ function LandingNav() {
   );
 }
 
-function HeroProductPreview() {
+function LandingPromoVideo({ className = '' }: { className?: string }) {
   return (
-    <div className="landing-hero-preview relative p-4 sm:p-5 lg:max-w-md lg:justify-self-end">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-linen/90">Vista POS IA</p>
-        <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-200">
-          En vivo
-        </span>
-      </div>
-      <div className="landing-hero-preview-inner space-y-3 p-4">
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-          <span className="text-brand-linen" aria-hidden>
-            🎤
-          </span>
-          <p className="text-sm text-white/90">&quot;agrega 2 empanadas de pino&quot;</p>
-        </div>
-        <ul className="space-y-2 text-sm">
-          <li className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-white/90">
-            <span>Empanada de pino</span>
-            <span className="font-semibold text-brand-linen">×2</span>
-          </li>
-          <li className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-white/90">
-            <span>Café tradicional</span>
-            <span className="font-semibold text-brand-linen">×1</span>
-          </li>
-        </ul>
-        <div className="flex items-center justify-between border-t border-white/10 pt-3">
-          <span className="text-xs text-white/60">Total estimado</span>
-          <span className="font-serif text-lg font-semibold text-brand-linen">$4.850</span>
-        </div>
-      </div>
-      <div className="mt-3 flex items-start gap-2 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 px-3 py-2.5">
-        <span className="mt-0.5 text-xs font-bold text-[#25D366]" aria-hidden>
-          WSP
-        </span>
-        <p className="text-xs leading-relaxed text-white/80">
-          Comprobante validado · monto y cuenta coinciden con tu perfil de transferencia.
-        </p>
-      </div>
+    <div
+      className={`landing-video-wrap relative mx-auto w-full overflow-hidden rounded-2xl border border-brand-linen/80 bg-brand-ink shadow-2xl shadow-brand-olive/15 ${className}`}
+    >
+      <video
+        className="aspect-video w-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+        controls
+        preload="metadata"
+        poster={LANDING_MEDIA.videoPoster}
+        aria-label="Video promocional POS-AI"
+      >
+        <source src={LANDING_MEDIA.video} type="video/mp4" />
+      </video>
     </div>
   );
 }
 
-function HeroSection() {
+function LandingHeroImageFrame({ priority = false, className = '' }: { priority?: boolean; className?: string }) {
   return (
-    <section className="landing-hero relative min-h-[100svh] overflow-hidden pt-[4.25rem]">
+    <div
+      className={`relative aspect-[3/2] w-full overflow-hidden rounded-2xl border border-white/15 shadow-[0_24px_64px_rgba(0,0,0,0.35)] ${className}`}
+    >
+      <Image
+        src={LANDING_MEDIA.heroSlide}
+        alt="POS-AI — copiloto de negocio con IA en caja, WhatsApp y ERP"
+        fill
+        priority={priority}
+        className="object-cover object-center"
+        sizes="(max-width: 1024px) 90vw, 520px"
+      />
+    </div>
+  );
+}
+
+function LandingHeroVideoFrame({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`relative aspect-[3/2] w-full overflow-hidden rounded-2xl border border-white/15 bg-brand-ink shadow-[0_24px_64px_rgba(0,0,0,0.35)] ${className}`}
+    >
+      <video
+        className="h-full w-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+        controls
+        preload="metadata"
+        poster={LANDING_MEDIA.videoPoster}
+        aria-label="Video promocional POS-AI"
+      >
+        <source src={LANDING_MEDIA.video} type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
+function HeroSection({
+  mediaLayout = 'default',
+  withPreviewBanner = false,
+}: {
+  mediaLayout?: 'default' | 'video-hero';
+  withPreviewBanner?: boolean;
+}) {
+  return (
+    <section
+      className={`landing-hero relative overflow-hidden ${withPreviewBanner ? 'pt-[7rem]' : 'pt-[4.25rem]'}`}
+    >
       <div className="landing-hero-base pointer-events-none absolute inset-0" aria-hidden />
       <div className="landing-hero-mesh pointer-events-none absolute inset-0" aria-hidden />
       <div className="landing-hero-orb landing-hero-orb--1" aria-hidden />
       <div className="landing-hero-orb landing-hero-orb--2" aria-hidden />
       <div className="landing-hero-grid pointer-events-none absolute inset-0 opacity-60" aria-hidden />
 
-      <div className="relative mx-auto flex min-h-[calc(100svh-4.25rem)] max-w-6xl flex-col justify-center px-4 py-14 sm:px-6 lg:px-8">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
+      <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-12">
           <div className="max-w-xl">
             <p className="landing-badge mb-6 inline-flex items-center gap-2 rounded-full border border-brand-linen/35 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-linen backdrop-blur-sm">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-linen" aria-hidden />
               ERP con IA nativa · Chile
             </p>
-            <h1 className="font-serif text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.35rem]">
+            <h1 className="font-serif text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.15rem]">
               Punto de venta inteligente para la próxima generación de PYMEs
             </h1>
-            <p className="mt-6 text-lg leading-relaxed text-white/82">
-              Habla o escribe como en el mostrador. POS-AI une caja, inventario, comandas y —en plan Estándar—
-              un asistente WhatsApp que conoce tu catálogo y valida transferencias con los datos de tu empresa.
+            <p className="mt-6 text-lg leading-relaxed text-white/85">
+              Caja, inventario, comandas y asistente WhatsApp con stock real por sucursal. Un solo ERP en la nube
+              para operar y crecer con orden.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:gap-4">
-              <Link
-                href="/registro"
-                className="inline-flex min-w-[200px] items-center justify-center rounded-full bg-brand-linen px-8 py-3.5 text-base font-semibold text-brand-olive shadow-lg transition hover:bg-white"
-              >
-                Crear mi negocio
-              </Link>
-              <a
-                href="#ia"
-                className="inline-flex min-w-[200px] items-center justify-center rounded-full border border-white/35 bg-white/5 px-8 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition hover:bg-white/12"
-              >
-                Ver cómo funciona la IA
-              </a>
-            </div>
           </div>
 
-          <HeroProductPreview />
+          <div className="landing-hero-visual mx-auto flex w-full max-w-xl flex-col gap-6 lg:max-w-none lg:justify-self-end">
+            {mediaLayout === 'video-hero' ? (
+              <LandingHeroVideoFrame />
+            ) : (
+              <LandingHeroImageFrame priority />
+            )}
+            <Link
+              href="/registro"
+              className="inline-flex w-full items-center justify-center rounded-full bg-brand-linen px-8 py-3.5 text-base font-semibold text-brand-olive shadow-lg transition hover:bg-white sm:w-auto sm:self-start"
+            >
+              Crear mi negocio
+            </Link>
+          </div>
         </div>
+      </div>
 
-        <ul className="landing-stats mt-14 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:mt-16">
+      <div className="relative border-t border-white/10 bg-[#252a1f]/90">
+        <ul className="landing-stats mx-auto grid max-w-6xl grid-cols-2 gap-3 px-4 py-8 sm:grid-cols-4 sm:gap-4 sm:px-6 lg:px-8">
           {LANDING_STATS.map((s) => (
             <li key={s.label} className="landing-stat-card rounded-2xl px-4 py-3.5 sm:py-4">
               <p className="landing-stat-value font-serif text-2xl font-semibold sm:text-3xl">{s.value}</p>
@@ -148,6 +196,61 @@ function HeroSection() {
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+  );
+}
+
+function VideoSection({ mediaLayout = 'default' }: { mediaLayout?: 'default' | 'video-hero' }) {
+  return (
+    <section id="video" className="border-t border-brand-linen/60 bg-brand-surface px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div className="mx-auto max-w-6xl text-center">
+        <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
+          {mediaLayout === 'video-hero' ? 'Vista del producto' : 'Conoce POS-AI'}
+        </p>
+        <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+          {mediaLayout === 'video-hero'
+            ? 'El POS que piensa, aprende y hace crecer tu negocio'
+            : 'Tu negocio, potenciado con IA'}
+        </h2>
+        <p className="mx-auto mt-4 max-w-2xl text-brand-ink-muted">
+          {mediaLayout === 'video-hero'
+            ? 'Arte promocional con IA en el core, WhatsApp, telefonía y ERP completo.'
+            : 'Caja inteligente, WhatsApp con stock real y operación en la nube — diseñado para PYMEs chilenas.'}
+        </p>
+        <div className="mt-10">
+          {mediaLayout === 'video-hero' ? (
+            <div className="mx-auto max-w-4xl">
+              <LandingHeroImageFrame className="border-brand-linen/80 shadow-xl shadow-brand-olive/10" />
+            </div>
+          ) : (
+            <LandingPromoVideo className="max-w-4xl" />
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeatureSlidesSection() {
+  return (
+    <section id="servicios" className="border-t border-brand-linen/60 bg-white px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
+            Capacidades
+          </p>
+          <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+            IA en el core, WhatsApp y voz
+          </h2>
+          <p className="mt-4 text-brand-ink-muted">
+            Desliza o elige una pestaña para ver cada canal de inteligencia artificial.
+          </p>
+        </div>
+
+        <div className="mt-10">
+          <LandingFeatureCarousel slides={LANDING_MEDIA.featureSlides} />
+        </div>
       </div>
     </section>
   );
@@ -200,9 +303,9 @@ function AiSection() {
   );
 }
 
-function ServicesSection() {
+function ModulesSection() {
   return (
-    <section id="servicios" className="landing-services relative overflow-hidden border-t border-brand-linen/60 px-4 py-24 sm:px-6 lg:px-8">
+    <section className="landing-services relative overflow-hidden border-t border-brand-linen/60 px-4 py-24 sm:px-6 lg:px-8">
       <Image
         src={LANDING_BRAND.heroAccent}
         alt=""
@@ -381,14 +484,21 @@ function LandingFooter() {
   );
 }
 
-export function LandingPage({ plans }: LandingPageProps) {
+export function LandingPage({
+  plans,
+  mediaLayout = 'video-hero',
+  showPreviewBanner = false,
+}: LandingPageProps) {
   return (
     <div className="landing-page min-h-screen">
       <LandingNav />
+      {showPreviewBanner ? <LandingPreviewBanner /> : null}
       <main>
-        <HeroSection />
+        <HeroSection mediaLayout={mediaLayout} withPreviewBanner={showPreviewBanner} />
+        <VideoSection mediaLayout={mediaLayout} />
+        <FeatureSlidesSection />
         <AiSection />
-        <ServicesSection />
+        <ModulesSection />
         <PlansSection plans={plans} />
         <ContactSection plans={plans} />
       </main>
