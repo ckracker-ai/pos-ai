@@ -1,5 +1,6 @@
 import { normalizeRoleName } from '@/core/api/normalizers';
-import type { UserRole } from '@/core/interfaces';
+import type { EmpresaPlanSummary, UserRole } from '@/core/interfaces';
+import { isPlanModuleEnabled } from '@/core/config/plan-access';
 
 export type NavSectionId = 'navigation' | 'maintainers';
 
@@ -301,19 +302,38 @@ export function roleHasModuleAccess(role: UserRole | string, module: AppModule):
   return module.allowed.includes(resolved);
 }
 
-export function getDashboardModulesForRole(role?: string): AppModule[] {
-  const resolved = resolveUserRole(role);
-  return APP_MODULES.filter((m) => m.showOnDashboard && roleHasModuleAccess(resolved, m));
+function filterModulesForPlan(modules: AppModule[], plan?: EmpresaPlanSummary | null): AppModule[] {
+  return modules.filter((m) => isPlanModuleEnabled(m.key, plan));
 }
 
-export function getNavModulesForRole(role?: string): AppModule[] {
+export function getDashboardModulesForRole(
+  role?: string,
+  plan?: EmpresaPlanSummary | null
+): AppModule[] {
   const resolved = resolveUserRole(role);
-  return APP_MODULES.filter((m) => m.showInNav && roleHasModuleAccess(resolved, m));
+  return filterModulesForPlan(
+    APP_MODULES.filter((m) => m.showOnDashboard && roleHasModuleAccess(resolved, m)),
+    plan
+  );
 }
 
-export function getCatalogModulesForRole(role?: string): AppModule[] {
+export function getNavModulesForRole(role?: string, plan?: EmpresaPlanSummary | null): AppModule[] {
   const resolved = resolveUserRole(role);
-  return APP_MODULES.filter((m) => m.catalogGroup && roleHasModuleAccess(resolved, m));
+  return filterModulesForPlan(
+    APP_MODULES.filter((m) => m.showInNav && roleHasModuleAccess(resolved, m)),
+    plan
+  );
+}
+
+export function getCatalogModulesForRole(
+  role?: string,
+  plan?: EmpresaPlanSummary | null
+): AppModule[] {
+  const resolved = resolveUserRole(role);
+  return filterModulesForPlan(
+    APP_MODULES.filter((m) => m.catalogGroup && roleHasModuleAccess(resolved, m)),
+    plan
+  );
 }
 
 export type NavSection = {
@@ -324,10 +344,13 @@ export type NavSection = {
 };
 
 /** Menú lateral agrupado por sección. */
-export function getNavSectionsForRole(role?: string): NavSection[] {
+export function getNavSectionsForRole(
+  role?: string,
+  plan?: EmpresaPlanSummary | null
+): NavSection[] {
   const resolved = resolveUserRole(role);
-  const navModules = getNavModulesForRole(resolved).filter((m) => !m.catalogGroup);
-  const catalogItems = getCatalogModulesForRole(resolved);
+  const navModules = getNavModulesForRole(resolved, plan).filter((m) => !m.catalogGroup);
+  const catalogItems = getCatalogModulesForRole(resolved, plan);
 
   return (['navigation', 'maintainers'] as NavSectionId[])
     .map((id) => {
@@ -355,7 +378,11 @@ function findModulesForPath(pathname: string): AppModule[] {
 }
 
 /** Control de rutas en RouteGuard; nuevos módulos en APP_MODULES quedan cubiertos automáticamente. */
-export function canAccessPath(role: string | undefined, pathname: string): boolean {
+export function canAccessPath(
+  role: string | undefined,
+  pathname: string,
+  plan?: EmpresaPlanSummary | null
+): boolean {
   if (!role?.trim()) return false;
 
   const resolved = resolveUserRole(role);
@@ -373,5 +400,6 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     current.path.length > best.path.length ? current : best
   );
 
-  return roleHasModuleAccess(resolved, bestMatch);
+  if (!roleHasModuleAccess(resolved, bestMatch)) return false;
+  return isPlanModuleEnabled(bestMatch.key, plan);
 }

@@ -5,6 +5,7 @@ import React, { ReactNode, useState, useEffect, useRef } from 'react';
 import { useBranchStore } from '@/store/branch';
 import { ActiveBranchBar } from '@/components/molecules/ActiveBranchBar';
 import { SupportSessionBanner } from '@/components/molecules/SupportSessionBanner';
+import { TenantSubscriptionBanner } from '@/components/molecules/TenantSubscriptionBanner';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -88,6 +89,7 @@ export function DashboardLayout({
           <header className="border-b border-brand-linen/60 bg-white shadow-sm">
             {headerNode}
             {!hideBranchBar ? <SupportSessionBanner /> : null}
+            {!hideBranchBar ? <TenantSubscriptionBanner /> : null}
             {!hideBranchBar ? <ActiveBranchBar /> : null}
           </header>
         )}

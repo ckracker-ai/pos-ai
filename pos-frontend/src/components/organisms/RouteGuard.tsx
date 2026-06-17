@@ -5,12 +5,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { canAccessPath } from '@/core/config/role-access';
 import { consumeSupportHandoff } from '@/core/context/support-handoff';
+import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 
 /** Solo envuelve rutas en `app/(app)/*` — marketing y platform tienen layout propio. */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, hydrate, user } = useAuthStore();
+  const { empresa } = useTenantEmpresa();
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -35,10 +37,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (pathname && !canAccessPath(user?.role, pathname)) {
+    if (pathname && !canAccessPath(user?.role, pathname, empresa?.plan)) {
       router.push('/dashboard');
     }
-  }, [isHydrated, isAuthenticated, pathname, router, user?.role]);
+  }, [isHydrated, isAuthenticated, pathname, router, user?.role, empresa?.plan]);
 
   if (!isHydrated) {
     return (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { platformFetch, usePlatformAuthStore } from '@/core/context/platform-auth';
 import { PlatformPageHeader } from '@/components/molecules/PlatformPageHeader';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
+import { formatPlanValor } from '@/core/constants/saas-plan';
 
 type ApiEnvelope<T> = { success: boolean; data: T; error: string | null };
 
@@ -17,6 +18,8 @@ type DashboardStats = {
   comprobantesPendientes: number;
   suscripcionesVencidas: number;
   suscripcionesEnGracia: number;
+  suscripcionesActivas: number;
+  mrrEstimadoClp: number;
 };
 
 export default function PlatformDashboardPage() {
@@ -53,6 +56,8 @@ export default function PlatformDashboardPage() {
 
   const cards = stats
     ? [
+        { label: 'MRR estimado (neto)', value: formatPlanValor(stats.mrrEstimadoClp), tone: 'text-brand-olive' },
+        { label: 'Suscripciones activas', value: stats.suscripcionesActivas, tone: 'text-emerald-700' },
         { label: 'Empresas activas', value: stats.empresasActivas, tone: 'text-emerald-700' },
         { label: 'Suspendidas', value: stats.empresasSuspendidas, tone: 'text-rose-700' },
         { label: 'Pendiente onboarding', value: stats.empresasPendientes, tone: 'text-amber-700' },
@@ -67,7 +72,7 @@ export default function PlatformDashboardPage() {
     <>
       <PlatformPageHeader
         title="Dashboard"
-        description="Resumen de tenants, planes SaaS, canal WhatsApp y comprobantes pendientes."
+        description="Resumen de tenants, MRR estimado, planes SaaS y canal WhatsApp."
       />
       {error && (
         <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">

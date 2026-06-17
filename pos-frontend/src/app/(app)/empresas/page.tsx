@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/core/api/api-client';
 import { extractEntity, normalizeEmpresa, unwrapApiEnvelope } from '@/core/api/normalizers';
@@ -13,6 +14,7 @@ import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
 import { useAuthStore } from '@/core/context/auth';
 import { getRoleProfile } from '@/core/config/role-access';
+import { canRenewSubscription } from '@/core/config/plan-access';
 import { notifyApiError, notifySuccess } from '@/store/ui';
 import { EmpresaFormalizarPanel } from '@/components/molecules/EmpresaFormalizarPanel';
 import { EmpresaPrivacidadPanel } from '@/components/molecules/EmpresaPrivacidadPanel';
@@ -523,6 +525,7 @@ export default function EmpresasPage() {
                           <strong>
                             {empresa.plan?.valor != null ? formatPlanValor(empresa.plan.valor) : '—'}
                           </strong>
+                          <span className="text-brand-ink-muted"> / mes + IVA</span>
                         </span>
                         <span>
                           Pago:{' '}
@@ -539,17 +542,37 @@ export default function EmpresasPage() {
                         )}
                       </div>
                       {empresa.suscripcion && (
+                        <div className="mt-4 space-y-1 text-sm text-brand-ink">
+                          <p>
+                            Estado suscripción:{' '}
+                            <strong>{empresa.suscripcion.estado ?? '—'}</strong>
+                          </p>
+                          {empresa.suscripcion.proximoCobroEn ? (
+                            <p className="text-brand-ink-muted">
+                              Próximo cobro: {empresa.suscripcion.proximoCobroEn}
+                            </p>
+                          ) : null}
+                          {empresa.suscripcion.graceHasta ? (
+                            <p className="text-amber-800">
+                              Gracia hasta: {empresa.suscripcion.graceHasta}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
+                      {canRenewSubscription(empresa) && empresa.id ? (
+                        <div className="mt-5">
+                          <Link
+                            href={`/checkout?empresaId=${encodeURIComponent(empresa.id)}`}
+                            className="inline-flex items-center rounded-lg bg-brand-olive px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-olive/90"
+                          >
+                            Renovar suscripción
+                          </Link>
+                        </div>
+                      ) : (
                         <p className="mt-4 text-xs text-brand-ink-muted">
-                          Suscripción: {empresa.suscripcion.estado ?? '—'}
-                          {empresa.suscripcion.proximoCobroEn
-                            ? ` · Próximo cobro ${empresa.suscripcion.proximoCobroEn}`
-                            : ''}
+                          Para cambiar de plan contacta a soporte POS-AI.
                         </p>
                       )}
-                      <p className="mt-4 text-xs text-brand-ink-muted">
-                        Para cambiar de plan contacta a soporte POS-AI o usa el checkout de renovación
-                        cuando esté disponible en tu cuenta.
-                      </p>
                     </div>
                   )}
                 </div>

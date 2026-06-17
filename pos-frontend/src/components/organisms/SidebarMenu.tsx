@@ -30,11 +30,12 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
-  const { displayName: empresaName } = useTenantEmpresa();
+  const { displayName: empresaName, empresa } = useTenantEmpresa();
   const currentRole = resolveUserRole(user?.role);
+  const plan = empresa?.plan ?? null;
 
-  const navSections = useMemo(() => getNavSectionsForRole(currentRole), [currentRole]);
-  const catalogItems = useMemo(() => getCatalogModulesForRole(currentRole), [currentRole]);
+  const navSections = useMemo(() => getNavSectionsForRole(currentRole, plan), [currentRole, plan]);
+  const catalogItems = useMemo(() => getCatalogModulesForRole(currentRole, plan), [currentRole, plan]);
   const isCatalogRoute = catalogItems.some((item) => pathname.startsWith(item.path));
   const [catalogOpen, setCatalogOpen] = useState(isCatalogRoute);
 

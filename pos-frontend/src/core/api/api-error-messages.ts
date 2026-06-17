@@ -120,6 +120,8 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   EMPRESA_PENDING_ONBOARDING: 'La empresa aún no completó el onboarding.',
   SUBSCRIPTION_EXPIRED:
     'La suscripción venció. Renueva desde el checkout o contacta soporte si ya pagaste.',
+  SUBSCRIPTION_GRACE:
+    'La suscripción está en período de gracia. Renueva antes de que se suspenda el acceso.',
   SUBSCRIPTION_CANCELLED: 'La suscripción fue cancelada. Contacta al soporte de la plataforma.',
   SLUG_ALREADY_TAKEN: 'Ese identificador (slug) ya está en uso. Elige otro.',
   RUT_ALREADY_REGISTERED: 'Ese RUT ya está registrado en la plataforma.',

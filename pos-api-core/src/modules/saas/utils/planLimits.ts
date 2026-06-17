@@ -69,6 +69,8 @@ export async function countPlatformStats(): Promise<
     comprobantesPendientes: number;
     suscripcionesVencidas: number;
     suscripcionesEnGracia: number;
+    suscripcionesActivas: number;
+    mrrEstimadoClp: number;
   }>
 > {
   const empresas = await Empresa.findAll({ include: [{ model: SaasPlan, as: 'plan', required: true }] });
@@ -107,6 +109,35 @@ export async function countPlatformStats(): Promise<
     where: { estado: 'GRACIA' },
   });
 
+  const activeEmpresaIds = empresas
+    .filter((row) => String(row.getDataValue('estado') ?? '') === 'ACTIVO')
+    .map((row) => String(row.getDataValue('id')));
+
+  const payingSubs = await EmpresaSuscripcion.findAll({
+    where: {
+      empresaId: { [Op.in]: activeEmpresaIds },
+      estado: { [Op.in]: ['ACTIVA', 'PILOTO', 'GRACIA'] },
+    },
+  });
+
+  const valorByEmpresaId = new Map<string, number>();
+  for (const row of empresas) {
+    const id = String(row.getDataValue('id'));
+    const plan = row.get('plan') as SaasPlan | undefined;
+    const valor = Number(plan?.getDataValue('valor') ?? 0);
+    valorByEmpresaId.set(id, Number.isFinite(valor) ? valor : 0);
+  }
+
+  let mrrEstimadoClp = 0;
+  for (const sub of payingSubs) {
+    const empresaId = String(sub.getDataValue('empresaId'));
+    mrrEstimadoClp += valorByEmpresaId.get(empresaId) ?? 0;
+  }
+
+  const suscripcionesActivas = payingSubs.filter(
+    (sub) => String(sub.getDataValue('estado')) === 'ACTIVA'
+  ).length;
+
   return ok({
     empresasActivas: activas,
     empresasSuspendidas: suspendidas,
@@ -116,5 +147,7 @@ export async function countPlatformStats(): Promise<
     comprobantesPendientes,
     suscripcionesVencidas,
     suscripcionesEnGracia,
+    suscripcionesActivas,
+    mrrEstimadoClp,
   });
 }

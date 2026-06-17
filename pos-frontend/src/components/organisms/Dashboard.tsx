@@ -20,11 +20,12 @@ export function Dashboard() {
   const role = user?.role;
   const profile = useMemo(() => getRoleProfile(role), [role]);
   const { activeBranchName, branchId, canSwitchBranch } = useActiveBranch();
-  const { displayName: empresaName } = useTenantEmpresa();
+  const { displayName: empresaName, empresa } = useTenantEmpresa();
   const [pendingShrinkagesCount, setPendingShrinkagesCount] = useState(0);
+  const plan = empresa?.plan ?? null;
 
-  const dashboardModules = useMemo(() => getDashboardModulesForRole(role), [role]);
-  const navModules = useMemo(() => getNavModulesForRole(role), [role]);
+  const dashboardModules = useMemo(() => getDashboardModulesForRole(role, plan), [role, plan]);
+  const navModules = useMemo(() => getNavModulesForRole(role, plan), [role, plan]);
 
   useEffect(() => {
     if (!profile.canApproveShrinkages) return;
