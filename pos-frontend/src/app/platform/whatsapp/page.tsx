@@ -30,12 +30,24 @@ type AssistantBindingRow = {
 type BranchRow = { id: string; name: string };
 
 const QUICK_COMMANDS = [
+  'ayuda',
   'sucursales',
   'buscar empanada',
   'pedido 1x2',
-  'confirmar',
   'mi pedido',
-  'ayuda',
+  'confirmar',
+  'categorias',
+  'cancelar pedido',
+] as const;
+
+/** Flujo guiado demo Costa Azul (WSP P2). */
+const DEMO_SCENARIO = [
+  'sucursales',
+  '1',
+  'buscar empanada',
+  'pedido 1x2',
+  'mi pedido',
+  'confirmar',
 ] as const;
 
 const CUSTOM_PHONE = '__custom__';
@@ -65,6 +77,7 @@ export default function PlatformWhatsappSimPage() {
   const [sessionBranchId, setSessionBranchId] = useState<string>('');
   const [bindingId, setBindingId] = useState<string | null>(null);
   const [branchSaving, setBranchSaving] = useState(false);
+  const [scenarioRunning, setScenarioRunning] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -230,10 +243,10 @@ export default function PlatformWhatsappSimPage() {
   );
 
   const sendText = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      void sendPayload({ displayText: trimmed, text: trimmed });
+      await sendPayload({ displayText: trimmed, text: trimmed });
     },
     [sendPayload]
   );
@@ -278,6 +291,20 @@ export default function PlatformWhatsappSimPage() {
     sendText(text);
   };
 
+  const runDemoScenario = useCallback(async () => {
+    if (sending || scenarioRunning || !bindingId) return;
+    setScenarioRunning(true);
+    setError(null);
+    try {
+      for (const cmd of DEMO_SCENARIO) {
+        await sendText(cmd);
+        await new Promise((r) => setTimeout(r, 900));
+      }
+    } finally {
+      setScenarioRunning(false);
+    }
+  }, [bindingId, scenarioRunning, sendText, sending]);
+
   const clearChat = () => {
     setMessages([]);
     setError(null);
@@ -301,6 +328,14 @@ export default function PlatformWhatsappSimPage() {
         <strong>sucursales</strong> → <strong>buscar</strong> → <strong>pedido</strong> →{' '}
         <strong>confirmar</strong> → comprobante. Valida en el tenant en{' '}
         <strong>Comprobantes</strong>.
+        <button
+          type="button"
+          disabled={!bindingId || sending || scenarioRunning}
+          onClick={() => void runDemoScenario()}
+          className="ml-2 inline-flex rounded-full border border-brand-olive/40 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-brand-olive hover:bg-brand-vainilla disabled:opacity-50"
+        >
+          {scenarioRunning ? 'Ejecutando demo…' : '▶ Demo automático'}
+        </button>
       </p>
 
       {error ? (
@@ -469,7 +504,7 @@ export default function PlatformWhatsappSimPage() {
               <button
                 key={cmd}
                 type="button"
-                disabled={sending}
+                disabled={sending || scenarioRunning}
                 onClick={() => void sendText(cmd)}
                 className="rounded-full border border-brand-linen bg-brand-vainilla px-2.5 py-0.5 text-[11px] text-brand-ink hover:border-brand-olive disabled:opacity-50"
               >

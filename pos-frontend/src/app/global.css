@@ -500,6 +500,14 @@
   font-weight: 600;
 }
 
+.wsp-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(74, 83, 60, 0.08);
+}
+
 .wsp-bubble-error {
   background: #fef2f2 !important;
   border-color: #fecaca !important;
