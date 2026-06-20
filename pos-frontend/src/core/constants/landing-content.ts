@@ -9,7 +9,7 @@ export const LANDING_BRAND = {
 
 /** Assets de marketing (composite 2×2 + video). */
 export const LANDING_MEDIA = {
-  video: '/videos/pos-ai.mp4',
+  video: '/videos/pos-ai-2.mp4',
   videoPoster: '/images/landing-slide-1.png',
   heroSlide: '/images/landing-slide-1.png',
   featureSlides: [
