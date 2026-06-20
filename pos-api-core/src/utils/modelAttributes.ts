@@ -22,3 +22,25 @@ export function readModelString(model: Model, attr: string): string {
 
   return '';
 }
+
+export function readModelId(model: Model, attr = 'id'): string {
+  return readModelString(model, attr);
+}
+
+export function readModelBool(model: Model, attr: string, fallback = false): boolean {
+  const fromData = model.getDataValue(attr);
+  if (typeof fromData === 'boolean') return fromData;
+
+  const plain =
+    typeof model.toJSON === 'function'
+      ? (model.toJSON() as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+
+  const snake = attr.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  for (const key of [attr, snake]) {
+    const value = plain[key];
+    if (typeof value === 'boolean') return value;
+  }
+
+  return fallback;
+}

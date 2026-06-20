@@ -388,6 +388,17 @@ export const api = {
   consolidatePaymentProofDuplicates: (config?: AxiosRequestConfig) =>
     getApiClient().post('/pos/proxy/payment-proofs/consolidate-duplicates', {}, config),
 
+  // WhatsApp — menú virtual QR
+  getWspMenu: (branchId: string, config?: AxiosRequestConfig) =>
+    getApiClient().get(`/pos/proxy/wsp/menu/${branchId}`, config),
+  updateWspMenu: (
+    branchId: string,
+    data: { title?: string; subtitle?: string | null; isEnabled?: boolean },
+    config?: AxiosRequestConfig
+  ) => getApiClient().patch(`/pos/proxy/wsp/menu/${branchId}`, data, config),
+  syncWspMenuCatalog: (branchId: string, config?: AxiosRequestConfig) =>
+    getApiClient().post(`/pos/proxy/wsp/menu/${branchId}/sync-catalog`, {}, config),
+
   // Bulk Import
   importProducts: (formData: FormData, config?: AxiosRequestConfig) =>
     getApiClient().post('/pos/proxy/catalog/products/import', formData, {

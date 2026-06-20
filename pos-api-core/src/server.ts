@@ -29,6 +29,7 @@ import { APP_NAME, APP_VERSION } from './version';
 import territoryRoutes from './modules/territory/routes/territory.routes';
 import paymentRoutes from './modules/payments/routes/payment.routes';
 import { legalPublicRoutes, legalProtectedRoutes } from './modules/legal/routes/legal.routes';
+import virtualMenuRoutes from './modules/wsp/routes/virtualMenu.routes';
 import { startTenantDeletionJob } from './jobs/tenantDeletionJob';
 import { getRedis, isRedisConfigured } from './lib/redis';
 
@@ -116,6 +117,7 @@ async function bootstrap(): Promise<void> {
   // Protected routes (require internal key)
   app.use(internalKeyGuard);
   app.use('/legal', legalProtectedRoutes);
+  app.use('/virtual-menu', virtualMenuRoutes);
   app.use('/inventory', inventoryRoutes);
   app.use('/catalog', catalogRoutes);
   app.use('/branch', branchRoutes);

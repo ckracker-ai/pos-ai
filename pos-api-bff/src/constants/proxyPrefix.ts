@@ -20,12 +20,14 @@ function matchesPublicRules(normalized: string, prefix: string): boolean {
     normalized === `${prefix}/public/planes` ||
     normalized === `${prefix}/public/registro` ||
     normalized.startsWith(`${prefix}/public/legal`) ||
+    normalized.startsWith(`${prefix}/public/menu`) ||
     normalized.startsWith(`${prefix}/public/checkout`) ||
     normalized === `${prefix}/public/webhooks/subscription-payment` ||
     normalized === `${prefix}/public/webhooks/payment-gateway` ||
     normalized === '/public/planes' ||
     normalized === '/public/registro' ||
     normalized.startsWith('/public/legal') ||
+    normalized.startsWith('/public/menu') ||
     normalized.startsWith('/public/checkout')
   );
 }

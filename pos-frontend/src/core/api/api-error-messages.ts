@@ -42,6 +42,9 @@ export type ApiErrorContext =
   | 'comprobantes.list'
   | 'comprobantes.confirm'
   | 'comprobantes.reject'
+  | 'wsp.menu.load'
+  | 'wsp.menu.save'
+  | 'wsp.menu.sync'
   | 'reports.load'
   | 'generic';
 
@@ -93,6 +96,9 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'comprobantes.list': 'No se pudieron cargar los comprobantes',
   'comprobantes.confirm': 'No se pudo confirmar el pago',
   'comprobantes.reject': 'No se pudo rechazar el comprobante',
+  'wsp.menu.load': 'No se pudo cargar el menú virtual',
+  'wsp.menu.save': 'No se pudo guardar el menú virtual',
+  'wsp.menu.sync': 'No se pudo sincronizar el menú desde el catálogo',
   'reports.load': 'No se pudieron cargar los reportes',
   generic: 'No se pudo completar la operación',
 };

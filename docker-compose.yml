@@ -40,7 +40,7 @@ services:
     container_name: pos-ai-api-bff
     restart: unless-stopped
     user: "1000:1000"
-    command: sh -c "if [ -f dist/server.js ]; then node dist/server.js; else npm ci && npm run build && node dist/server.js; fi"
+    command: sh -c "npm ci && node dist/server.js"
     ports:
       - '2020:2020'
     environment:

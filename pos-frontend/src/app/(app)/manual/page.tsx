@@ -7,6 +7,7 @@ import { Navbar } from '@/components/organisms/Navbar';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { useAuthStore } from '@/store/auth';
 import { APP_VERSION_LABEL } from '@/core/constants/version';
+import { WSP_MENU_HELP_EXAMPLE } from '@/components/molecules/WspMenuHelpPanel';
 
 type ManualRole = 'admin' | 'auditor' | 'seller' | 'comanda' | 'all';
 
@@ -120,6 +121,21 @@ const sections: ManualSection[] = [
       'Rechazar: cancela el pedido, libera el stock reservado y notifica al cliente. Puedes dejar una nota interna.',
       'Etiquetas IA (revisar, destinatario ilegible, monto distinto): guían la revisión; la decisión final es humana.',
       'Si la IA no lee bien la imagen, el cliente puede escribir el monto antes de la foto; igual debes validar la captura.',
+    ],
+  },
+  {
+    id: 'wsp-menu-qr',
+    title: 'Menú virtual con código QR',
+    hint: 'Carta móvil por sucursal para que tus clientes vean platos desde el celular (Plan Estándar / Full).',
+    allowed: ['admin', 'auditor'],
+    bullets: [
+      'Menú lateral → WhatsApp y menú QR. Cada sucursal tiene su propio enlace y QR único.',
+      'Paso 1 — Pulsa «Sincronizar desde catálogo» para traer categorías y productos del ERP a la carta pública.',
+      'Paso 2 — Ajusta título y subtítulo (ej. «Menú Antojitos» / «Comida casera»), activa «Menú virtual activo» y guarda.',
+      'Paso 3 — Imprime o muestra el QR en mesas, barra o vitrina. Al escanearlo, el cliente abre una web mobile-first con fotos, precios y categorías.',
+      'El menú público no requiere login del cliente; solo debe estar activo y con al menos un plato publicado.',
+      'Si cambias precios o agregas productos en Catálogo, vuelve a sincronizar para actualizar la carta.',
+      'Ejemplo: restaurante «Antojitos» → categoría «Hamburguesas» → plato «Hamburguesa Especial con Queso» → QR en mesas → clientes ven la carta al instante.',
     ],
   },
   {
@@ -332,6 +348,16 @@ export default function ManualPage() {
                     </li>
                   ))}
                 </ul>
+                {selected.id === 'wsp-menu-qr' ? (
+                  <div className="mt-5 rounded-xl border border-brand-olive/20 bg-brand-olive/5 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-brand-olive">
+                      Ejemplo práctico
+                    </p>
+                    <p className="mt-2 text-sm italic leading-relaxed text-brand-ink">
+                      {WSP_MENU_HELP_EXAMPLE}
+                    </p>
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="text-sm text-brand-ink-muted">

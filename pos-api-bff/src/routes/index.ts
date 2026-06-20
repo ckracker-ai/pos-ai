@@ -13,6 +13,7 @@ import empresaRoutes from './empresa.js';
 import platformRoutes from './platform/index.js';
 import publicRoutes from './public/index.js';
 import posRoutes from './pos.js';
+import wspRoutes from './wsp.js';
 
 const apiRoutes = async (app: FastifyInstance) => {
   app.register(healthRoutes, { prefix: '/health' });
@@ -29,6 +30,7 @@ const apiRoutes = async (app: FastifyInstance) => {
   app.register(platformRoutes, { prefix: '/platform' });
   app.register(publicRoutes, { prefix: '/public' });
   app.register(posRoutes, { prefix: '/pos' });
+  app.register(wspRoutes, { prefix: '/wsp' });
 };
 
 export default apiRoutes;

@@ -17,6 +17,9 @@ import Comuna from '../modules/territory/models/Comuna.model';
 import SaleDeliveryEvent from '../modules/delivery/models/SaleDeliveryEvent.model';
 import LegalDocument from '../modules/legal/models/LegalDocument.model';
 import LegalAcceptance from '../modules/legal/models/LegalAcceptance.model';
+import VirtualMenu from '../modules/wsp/models/VirtualMenu.model';
+import VirtualMenuCategory from '../modules/wsp/models/VirtualMenuCategory.model';
+import VirtualMenuProduct from '../modules/wsp/models/VirtualMenuProduct.model';
 
 export function defineAssociations(): void {
   LegalDocument.hasMany(LegalAcceptance, { foreignKey: 'documentId', as: 'acceptances' });
@@ -71,6 +74,17 @@ export function defineAssociations(): void {
 
   Branch.hasMany(InventoryStock, { foreignKey: 'branchId', as: 'stockEntries' });
   InventoryStock.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+  Empresa.hasMany(VirtualMenu, { foreignKey: 'empresaId', as: 'virtualMenus' });
+  VirtualMenu.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+  Branch.hasOne(VirtualMenu, { foreignKey: 'branchId', as: 'virtualMenu' });
+  VirtualMenu.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+  VirtualMenu.hasMany(VirtualMenuCategory, { foreignKey: 'menuId', as: 'categories' });
+  VirtualMenuCategory.belongsTo(VirtualMenu, { foreignKey: 'menuId', as: 'menu' });
+  VirtualMenuCategory.hasMany(VirtualMenuProduct, { foreignKey: 'menuCategoryId', as: 'products' });
+  VirtualMenuProduct.belongsTo(VirtualMenuCategory, { foreignKey: 'menuCategoryId', as: 'menuCategory' });
+  Product.hasMany(VirtualMenuProduct, { foreignKey: 'productId', as: 'virtualMenuEntries' });
+  VirtualMenuProduct.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
   Product.hasMany(Shrinkage, { foreignKey: 'productId', as: 'shrinkages' });
   Shrinkage.belongsTo(Product, { foreignKey: 'productId', as: 'product' });

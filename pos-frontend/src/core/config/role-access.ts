@@ -188,6 +188,17 @@ export const APP_MODULES: readonly AppModule[] = [
     navSection: 'navigation',
   },
   {
+    key: 'wsp',
+    title: 'WhatsApp y menú QR',
+    description: 'Menú virtual gastronómico con código QR por sucursal',
+    icon: '📱',
+    path: '/wsp',
+    allowed: ['admin', 'auditor'],
+    showOnDashboard: true,
+    showInNav: true,
+    navSection: 'navigation',
+  },
+  {
     key: 'comprobantes',
     title: 'Comprobantes WSP',
     description: 'Validar pagos por transferencia (WhatsApp)',

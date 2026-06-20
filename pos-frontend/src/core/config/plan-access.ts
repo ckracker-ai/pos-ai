@@ -18,6 +18,7 @@ export function resolvePlanFeatures(plan?: EmpresaPlanSummary | null): ResolvedP
 
 const MODULE_PLAN_REQUIREMENTS: Partial<Record<string, keyof SaasPlanFeatures>> = {
   comprobantes: 'assistantWhatsapp',
+  wsp: 'assistantWhatsapp',
 };
 
 export function isPlanModuleEnabled(
