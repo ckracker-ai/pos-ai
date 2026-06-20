@@ -19,8 +19,8 @@ import {
 
 test('tras elegir sucursal invita a buscar (no pedir UUID)', () => {
   const msg = branchSelectedSearchPrompt('Sucursal Central');
-  assert.match(msg, /qué deseas buscar/i);
-  assert.match(msg, /buscar cafe/i);
+  assert.match(msg, /qué buscas/i);
+  assert.match(msg, /buscar empanada/i);
 });
 
 test('carrito abierto permite agregar más ítems antes de confirmar', () => {

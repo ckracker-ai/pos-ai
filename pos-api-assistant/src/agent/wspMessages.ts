@@ -281,3 +281,206 @@ export function wspProofDefaultReply(opts: ProofVariantReplyOpts): string {
     footer
   );
 }
+
+// --- Flujo pedido / catálogo / sucursales (P2) ---
+
+export function wspBranchList(empresaNombre: string, numberedLines: string[]): string {
+  return (
+    `*Sucursales de ${empresaNombre}*\n\n` +
+    `${numberedLines.join('\n')}\n\n` +
+    'Responde con el *número* (ej. *1*).'
+  );
+}
+
+export function wspPickBranchPrompt(): string {
+  return '¿En qué sucursal compras? Escribe *sucursales* y responde con el número.';
+}
+
+export function wspBranchSelected(branchName: string): string {
+  return (
+    `Listo ✅ Atendemos en *${branchName}*.\n\n` +
+    '¿Qué buscas? Ej: *buscar empanada* · *buscar bebida*'
+  );
+}
+
+export function wspNoCategories(): string {
+  return 'Aún no hay categorías configuradas en el catálogo.';
+}
+
+export function wspCategoryMenu(resumen: string): string {
+  return (
+    `*Familias del menú:*\n\n${resumen}\n\n` +
+    'Busca con *buscar …* (ej. *buscar empanada* o el nombre de una familia).'
+  );
+}
+
+export function wspSearchNotFound(query: string): string {
+  return `No encontré "*${query}*". Prueba otro nombre o *categorias*.`;
+}
+
+export function wspSearchResultsHeader(): string {
+  return 'En tu sucursal:\n\n';
+}
+
+export function wspSearchResultsFooter(hasOpenCart: boolean): string {
+  if (!hasOpenCart) {
+    return (
+      '\n\n📋 *Cómo pedir*\n' +
+      'Escribe el *número* × cantidad → *pedido 1x2*\n' +
+      'Puedes *buscar* otro producto y seguir sumando.'
+    );
+  }
+  return (
+    '\n\n🛒 *Carrito abierto*\n' +
+    '• *pedido 2x1* o *agregar 1 x1*\n' +
+    '• Otro producto: *buscar …* y elige número\n' +
+    '• *mi pedido* · *confirmar* cuando termines'
+  );
+}
+
+export function wspPedidoHelpEmpty(): string {
+  return (
+    'Indica qué quieres pedir:\n' +
+    '• *pedido 2x2* — ítem 2 del listado, cantidad 2\n' +
+    '• *pedido 5x2, 2x1* — varios ítems (coma)\n' +
+    '• *pedido empanada 2* — por nombre\n\n' +
+    'Primero *buscar empanada* para ver el listado numerado.'
+  );
+}
+
+export function wspPedidoNeedSearchFirst(): string {
+  return 'Primero escribe *buscar …* para ver el listado numerado y luego *pedido 2x2*.';
+}
+
+export function wspInvalidQtyLineItem(index: number): string {
+  return `Cantidad inválida en ítem ${index}. Ejemplo: *pedido 2x2*`;
+}
+
+export function wspInvalidQty(example: string): string {
+  return `Cantidad inválida. Ejemplo: *${example}*`;
+}
+
+export function wspInvalidCatalogIndex(index: number): string {
+  return `No hay ítem *${index}* en tu última búsqueda. Escribe *buscar …* de nuevo.`;
+}
+
+export function wspProductNotFound(): string {
+  return 'Producto no encontrado.';
+}
+
+export function wspProductNameNotFound(nameQuery: string, searchHint: string): string {
+  return `No encontré "*${nameQuery}". Prueba *buscar ${searchHint}*.`;
+}
+
+export function wspStockLowHere(options: {
+  productName: string;
+  available: number;
+  otherBranchName: string;
+  otherQty: number;
+}): string {
+  const { productName, available, otherBranchName, otherQty } = options;
+  return (
+    `Solo hay ${available} u. de *${productName}* aquí.\n` +
+    `En *${otherBranchName}* hay ${otherQty} u.\n\n` +
+    '¿Cambiamos sucursal (*sucursales*) o apartamos lo disponible?'
+  );
+}
+
+export function wspStockInsufficient(productName: string, available: number, requested: number): string {
+  return `No hay stock suficiente de *${productName}* (hay ${available} u., pediste ${requested}).`;
+}
+
+export function wspOrderConfirmed(coreMessage: string): string {
+  return `Pedido confirmado ✅\n\n${coreMessage}`;
+}
+
+export function wspOnlineOrderRegistered(options: {
+  detailLines: string[];
+  payMessage: string;
+  appended: boolean;
+}): string {
+  const verb = options.appended ? 'Agregado' : 'Pedido registrado';
+  return `${verb} ✅\n${options.detailLines.join('\n')}\n\n${options.payMessage}`;
+}
+
+export function wspFormatAddedLinesReply(options: {
+  pedidoId: string;
+  total: number;
+  addedLines: Array<{ nombre: string; quantity: number; subtotal: number }>;
+  appended: boolean;
+  formatPrice: (n: number) => string;
+}): string {
+  const { pedidoId, total, addedLines, appended, formatPrice } = options;
+  const shortId = pedidoId.slice(0, 8);
+  const lines = addedLines.map((l) => `• ${l.quantity} × ${l.nombre} — ${formatPrice(l.subtotal)}`);
+  const verb = appended ? 'Agregado al pedido' : 'Pedido registrado';
+  return (
+    `${verb} ✅\n` +
+    `${lines.join('\n')}\n` +
+    `Total carrito: ${formatPrice(total)}\n` +
+    `Ref. #${shortId}\n\n` +
+    'Puedes *buscar* otro producto y sumar más con *pedido …* o *agregar …*.\n' +
+    '*mi pedido* para ver todo · *confirmar* cuando esté listo.\n' +
+    '*cancelar pedido* si te equivocaste'
+  );
+}
+
+export function wspGenericError(detail: string): string {
+  return `Disculpa, hubo un error: ${detail}`;
+}
+
+export function wspOpenAiFallback(): string {
+  return 'No pude procesar tu mensaje. Escribe *ayuda*.';
+}
+
+// --- Territorio / comuna ---
+
+export type ComunaOption = {
+  codigoCut: string;
+  nombre: string;
+  regionNombre?: string | null;
+};
+
+export function wspComunaNotFound(): string {
+  return 'No encontré esa comuna. Prueba *comuna estacion central* o el código CUT (ej. *13106*).';
+}
+
+export function wspComunaSearchResults(options: ComunaOption[]): string {
+  if (options.length === 0) return wspComunaNotFound();
+  const lines = options.map(
+    (c, i) =>
+      `*${i + 1}.* ${c.nombre}${c.regionNombre ? ` (${c.regionNombre})` : ''} — \`${c.codigoCut}\``
+  );
+  return (
+    `*Comunas encontradas:*\n\n${lines.join('\n')}\n\n` +
+    'Responde con el *número* para ver sucursales en esa comuna.\n' +
+    'También: *sucursales* para listar locales sin comuna.'
+  );
+}
+
+export function wspTerritoryResolveReply(options: {
+  comunaNombre: string;
+  branches: Array<{ name: string; address: string | null }>;
+  empresaNombre: string;
+}): string {
+  const { comunaNombre, branches, empresaNombre } = options;
+  if (branches.length === 0) {
+    return (
+      `En *${comunaNombre}* no hay sucursal activa de ${empresaNombre}.\n` +
+      'Prueba *sucursales* o otra comuna.'
+    );
+  }
+  if (branches.length === 1) {
+    const b = branches[0]!;
+    return (
+      `Sucursal en *${comunaNombre}*: *${b.name}*.\n` +
+      `${b.address ? `${b.address}\n\n` : ''}` +
+      'Ya puedes *buscar* productos. Ej: *buscar empanada*'
+    );
+  }
+  const lines = branches.map((b, i) => `${i + 1}. ${b.name}${b.address ? ` — ${b.address}` : ''}`);
+  return (
+    `Sucursales en *${comunaNombre}*:\n\n${lines.join('\n')}\n\n` +
+    'Responde con el *número* para elegir sucursal (igual que *sucursales*).'
+  );
+}

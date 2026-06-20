@@ -31,6 +31,25 @@ import {
   wspShowPendingProofStep,
   wspOrderCancelled,
   wspTransferProfileIncomplete,
+  wspBranchList,
+  wspPickBranchPrompt,
+  wspNoCategories,
+  wspCategoryMenu,
+  wspSearchNotFound,
+  wspSearchResultsHeader,
+  wspPedidoHelpEmpty,
+  wspPedidoNeedSearchFirst,
+  wspInvalidQtyLineItem,
+  wspInvalidQty,
+  wspInvalidCatalogIndex,
+  wspProductNotFound,
+  wspProductNameNotFound,
+  wspStockLowHere,
+  wspStockInsufficient,
+  wspOrderConfirmed,
+  wspOnlineOrderRegistered,
+  wspGenericError,
+  wspOpenAiFallback,
 } from './wspMessages.js';
 
 
@@ -124,7 +143,7 @@ function formatCatalogList(items: CatalogItem[], hasOpenCart: boolean): string {
     return `*${i + 1}.* ${p.nombre}${cat} — ${formatPrice(p.precio)} — ${stock}`;
   });
 
-  return `${lines.join('\n')}${searchResultsFooter(hasOpenCart)}`;
+  return wspSearchResultsHeader() + lines.join('\n') + searchResultsFooter(hasOpenCart);
 }
 
 async function hasOpenCart(context: AssistantContext): Promise<boolean> {
@@ -180,14 +199,16 @@ async function addCartLines(
       if (otros.length > 0 && lines.length === 1) {
         const alt = otros[0] as Record<string, unknown>;
         return {
-          text:
-            `Solo hay ${available} u. de *${product.nombre}* aquí. ` +
-            `En *${String(alt.sucursal_nombre ?? 'otra sucursal')}* hay ${alt.cantidad}. ` +
-            '¿Cambiamos sucursal o apartamos lo disponible?',
+          text: wspStockLowHere({
+            productName: product.nombre,
+            available,
+            otherBranchName: String(alt.sucursal_nombre ?? 'otra sucursal'),
+            otherQty: Number(alt.cantidad ?? 0),
+          }),
         };
       }
       return {
-        text: `No hay stock suficiente de *${product.nombre}* (hay ${available} u., pediste ${qty}).`,
+        text: wspStockInsufficient(product.nombre, available, qty),
       };
     }
   }
@@ -242,7 +263,11 @@ async function addCartLines(
       (l) => `• ${l.quantity} × ${l.nombre} — ${formatPrice(l.subtotal)}`
     );
     return {
-      text: `${appended ? 'Agregado' : 'Pedido registrado'} ✅\n${detailLines.join('\n')}\n\n${pay.mensaje}`,
+      text: wspOnlineOrderRegistered({
+        detailLines,
+        payMessage: pay.mensaje,
+        appended,
+      }),
     };
   }
 
@@ -323,30 +348,12 @@ async function handlePedidoCommand(
   const body = text.replace(/^(pedido|agregar|quiero)\s+/i, '').trim();
 
   if (!body) {
-
-    return {
-
-      text:
-
-        'Indica qué quieres pedir:\n' +
-
-        '• *pedido 2x2* — ítem 2 del listado, cantidad 2\n' +
-
-        '• *pedido 5x2, 2x1* — varios ítems (coma)\n' +
-
-        '• *pedido empanada 2* — por nombre\n' +
-
-        'Primero *buscar empanada* para ver el listado numerado.',
-
-    };
-
+    return { text: wspPedidoHelpEmpty() };
   }
 
   const parsedLines = parsePedidoLines(body);
   if (parsedLines && session.lastSearch.length === 0) {
-    return {
-      text: 'Primero escribe *buscar …* para ver el listado numerado y luego *pedido 2x2*.',
-    };
+    return { text: wspPedidoNeedSearchFirst() };
   }
 
   if (parsedLines) {
@@ -354,13 +361,11 @@ async function handlePedidoCommand(
     for (const line of parsedLines) {
       const qty = parseOrderQuantity(String(line.qty), 1);
       if (qty == null) {
-        return { text: `Cantidad inválida en ítem ${line.index}. Ejemplo: *pedido 2x2*` };
+        return { text: wspInvalidQtyLineItem(line.index) };
       }
       const product = resolveFromCatalogIndex(session, line.index);
       if (!product) {
-        return {
-          text: `No hay ítem *${line.index}* en tu última búsqueda. Escribe *buscar …* de nuevo.`,
-        };
+        return { text: wspInvalidCatalogIndex(line.index) };
       }
       resolved.push({ product, qty });
     }
@@ -377,18 +382,12 @@ async function handlePedidoCommand(
 
     const qty = parseOrderQuantity(parts[1], 1);
 
-    if (qty == null) return { text: 'Cantidad inválida. Ejemplo: *pedido 1 2*' };
+    if (qty == null) return { text: wspInvalidQty('pedido 1 2') };
 
     const product = resolveFromCatalogIndex(session, idx);
 
     if (!product) {
-
-      return {
-
-        text: `No hay ítem *${idx}* en tu última búsqueda. Escribe *buscar …* de nuevo.`,
-
-      };
-
+      return { text: wspInvalidCatalogIndex(idx) };
     }
 
     return placeOrder(session, branchId, product, qty);
@@ -409,7 +408,7 @@ async function handlePedidoCommand(
 
       .find((p) => p.producto_id === parts[0]);
 
-    if (!product) return { text: 'Producto no encontrado.' };
+    if (!product) return { text: wspProductNotFound() };
 
     return placeOrder(session, branchId, product, qty);
 
@@ -434,9 +433,8 @@ async function handlePedidoCommand(
   const product = await resolveProductByName(session, branchId, nameQuery);
 
   if (!product) {
-
-    return { text: `No encontré "${nameQuery}". Prueba *buscar ${nameQuery.split(' ')[0] ?? 'producto'}*.` };
-
+    const hint = nameQuery.split(' ')[0] ?? 'producto';
+    return { text: wspProductNameNotFound(nameQuery, hint) };
   }
 
   return placeOrder(session, branchId, product, qty);
@@ -448,9 +446,7 @@ async function handlePedidoCommand(
 async function confirmMyPendingOrder(context: AssistantContext): Promise<AgentReply> {
   try {
     const pedido = await coreClient.confirmPendingOrder(context.empresaId, context.phone);
-    return {
-      text: `Pedido confirmado ✅\n\n${pedido.mensaje}`,
-    };
+    return { text: wspOrderConfirmed(pedido.mensaje) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : '';
     if (msg.includes('TRANSFER_PROFILE_INCOMPLETE')) {
@@ -587,9 +583,7 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
         const lines = list.map((b, i) => `${i + 1}. ${b.name}`);
 
         return {
-
-          text: `Sucursales de ${context.empresaNombre}:\n\n${lines.join('\n')}\n\nResponde con el *número* (ej. *1*).`,
-
+          text: wspBranchList(context.empresaNombre, lines),
         };
 
       }
@@ -694,13 +688,7 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
 
 
     if (!branchId) {
-
-      return {
-
-        text: '¿En qué sucursal compras? Escribe *sucursales* y responde con el número.',
-
-      };
-
+      return { text: wspPickBranchPrompt() };
     }
 
 
@@ -708,13 +696,9 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
     if (lower === 'categorias' || lower === 'categorías' || lower === 'menu categorias') {
       await ensureCategoryCatalog(session);
       if (!session.categoryCatalogResumen) {
-        return { text: 'Aún no hay categorías configuradas en el catálogo.' };
+        return { text: wspNoCategories() };
       }
-      return {
-        text:
-          `*Familias del menú:*\n\n${session.categoryCatalogResumen}\n\n` +
-          'Busca con *buscar …* (ej. *buscar empanada* o el nombre de una familia).',
-      };
+      return { text: wspCategoryMenu(session.categoryCatalogResumen) };
     }
 
     if (lower.startsWith('buscar ') || lower.startsWith('stock ')) {
@@ -723,15 +707,13 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
       const productos = await coreClient.searchProducts(context.empresaId, q, branchId);
 
       if (productos.length === 0) {
-
-        return { text: `No encontré "${q}". Prueba otro nombre.` };
-
+        return { text: wspSearchNotFound(q) };
       }
 
       session.lastSearch = productos.slice(0, 8).map((p) => normalizeProduct(p));
       const openCart = await hasOpenCart(context);
 
-      return { text: `En tu sucursal:\n\n${formatCatalogList(session.lastSearch, openCart)}` };
+      return { text: formatCatalogList(session.lastSearch, openCart) };
 
     }
 
@@ -745,14 +727,12 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
 
       const qty = parseOrderQuantity(quickOrder[2], 1);
 
-      if (qty == null) return { text: 'Cantidad inválida. Ejemplo: *2 x 3*' };
+      if (qty == null) return { text: wspInvalidQty('2 x 3') };
 
       const product = resolveFromCatalogIndex(session, idx);
 
       if (!product) {
-
-        return { text: `Ítem *${idx}* no válido. Busca de nuevo con *buscar …*` };
-
+        return { text: wspInvalidCatalogIndex(idx) };
       }
 
       return placeOrder(session, branchId, product, qty);
@@ -790,9 +770,9 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
     return { text: helpForChannel(session) };
 
   } catch (e) {
-
-    return { text: `Disculpa, hubo un error: ${e instanceof Error ? e.message : 'desconocido'}` };
-
+    return {
+      text: wspGenericError(e instanceof Error ? e.message : 'desconocido'),
+    };
   }
 
 }
@@ -865,7 +845,7 @@ async function runOpenAi(session: Session, userText: string): Promise<AgentReply
 
   const content = json.choices?.[0]?.message?.content?.trim();
 
-  return { text: content || 'No pude procesar tu mensaje. Escribe *ayuda*.' };
+  return { text: content || wspOpenAiFallback() };
 
 }
 
