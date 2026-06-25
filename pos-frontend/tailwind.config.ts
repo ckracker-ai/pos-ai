@@ -18,6 +18,8 @@ const config: Config = {
           lino: '#D1C7BD',
           surface: '#F4F4F3',
           vainilla: '#F4F4F3',
+          /** Alias inglés usado en varios componentes (mismo token que vainilla). */
+          vanilla: '#F4F4F3',
           muted: '#D8D8D3',
           ink: '#3D4532',
           'ink-muted': '#6B7362',

@@ -4,6 +4,7 @@ import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import {
   authenticateToken,
   requireSeller,
+  requireDeliveryOps,
   requireComanda,
   AuthenticatedRequest,
 } from '../../../middleware/auth.middleware';
@@ -430,20 +431,37 @@ router.delete('/sales/:id', requireSeller, async (req: AuthenticatedRequest, res
   }
 });
 
-router.get('/deliveries/pending', requireSeller, async (req: AuthenticatedRequest, res) => {
-  const result = await deliveryTrackingDelegate.listPending(
+router.get('/deliveries/drivers', requireDeliveryOps, async (req: AuthenticatedRequest, res) => {
+  const roleName = String(req.user!.roleName ?? '').toUpperCase();
+  if (roleName === 'DELIVERY') {
+    return sendFail(res, 'FORBIDDEN', 403);
+  }
+  const result = await deliveryTrackingDelegate.listDrivers(
     getEffectiveEmpresaId(req),
     req.user!.branchId
+  );
+  if (!result.success) return sendFail(res, result.error, 400);
+  return sendOk(res, { drivers: result.value });
+});
+
+router.get('/deliveries/pending', requireDeliveryOps, async (req: AuthenticatedRequest, res) => {
+  const roleName = String(req.user!.roleName ?? '').toUpperCase();
+  const driverUserId = roleName === 'DELIVERY' ? req.user!.userId : null;
+  const result = await deliveryTrackingDelegate.listPending(
+    getEffectiveEmpresaId(req),
+    req.user!.branchId,
+    { driverUserId }
   );
   if (!result.success) return sendFail(res, result.error, 400);
   return sendOk(res, { deliveries: result.value });
 });
 
-router.patch('/sales/:id/delivery-status', requireSeller, async (req: AuthenticatedRequest, res) => {
-  const body = (req.body ?? {}) as { status?: string; note?: string };
+router.patch('/sales/:id/delivery-status', requireDeliveryOps, async (req: AuthenticatedRequest, res) => {
+  const body = (req.body ?? {}) as { status?: string; note?: string; assignedDriverId?: string | null };
   const status = parseDeliveryStatus(body.status);
   if (!status) return sendFail(res, 'VALIDATION_ERROR: status required', 422);
 
+  const roleName = String(req.user!.roleName ?? '').toUpperCase();
   const result = await deliveryTrackingDelegate.advanceStatus({
     saleId: req.params.id,
     empresaId: getEffectiveEmpresaId(req),
@@ -451,9 +469,15 @@ router.patch('/sales/:id/delivery-status', requireSeller, async (req: Authentica
     status,
     note: body.note ?? null,
     userId: req.user!.userId,
+    assignedDriverId:
+      roleName === 'DELIVERY' ? undefined : (body.assignedDriverId ?? null),
   });
   if (!result.success) {
-    const code = result.error.startsWith('SALE_NOT_FOUND') ? 404 : 400;
+    const code = result.error.startsWith('SALE_NOT_FOUND')
+      ? 404
+      : result.error.startsWith('VALIDATION_ERROR') || result.error.startsWith('DRIVER_NOT_FOUND')
+        ? 422
+        : 400;
     return sendFail(res, result.error, code);
   }
   return sendOk(res, {
@@ -462,7 +486,7 @@ router.patch('/sales/:id/delivery-status', requireSeller, async (req: Authentica
   });
 });
 
-router.get('/sales/:id/delivery-timeline', requireSeller, async (req: AuthenticatedRequest, res) => {
+router.get('/sales/:id/delivery-timeline', requireDeliveryOps, async (req: AuthenticatedRequest, res) => {
   const result = await deliveryTrackingDelegate.getTimeline(
     req.params.id,
     getEffectiveEmpresaId(req),

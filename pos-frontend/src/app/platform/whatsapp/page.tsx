@@ -317,7 +317,7 @@ export default function PlatformWhatsappSimPage() {
     branches.find((b) => b.id === sessionBranchId)?.name ?? 'Sucursal automática';
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 p-4 sm:p-6">
+    <div className="wsp-sim-panel mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 p-4 sm:p-6">
       <PlatformPageHeader
         title="Simulador WhatsApp"
         description="Plan Estándar · prueba el flujo del asistente sin Meta Graph API"

@@ -16,6 +16,7 @@ import {
   parseComunaQuery,
   type ComunaOption,
 } from './territoryFlow.js';
+import { wantsVirtualMenuCommand } from './virtualMenuFlow.js';
 
 import { SYSTEM_PROMPT, VOICE_SYSTEM_PROMPT } from './systemPrompt.js';
 import { formatVoiceReply, isVoiceChannel } from './voiceFormat.js';
@@ -50,6 +51,10 @@ import {
   wspOnlineOrderRegistered,
   wspGenericError,
   wspOpenAiFallback,
+  wspVirtualMenuLink,
+  wspVirtualMenuNotEnabled,
+  wspVirtualMenuEmpty,
+  wspVirtualMenuUnavailable,
 } from './wspMessages.js';
 
 
@@ -515,6 +520,30 @@ async function ensureCategoryCatalog(session: Session): Promise<void> {
   }
 }
 
+async function replyVirtualMenuLink(session: Session, branchId: string): Promise<AgentReply> {
+  const { context } = session;
+  try {
+    const link = await coreClient.getVirtualMenuLink(context.empresaId, branchId);
+    if (!link.isEnabled) {
+      return { text: wspVirtualMenuNotEnabled(link.branchName) };
+    }
+    if (!link.hasPublishedItems) {
+      return {
+        text: wspVirtualMenuEmpty({ branchName: link.branchName, url: link.publicUrl }),
+      };
+    }
+    return {
+      text: wspVirtualMenuLink({
+        title: link.title,
+        branchName: link.branchName,
+        url: link.publicUrl,
+      }),
+    };
+  } catch {
+    return { text: wspVirtualMenuUnavailable() };
+  }
+}
+
 function helpForChannel(session: Session): string {
   return isVoiceChannel(session.context.channel)
     ? voiceHelp(session.context.empresaNombre)
@@ -542,10 +571,17 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
 
   try {
 
-    if (lower === 'ayuda' || lower === 'help' || lower === 'menu') {
+    if (lower === 'ayuda' || lower === 'help') {
 
       return { text: helpForChannel(session) };
 
+    }
+
+    if (wantsVirtualMenuCommand(text)) {
+      if (!branchId) {
+        return { text: wspPickBranchPrompt() };
+      }
+      return replyVirtualMenuLink(session, branchId);
     }
 
 

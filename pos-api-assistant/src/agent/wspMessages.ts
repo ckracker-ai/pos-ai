@@ -11,7 +11,8 @@ export function wspHelp(empresaNombre: string): string {
     `• *mi pedido* — ver carrito\n` +
     `• *agregar 2x1* — suma al mismo pedido\n` +
     `• *cancelar pedido* — anular y empezar de nuevo\n` +
-    `• *categorias* — ver familias del menú`
+    `• *categorias* — ver familias del menú\n` +
+    `• *menu* — carta digital con precios (link web)`
   );
 }
 
@@ -299,7 +300,8 @@ export function wspPickBranchPrompt(): string {
 export function wspBranchSelected(branchName: string): string {
   return (
     `Listo ✅ Atendemos en *${branchName}*.\n\n` +
-    '¿Qué buscas? Ej: *buscar empanada* · *buscar bebida*'
+    '¿Qué buscas? Ej: *buscar empanada* · *buscar bebida*\n' +
+    '📋 *menu* — carta digital con precios'
   );
 }
 
@@ -310,7 +312,44 @@ export function wspNoCategories(): string {
 export function wspCategoryMenu(resumen: string): string {
   return (
     `*Familias del menú:*\n\n${resumen}\n\n` +
-    'Busca con *buscar …* (ej. *buscar empanada* o el nombre de una familia).'
+    'Busca con *buscar …* (ej. *buscar empanada* o el nombre de una familia).\n' +
+    'O escribe *menu* para la carta web con precios.'
+  );
+}
+
+export function wspVirtualMenuLink(options: {
+  title: string;
+  branchName: string;
+  url: string;
+}): string {
+  const { title, branchName, url } = options;
+  return (
+    `*${title}* · ${branchName}\n\n` +
+    `Abre la carta digital aquí 👇\n${url}\n\n` +
+    'Cuando elijas, vuelve por aquí: *buscar …* → *pedido 1x2* → *confirmar*.'
+  );
+}
+
+export function wspVirtualMenuNotEnabled(branchName: string): string {
+  return (
+    `La carta digital de *${branchName}* aún no está publicada.\n\n` +
+    'Puedes pedir por aquí con *buscar …* y *pedido …*, o vuelve a intentar más tarde.'
+  );
+}
+
+export function wspVirtualMenuEmpty(options: { branchName: string; url: string }): string {
+  const { branchName, url } = options;
+  return (
+    `*${branchName}* está actualizando su carta.\n\n` +
+    `Puedes ver el menú aquí (aún sin platos):\n${url}\n\n` +
+    'Mientras tanto: *buscar …* para pedir por WhatsApp.'
+  );
+}
+
+export function wspVirtualMenuUnavailable(): string {
+  return (
+    'No pude cargar la carta digital ahora.\n' +
+    'Usa *buscar …* para ver productos y armar tu pedido.'
   );
 }
 

@@ -104,6 +104,9 @@ export function defineAssociations(): void {
   User.hasMany(Sale, { foreignKey: 'sellerId', as: 'sales' });
   Sale.belongsTo(User, { foreignKey: 'sellerId', as: 'seller' });
 
+  User.hasMany(Sale, { foreignKey: 'assignedDriverId', as: 'assignedDeliveries' });
+  Sale.belongsTo(User, { foreignKey: 'assignedDriverId', as: 'assignedDriver' });
+
   Sale.hasMany(SaleDetail, { foreignKey: 'saleId', as: 'details', onDelete: 'CASCADE' });
   SaleDetail.belongsTo(Sale, { foreignKey: 'saleId', as: 'sale' });
 

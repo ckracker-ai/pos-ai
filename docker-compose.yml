@@ -11,7 +11,7 @@ services:
         NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ''
         BFF_INTERNAL_URL: http://pos-api-bff:2020
-        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.9.2026-06-08}
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.20.2026-06-16}
     container_name: pos-ai-frontend
     restart: unless-stopped
     ports:
@@ -19,7 +19,7 @@ services:
     environment:
       BFF_INTERNAL_URL: http://pos-api-bff:2020
       AUTH_URL: http://pos-api-bff:2020
-      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.9.2026-06-08}
+      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.20.2026-06-16}
     networks:
       - public_gateway
     depends_on:
@@ -58,7 +58,7 @@ services:
       - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
       - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-pos_ai_jwt_refresh_secret_2026}
-      - APP_VERSION=${APP_VERSION:-1.9.2026-06-08}
+      - APP_VERSION=${APP_VERSION:-1.20.2026-06-16}
     volumes:
       - ./pos-api-bff:/usr/src/app
       - /usr/src/app/node_modules
@@ -152,7 +152,7 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-POS-AI <noreply@pos-ai.local>}
-      - APP_VERSION=${APP_VERSION:-1.9.2026-06-08}
+      - APP_VERSION=${APP_VERSION:-1.20.2026-06-16}
       - REDIS_URL=${REDIS_URL:-redis://pos-ai-redis:6379}
       - AUTH_USER_CACHE_TTL_SEC=${AUTH_USER_CACHE_TTL_SEC:-600}
       - PAYMENT_LINK_BASE_URL=${PAYMENT_LINK_BASE_URL:-https://pay.pos-ai.local/p}

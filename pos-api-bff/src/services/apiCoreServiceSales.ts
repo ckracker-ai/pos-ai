@@ -77,9 +77,16 @@ export class ApiCoreServiceSales extends ApiCoreBaseService {
     return response.data;
   }
 
+  async listDeliveryDrivers(token: string, internalKey: string, branchId: string) {
+    const response = await this.client.get('/sales/deliveries/drivers', {
+      headers: this.authHeaders(token, internalKey, branchId),
+    });
+    return response.data;
+  }
+
   async patchDeliveryStatus(
     saleId: string,
-    payload: { status: string; note?: string | null },
+    payload: { status: string; note?: string | null; assignedDriverId?: string | null },
     token: string,
     internalKey: string,
     branchId: string

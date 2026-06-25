@@ -15,6 +15,7 @@ test('wspHelp incluye pasos numerados y comandos clave', () => {
   assert.match(msg, /sucursales/);
   assert.match(msg, /confirmar/);
   assert.match(msg, /categorias/);
+  assert.match(msg, /\*menu\*/);
 });
 
 test('wspBranchList formatea lista numerada', () => {

@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
 import VirtualMenu from '../models/VirtualMenu.model';
 import VirtualMenuCategory from '../models/VirtualMenuCategory.model';
@@ -389,6 +390,53 @@ class VirtualMenuDelegate {
     }
 
     return ok(await this.buildMenuDetail(menu));
+  }
+
+  async getWspLink(
+    empresaId: string,
+    branchId: string
+  ): Promise<
+    Result<{
+      publicSlug: string;
+      publicUrl: string;
+      isEnabled: boolean;
+      title: string;
+      branchName: string;
+      hasPublishedItems: boolean;
+    }>
+  > {
+    const menuResult = await this.getOrCreateMenu(empresaId, branchId);
+    if (!menuResult.success) return menuResult;
+
+    const menu = menuResult.value;
+    const menuId = readModelId(menu);
+    const branch = await Branch.findByPk(branchId);
+    const branchName = branch ? readModelString(branch, 'name') : 'Sucursal';
+    const publicSlug = readModelString(menu, 'publicSlug');
+    const base = (process.env.FRONTEND_PUBLIC_URL ?? 'http://127.0.0.1:8010').replace(/\/$/, '');
+    const publicUrl = `${base}/menu/${encodeURIComponent(publicSlug)}`;
+
+    const categoryRows = await VirtualMenuCategory.findAll({
+      where: { menuId, isActive: true },
+      attributes: ['id'],
+    });
+    const categoryIds = categoryRows.map((c) => readModelId(c));
+    let hasPublishedItems = false;
+    if (categoryIds.length > 0) {
+      const productCount = await VirtualMenuProduct.count({
+        where: { menuCategoryId: { [Op.in]: categoryIds }, isActive: true },
+      });
+      hasPublishedItems = productCount > 0;
+    }
+
+    return ok({
+      publicSlug,
+      publicUrl,
+      isEnabled: readModelBool(menu, 'isEnabled', false),
+      title: readModelString(menu, 'title') || 'Menú',
+      branchName,
+      hasPublishedItems,
+    });
   }
 
   async getPublicBySlug(slug: string): Promise<Result<PublicMenuPayload>> {

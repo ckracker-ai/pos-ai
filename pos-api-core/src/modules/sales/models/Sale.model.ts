@@ -15,6 +15,7 @@ class Sale extends Model {
   public deliveryAddress?: string | null;
   public deliveryAmount!: number;
   public deliveryStatus?: string | null;
+  public assignedDriverId?: string | null;
   public notes?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -89,6 +90,11 @@ Sale.init(
       type: DataTypes.STRING(20),
       allowNull: true,
       field: 'delivery_status',
+    },
+    assignedDriverId: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+      field: 'assigned_driver_id',
     },
     notes: {
       type: DataTypes.TEXT,

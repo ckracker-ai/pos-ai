@@ -35,7 +35,7 @@ export type RoleProfile = {
   canManageEmpresa: boolean;
 };
 
-const ALL_ROLES: readonly UserRole[] = ['admin', 'auditor', 'seller', 'comanda', 'user'];
+const ALL_ROLES: readonly UserRole[] = ['admin', 'auditor', 'seller', 'comanda', 'delivery', 'user'];
 
 /** Perfiles conocidos; roles nuevos en BD usan fallback dinámico. */
 const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
@@ -87,6 +87,18 @@ const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
     canManageBranches: false,
     canManageEmpresa: false,
   },
+  delivery: {
+    role: 'delivery',
+    label: 'Repartidor',
+    panelTitle: 'Panel de reparto',
+    panelDescription:
+      'Pedidos asignados a ti: marca en ruta y confirma entregas de tu sucursal.',
+    canSwitchBranch: false,
+    canApproveShrinkages: false,
+    canManageUsers: false,
+    canManageBranches: false,
+    canManageEmpresa: false,
+  },
   user: {
     role: 'user',
     label: 'Usuario',
@@ -111,7 +123,7 @@ export const APP_MODULES: readonly AppModule[] = [
     description: 'Resumen y accesos rápidos de tu rol',
     icon: '🏠',
     path: '/dashboard',
-    allowed: ['admin', 'auditor', 'seller', 'comanda'],
+    allowed: ['admin', 'auditor', 'seller', 'comanda', 'delivery'],
     showInNav: true,
     navSection: 'navigation',
   },
@@ -182,7 +194,7 @@ export const APP_MODULES: readonly AppModule[] = [
     description: 'Seguimiento de pedidos con delivery',
     icon: '📦',
     path: '/delivery',
-    allowed: ['admin', 'auditor', 'seller', 'comanda'],
+    allowed: ['admin', 'auditor', 'seller', 'comanda', 'delivery'],
     showOnDashboard: true,
     showInNav: true,
     navSection: 'navigation',

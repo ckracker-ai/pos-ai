@@ -1,5 +1,5 @@
 /** Versión de producto POS-AI — formato `major.minor.YYYY-MM-DD` en releases UX. */
-export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '1.9.2026-06-08';
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '1.20.2026-06-16';
 
 /** Etiqueta corta para UI, ej. `v1.9 · 2026-06-08` o `v1.4.2` */
 export function formatAppVersionLabel(version = APP_VERSION): string {

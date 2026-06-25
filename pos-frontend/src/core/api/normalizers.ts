@@ -69,6 +69,7 @@ export const normalizeRoleName = (roleName?: string): UserRole => {
   if (!roleName) return 'user';
   const normalized = roleName.toLowerCase();
   if (normalized.includes('comanda')) return 'comanda';
+  if (normalized.includes('delivery') || normalized.includes('repartidor')) return 'delivery';
   if (normalized.includes('admin')) return 'admin';
   if (normalized.includes('auditor')) return 'auditor';
   if (normalized.includes('seller') || normalized.includes('vendedor')) return 'seller';

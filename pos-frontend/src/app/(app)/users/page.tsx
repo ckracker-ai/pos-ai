@@ -35,6 +35,7 @@ const roleLabels: Record<string, string> = {
   seller: 'Vendedor',
   auditor: 'Auditor',
   comanda: 'Comanda',
+  delivery: 'Repartidor',
   user: 'Usuario',
 };
 

@@ -372,6 +372,8 @@ export const requireAuditor = requireRole(['ADMIN', 'AUDITOR']);
 
 export const requireSeller = requireRole(['ADMIN', 'AUDITOR', 'SELLER']);
 
+export const requireDeliveryOps = requireRole(['ADMIN', 'AUDITOR', 'SELLER', 'DELIVERY']);
+
 export const requireComanda = requireRole(['ADMIN', 'AUDITOR', 'SELLER', 'COMANDA']);
 
 

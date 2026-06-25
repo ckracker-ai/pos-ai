@@ -7,6 +7,7 @@ const DEFAULT_ROLES: ReadonlyArray<{ name: string; description: string }> = [
   { name: 'AUDITOR', description: 'Auditoría y gestión de usuarios' },
   { name: 'SELLER', description: 'Vendedor / operación de sucursal' },
   { name: 'COMANDA', description: 'Usuario para ver comandas en el frontend' },
+  { name: 'DELIVERY', description: 'Repartidor / envíos a domicilio' },
 ];
 
 export async function seedRoles(): Promise<void> {

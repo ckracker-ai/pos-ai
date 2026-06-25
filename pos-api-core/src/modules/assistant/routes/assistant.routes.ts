@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import assistantDelegate, { normalizePhoneE164 } from '../delegates/AssistantDelegate';
+import virtualMenuDelegate from '../../wsp/delegates/VirtualMenuDelegate';
 import { territoryDelegate } from '../../territory/delegates/TerritoryDelegate';
 import { loadAssistantPlan, AssistantRequest } from '../middleware/assistantContext';
 const router = Router();
@@ -75,6 +76,12 @@ router.get('/stock-other/:productId', async (req: AssistantRequest, res) => {
 router.get('/catalog/categories-summary', async (req: AssistantRequest, res) => {
   const result = await assistantDelegate.getCategoryCatalogSummary(req.assistantEmpresaId!);
   if (result.success) return sendOk(res, result.value);
+  return sendFail(res, result.error, mapError(result.error));
+});
+
+router.get('/virtual-menu/branch/:branchId/link', async (req: AssistantRequest, res) => {
+  const result = await virtualMenuDelegate.getWspLink(req.assistantEmpresaId!, req.params.branchId);
+  if (result.success) return sendOk(res, { link: result.value });
   return sendFail(res, result.error, mapError(result.error));
 });
 

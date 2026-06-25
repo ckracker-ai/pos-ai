@@ -469,16 +469,44 @@
   border-color: rgba(209, 199, 189, 0.75) !important;
 }
 
-.app-page-content [class*='text-white'],
-.app-page-content [class*='text-slate-300'],
-.app-page-content [class*='text-slate-400'] {
+/* Solo remapear grises slate legacy — NO tocar text-white global (rompe olivo + WSP) */
+.app-page-content [class*='text-slate-300']:not(.wsp-chat-header *):not(.app-sidebar *) {
+  color: #5c6650 !important;
+}
+
+.app-page-content [class*='text-slate-400']:not(.wsp-chat-header *):not(.app-sidebar *) {
+  color: #6b7362 !important;
+}
+
+/* Burbujas chat asistente — siempre legibles (no olivo sobre olivo) */
+.app-page-content .wsp-bubble-out,
+.app-page-content .wsp-bubble-out *:not(strong):not(.assistant-chat-label) {
   color: #3d4532 !important;
 }
 
-/* Simulador WSP: burbujas usuario y botón Enviar sobre olivo */
-.app-page-content .wsp-sim-panel .wsp-on-olive,
+.app-page-content .wsp-bubble-in,
+.app-page-content .wsp-bubble-in *:not(strong):not(.assistant-chat-label) {
+  color: #3d4532 !important;
+}
+
+/* Texto claro en superficies oscuras de marca (sidebar, chat WSP, botones olivo) */
+.app-page-content .app-sidebar,
+.app-page-content .app-sidebar *,
+.app-page-content .wsp-chat-header,
+.app-page-content .wsp-chat-header *,
+.app-page-content [class*='bg-brand-olive'][class*='text-white'],
+.app-page-content [class*='bg-brand-olive'] [class*='text-white'],
 .app-page-content .wsp-on-olive {
   color: #fafaf9 !important;
+}
+
+.app-page-content .wsp-chat-header [class*='text-white/'] {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.app-page-content .wsp-chat-header [class*='text-white/70'],
+.app-page-content .wsp-chat-header [class*='text-white/80'] {
+  color: rgba(255, 255, 255, 0.78) !important;
 }
 
 .wsp-chat-frame {
@@ -495,9 +523,29 @@
     radial-gradient(circle at 80% 0%, rgba(209, 199, 189, 0.35) 0%, transparent 40%);
 }
 
+.wsp-bubble-out {
+  background: #d9fdd3 !important;
+  color: #3d4532 !important;
+}
+
+.wsp-bubble-in {
+  background: #fff !important;
+  color: #3d4532 !important;
+}
+
 .wsp-bubble-out strong,
 .wsp-bubble-in strong {
   font-weight: 600;
+}
+
+.assistant-chat-label {
+  display: block;
+  margin-bottom: 0.125rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7362 !important;
 }
 
 .wsp-inline-code {

@@ -17,7 +17,7 @@ type DemoUserSpec = {
   email: string;
   password: string;
   fullName: string;
-  roleName: 'SELLER' | 'COMANDA' | 'AUDITOR';
+  roleName: 'SELLER' | 'COMANDA' | 'AUDITOR' | 'DELIVERY';
   whatsappPhone?: string | null;
 };
 
@@ -109,6 +109,8 @@ export async function seedBootstrapDemoUsers(): Promise<void> {
   const sellerPassword = process.env.BOOTSTRAP_SELLER_PASSWORD ?? 'Vendedor@12345';
   const comandaEmail = process.env.BOOTSTRAP_COMANDA_EMAIL ?? 'comanda@empanadascostaazul.cl';
   const comandaPassword = process.env.BOOTSTRAP_COMANDA_PASSWORD ?? 'Comanda@12345';
+  const deliveryEmail = process.env.BOOTSTRAP_DELIVERY_EMAIL ?? 'repartidor@empanadascostaazul.cl';
+  const deliveryPassword = process.env.BOOTSTRAP_DELIVERY_PASSWORD ?? 'Repartidor@12345';
 
   await upsertDemoUser(
     empresaId,
@@ -131,6 +133,19 @@ export async function seedBootstrapDemoUsers(): Promise<void> {
       password: comandaPassword,
       fullName: process.env.BOOTSTRAP_COMANDA_FULL_NAME ?? 'Comanda Costa Azul',
       roleName: 'COMANDA',
+    },
+    forceResetPassword
+  );
+
+  await upsertDemoUser(
+    empresaId,
+    branchId,
+    {
+      email: deliveryEmail,
+      password: deliveryPassword,
+      fullName: process.env.BOOTSTRAP_DELIVERY_FULL_NAME ?? 'Repartidor Costa Azul',
+      roleName: 'DELIVERY',
+      whatsappPhone: process.env.BOOTSTRAP_DELIVERY_WHATSAPP?.replace(/\D/g, '') || null,
     },
     forceResetPassword
   );

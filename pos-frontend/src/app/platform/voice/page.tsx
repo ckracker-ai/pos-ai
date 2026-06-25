@@ -179,7 +179,7 @@ export default function PlatformVoiceSimPage() {
   );
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 p-4 sm:p-6">
+    <div className="voice-sim-panel mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 p-4 sm:p-6">
       <PlatformPageHeader
         title="Simular llamada (voz IA)"
         description="Plan Full · respuestas cortas para telefonía · mismo motor que WhatsApp"
@@ -260,49 +260,58 @@ export default function PlatformVoiceSimPage() {
         ))}
       </div>
 
-      <div
-        ref={scrollRef}
-        className="min-h-[280px] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-brand-lino bg-brand-vainilla/50 p-4"
-      >
-        {messages.length === 0 ? (
-          <p className="text-center text-sm text-brand-ink-muted">
-            Escribe lo que diría el cliente por teléfono. La respuesta se adapta a voz (sin markdown).
-          </p>
-        ) : (
-          messages.map((m) => (
-            <div
-              key={m.id}
-              className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${
-                m.role === 'user'
-                  ? 'ml-auto bg-brand-olive text-white'
-                  : 'mr-auto border border-brand-lino bg-white text-brand-ink'
-              }`}
-            >
-              <span className="mb-0.5 block text-[10px] uppercase tracking-wide opacity-70">
-                {m.role === 'user' ? 'Cliente (STT)' : 'Asistente (TTS)'}
-              </span>
-              {m.text}
-            </div>
-          ))
-        )}
-      </div>
+      <div className="wsp-chat-frame overflow-hidden rounded-2xl border border-brand-linen/80 shadow-md">
+        <div className="wsp-chat-header px-4 py-3">
+          <p className="text-sm font-semibold text-white">Llamada simulada · voz IA</p>
+          <p className="text-xs text-white/80">+{normalizePhoneDigits(phone) || '…'}</p>
+        </div>
 
-      <form onSubmit={onSubmit} className="flex gap-2">
-        <input
-          className="flex-1 rounded-xl border border-brand-lino px-3 py-2 text-sm"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder='Ej. "buscar empanada" o "sucursales"'
-          disabled={sending}
-        />
-        <button
-          type="submit"
-          disabled={sending || !input.trim()}
-          className="rounded-xl bg-brand-olive px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        <div
+          ref={scrollRef}
+          className="wsp-chat-body min-h-[280px] max-h-[50vh] flex-1 space-y-3 overflow-y-auto p-4 sm:max-h-[55vh]"
         >
-          {sending ? '…' : 'Hablar'}
-        </button>
-      </form>
+          {messages.length === 0 ? (
+            <p className="text-center text-sm text-brand-ink-muted">
+              Escribe lo que diría el cliente por teléfono. La respuesta se adapta a voz (sin markdown).
+            </p>
+          ) : (
+            messages.map((m) => (
+              <div
+                key={m.id}
+                className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                  m.role === 'user'
+                    ? 'wsp-bubble-out ml-auto rounded-br-none'
+                    : 'wsp-bubble-in mr-auto rounded-bl-none border border-white/60'
+                }`}
+              >
+                <span className="assistant-chat-label">
+                  {m.role === 'user' ? 'Cliente (STT)' : 'Asistente (TTS)'}
+                </span>
+                {m.text}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="border-t border-brand-linen/50 bg-white/90 px-3 py-3">
+          <form onSubmit={onSubmit} className="flex gap-2">
+            <input
+              className="flex-1 rounded-full border border-brand-linen bg-white px-4 py-2 text-sm text-brand-ink outline-none focus:border-brand-olive"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder='Ej. "buscar empanada" o "sucursales"'
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="wsp-on-olive rounded-full bg-brand-olive px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3d4532] disabled:opacity-50"
+            >
+              {sending ? '…' : 'Hablar'}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

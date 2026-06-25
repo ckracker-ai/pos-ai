@@ -115,6 +115,21 @@ export const coreClient = {
     );
   },
 
+  getVirtualMenuLink(empresaId: string, branchId: string) {
+    return coreFetch<{
+      link: {
+        publicSlug: string;
+        publicUrl: string;
+        isEnabled: boolean;
+        title: string;
+        branchName: string;
+        hasPublishedItems: boolean;
+      };
+    }>(`/assistant/virtual-menu/branch/${encodeURIComponent(branchId)}/link`, {
+      empresaId,
+    }).then((d) => d.link);
+  },
+
   searchProducts(empresaId: string, q: string, branchId?: string) {
     const params = new URLSearchParams({ q });
     if (branchId) params.set('branchId', branchId);

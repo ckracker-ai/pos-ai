@@ -169,16 +169,32 @@ const salesRoutes = async (app: FastifyInstance) => {
     }
   });
 
+  app.get('/deliveries/drivers', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+    try {
+      const data = await salesCore.listDeliveryDrivers(ctx.token, ctx.internalKey, ctx.branchId);
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } };
+      return sendFail(reply, extractCoreError(e, 'Failed to list delivery drivers'), err.response?.status ?? 500);
+    }
+  });
+
   app.patch('/sales/:id/delivery-status', { preHandler: [requireSeller] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = (request.body ?? {}) as { status?: string; note?: string };
+    const body = (request.body ?? {}) as {
+      status?: string;
+      note?: string;
+      assignedDriverId?: string | null;
+    };
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
     if (!body.status) return sendFail(reply, 'VALIDATION_ERROR: status required', 422);
     try {
       const data = await salesCore.patchDeliveryStatus(
         id,
-        { status: body.status, note: body.note },
+        { status: body.status, note: body.note, assignedDriverId: body.assignedDriverId },
         ctx.token,
         ctx.internalKey,
         ctx.branchId

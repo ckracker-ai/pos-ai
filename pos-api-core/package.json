@@ -1,6 +1,6 @@
 {
   "name": "pos-api-core",
-  "version": "1.4.0",
+  "version": "1.20.0",
   "private": true,
   "description": "POS-AI Core API – multi-tenant data layer",
   "main": "dist/server.js",

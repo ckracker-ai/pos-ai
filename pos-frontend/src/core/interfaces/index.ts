@@ -75,7 +75,7 @@ export interface Sale {
 }
 
 // Authentication Types
-export type UserRole = 'admin' | 'seller' | 'auditor' | 'comanda' | 'user';
+export type UserRole = 'admin' | 'seller' | 'auditor' | 'comanda' | 'delivery' | 'user';
 
 export interface User {
   id: string;
