@@ -46,17 +46,26 @@ export class ProductsService {
     }
   }
 
-  async updateCatalogProductName(
+  async updateCatalogProduct(
     productId: string,
-    name: string,
+    input: {
+      name: string;
+      sku: string;
+      categoryId: string;
+      supplierId: string;
+      price: number;
+      description?: string | null;
+      unit?: string;
+      isActive?: boolean;
+    },
     token: string,
     internalKey: string,
     branchId: string
   ) {
     try {
-      const data = await this.productCore.updateCatalogProductName(
+      const data = await this.productCore.updateCatalogProduct(
         productId,
-        { name },
+        input,
         token,
         internalKey,
         branchId

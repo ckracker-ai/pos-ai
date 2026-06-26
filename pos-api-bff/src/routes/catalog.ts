@@ -45,6 +45,13 @@ const catalogProductCreateSchema = z.object({
 
 const catalogProductUpdateSchema = z.object({
   name: z.string().min(1),
+  sku: z.string().min(1),
+  categoryId: z.string().min(1),
+  supplierId: z.string().min(1),
+  price: z.coerce.number().positive(),
+  description: z.string().optional().nullable(),
+  unit: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 const catalogRoutes = async (app: FastifyInstance) => {
@@ -248,9 +255,9 @@ const catalogRoutes = async (app: FastifyInstance) => {
     const body = catalogProductUpdateSchema.parse(request.body);
 
     try {
-      const data = await productCore.updateCatalogProductName(
+      const data = await productCore.updateCatalogProduct(
         id,
-        { name: body.name },
+        body,
         ctx.token,
         ctx.internalKey,
         ctx.branchId

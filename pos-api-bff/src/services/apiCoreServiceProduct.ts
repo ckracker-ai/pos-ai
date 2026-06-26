@@ -44,9 +44,18 @@ export class ApiCoreServiceProduct extends ApiCoreBaseService {
     return response.data;
   }
 
-  async updateCatalogProductName(
+  async updateCatalogProduct(
     productId: string,
-    input: { name: string },
+    input: {
+      name: string;
+      sku: string;
+      categoryId: string;
+      supplierId: string;
+      price: number;
+      description?: string | null;
+      unit?: string;
+      isActive?: boolean;
+    },
     token: string,
     internalKey: string,
     branchId: string

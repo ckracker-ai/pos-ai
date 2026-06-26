@@ -148,12 +148,19 @@ const productsRoutes = async (app: FastifyInstance) => {
 
     const bodySchema = z.object({
       name: z.string().min(1),
+      sku: z.string().min(1),
+      categoryId: z.string().min(1),
+      supplierId: z.string().min(1),
+      price: z.coerce.number().positive(),
+      description: z.string().optional().nullable(),
+      unit: z.string().optional(),
+      isActive: z.boolean().optional(),
     });
 
     const body = bodySchema.parse(request.body);
-    const result = await productsService.updateCatalogProductName(
+    const result = await productsService.updateCatalogProduct(
       id,
-      body.name,
+      body,
       ctx.token,
       ctx.internalKey,
       ctx.branchId

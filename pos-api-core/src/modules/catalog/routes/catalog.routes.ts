@@ -183,6 +183,74 @@ const parseCreateProductBody = (
   };
 };
 
+const parseUpdateProductBody = (
+  body: unknown
+):
+  | { valid: true; payload: import('../delegates/CatalogProductDelegate').UpdateProductInput }
+  | { valid: false; error: string } => {
+  const b = body as Record<string, unknown> | undefined;
+  const payload: import('../delegates/CatalogProductDelegate').UpdateProductInput = {};
+
+  if (b?.name !== undefined) {
+    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    if (!name) return { valid: false, error: 'VALIDATION_ERROR: name is required' };
+    payload.name = name;
+  }
+
+  if (b?.sku !== undefined) {
+    const sku = typeof b.sku === 'string' ? b.sku.trim() : '';
+    if (!sku) return { valid: false, error: 'VALIDATION_ERROR: sku is required' };
+    payload.sku = sku;
+  }
+
+  if (b?.categoryId !== undefined) {
+    const categoryId = typeof b.categoryId === 'string' ? b.categoryId.trim() : '';
+    if (!categoryId) return { valid: false, error: 'VALIDATION_ERROR: categoryId is required' };
+    payload.categoryId = categoryId;
+  }
+
+  if (b?.supplierId !== undefined) {
+    const supplierId = typeof b.supplierId === 'string' ? b.supplierId.trim() : '';
+    if (!supplierId) return { valid: false, error: 'VALIDATION_ERROR: supplierId is required' };
+    payload.supplierId = supplierId;
+  }
+
+  if (b?.price !== undefined) {
+    const price = Number(b.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      return { valid: false, error: 'VALIDATION_ERROR: price must be a positive number' };
+    }
+    payload.price = price;
+  }
+
+  if (b?.description !== undefined) {
+    payload.description = typeof b.description === 'string' ? b.description : null;
+  }
+
+  if (b?.unit !== undefined) {
+    payload.unit = typeof b.unit === 'string' ? b.unit : undefined;
+  }
+
+  if (b?.isActive !== undefined) {
+    payload.isActive = b.isActive !== false;
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return { valid: false, error: 'VALIDATION_ERROR: no fields to update' };
+  }
+
+  return { valid: true, payload };
+};
+
+const statusForProductError = (error: string): number => {
+  if (error.startsWith('VALIDATION_ERROR')) return 422;
+  if (error === 'PRODUCT_NOT_FOUND' || error === 'CATEGORY_NOT_FOUND' || error === 'SUPPLIER_NOT_FOUND') {
+    return 404;
+  }
+  if (error === 'CATEGORY_NOT_LEAF' || error === 'CATEGORY_INACTIVE') return 409;
+  return 400;
+};
+
 // List products with branch stock (JOIN inventory_stock for active branch)
 router.get('/products', requireSeller, async (req: AuthenticatedRequest, res) => {
   try {
@@ -328,32 +396,40 @@ router.get('/product/:branchId', requireSeller, async (req: AuthenticatedRequest
 
 // Update
 router.put('/products/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const validation = parseUpdateProductBody(req.body);
+  if (!validation.valid) return sendFail(res, validation.error, 422);
+
   try {
     const empresaId = getEffectiveEmpresaId(req);
-    const [updated] = await Product.update(req.body, { where: { id: req.params.id, empresaId } });
-    if (!updated) return sendFail(res, 'PRODUCT_NOT_FOUND', 404);
-
-    const product = await Product.findOne({
-      where: { id: req.params.id, empresaId },
-      include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }],
-    });
-    return sendOk(res, { product });
+    const result = await catalogProductDelegate.update(
+      empresaId,
+      req.params.id,
+      validation.payload
+    );
+    if (!result.success) {
+      return sendFail(res, result.error, statusForProductError(result.error));
+    }
+    return sendOk(res, { product: result.value });
   } catch {
     return sendFail(res, 'ERROR_UPDATING_PRODUCT', 400);
   }
 });
 
 router.patch('/product/:id', requireSeller, async (req: AuthenticatedRequest, res) => {
+  const validation = parseUpdateProductBody(req.body);
+  if (!validation.valid) return sendFail(res, validation.error, 422);
+
   try {
     const empresaId = getEffectiveEmpresaId(req);
-    const [updated] = await Product.update(req.body, { where: { id: req.params.id, empresaId } });
-    if (!updated) return sendFail(res, 'PRODUCT_NOT_FOUND', 404);
-
-    const product = await Product.findOne({
-      where: { id: req.params.id, empresaId },
-      include: [{ model: Category, as: 'category' }, { model: Supplier, as: 'supplier' }],
-    });
-    return sendOk(res, { product });
+    const result = await catalogProductDelegate.update(
+      empresaId,
+      req.params.id,
+      validation.payload
+    );
+    if (!result.success) {
+      return sendFail(res, result.error, statusForProductError(result.error));
+    }
+    return sendOk(res, { product: result.value });
   } catch {
     return sendFail(res, 'ERROR_UPDATING_PRODUCT', 400);
   }

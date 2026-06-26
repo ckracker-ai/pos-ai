@@ -49,6 +49,17 @@ export interface CreateProductInput {
   minStock?: number;
 }
 
+export interface UpdateProductInput {
+  name?: string;
+  sku?: string;
+  categoryId?: string;
+  supplierId?: string;
+  price?: number;
+  description?: string | null;
+  unit?: string;
+  isActive?: boolean;
+}
+
 type BranchStockRow = {
   id: string;
   productId: string;
@@ -198,6 +209,81 @@ class CatalogProductDelegate {
       await transaction.rollback();
       throw error;
     }
+  }
+
+  async update(
+    empresaId: string,
+    productId: string,
+    input: UpdateProductInput
+  ): Promise<Result<Product>> {
+    const product = await Product.findOne({ where: { id: productId, empresaId } });
+    if (!product) return fail('PRODUCT_NOT_FOUND');
+
+    const patch: Record<string, unknown> = {};
+
+    if (input.name !== undefined) {
+      const name = input.name.trim();
+      if (!name) return fail('VALIDATION_ERROR: name is required');
+      patch.name = name;
+    }
+
+    if (input.sku !== undefined) {
+      const sku = input.sku.trim();
+      if (!sku) return fail('VALIDATION_ERROR: sku is required');
+      patch.sku = sku;
+    }
+
+    if (input.categoryId !== undefined) {
+      const categoryId = input.categoryId.trim();
+      if (!categoryId) return fail('VALIDATION_ERROR: categoryId is required');
+      const categoryCheck = await categoryDelegate.assertValidProductCategory(empresaId, categoryId);
+      if (!categoryCheck.success) return categoryCheck;
+      patch.categoryId = categoryId;
+    }
+
+    if (input.supplierId !== undefined) {
+      const supplierId = input.supplierId.trim();
+      if (!supplierId) return fail('VALIDATION_ERROR: supplierId is required');
+      const supplier = await Supplier.findOne({ where: { id: supplierId, empresaId } });
+      if (!supplier) return fail('SUPPLIER_NOT_FOUND');
+      patch.supplierId = supplierId;
+    }
+
+    if (input.price !== undefined) {
+      const price = Number(input.price);
+      if (!Number.isFinite(price) || price <= 0) {
+        return fail('VALIDATION_ERROR: price must be a positive number');
+      }
+      patch.price = price;
+    }
+
+    if (input.description !== undefined) {
+      patch.description = input.description?.trim() || null;
+    }
+
+    if (input.unit !== undefined) {
+      const unit = input.unit.trim();
+      if (!unit) return fail('VALIDATION_ERROR: unit is required');
+      patch.unit = unit;
+    }
+
+    if (input.isActive !== undefined) {
+      patch.isActive = input.isActive;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return fail('VALIDATION_ERROR: no fields to update');
+    }
+
+    await product.update(patch);
+    await product.reload({
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name'] },
+        { model: Supplier, as: 'supplier', attributes: ['id', 'name'] },
+      ],
+    });
+
+    return ok(product);
   }
 
   private toProductWithBranchStock(
