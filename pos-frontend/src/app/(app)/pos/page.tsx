@@ -40,7 +40,7 @@ import {
   validateAddToCart,
   validateSaleForm,
 } from '@/core/pos/posSaleAssist';
-import { coercePositiveIntInput } from '@/core/utils/numeric-input';
+import { applyDigitsOnlyInput, parsePositiveInt } from '@/core/utils/numeric-input';
 import {
   CHILE_IVA_LABEL,
   calculateIvaFromNet,
@@ -81,7 +81,7 @@ export default function PosPage() {
   const activeBranchName = useBranchStore((state) => state.activeBranchLabel);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [quantityInput, setQuantityInput] = useState('1');
   const [cart, setCart] = useState<PosLineItem[]>([]);
   const [notes, setNotes] = useState('');
   const [paymentType, setPaymentType] = useState<'cash' | 'pos'>('cash');
@@ -258,7 +258,7 @@ export default function PosPage() {
       ];
     });
     setSelectedProductId('');
-    setQuantity(1);
+    setQuantityInput('1');
     setPickerResetKey((k) => k + 1);
     showPosFeedback(
       'success',
@@ -273,7 +273,8 @@ export default function PosPage() {
 
   const handleAddProduct = () => {
     if (!selectedProduct) return;
-    addProductToCart(selectedProduct, quantity);
+    const qty = parsePositiveInt(quantityInput) ?? 1;
+    addProductToCart(selectedProduct, qty);
   };
 
   const handleQuickAddSuggestion = (productId: string, qty = 1) => {
@@ -576,8 +577,15 @@ export default function PosPage() {
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      value={quantity}
-                      onChange={(event) => setQuantity(coercePositiveIntInput(event.target.value))}
+                      value={quantityInput}
+                      onChange={(event) => {
+                        const { value } = applyDigitsOnlyInput(event.target.value);
+                        setQuantityInput(value);
+                      }}
+                      onBlur={() => {
+                        const qty = parsePositiveInt(quantityInput);
+                        setQuantityInput(qty ? String(qty) : '1');
+                      }}
                       className="app-input"
                     />
                   </label>

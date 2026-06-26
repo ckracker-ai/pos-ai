@@ -110,7 +110,7 @@ export default function DeliveryPage() {
       const body: { status: string; assignedDriverId?: string } = { status };
       if (assignedDriverId) body.assignedDriverId = assignedDriverId;
 
-      const res = await fetch(posProxyPath(`sales/${saleId}/delivery-status`), {
+      const res = await fetch(posProxyPath(`sales/sales/${saleId}/delivery-status`), {
         method: 'PATCH',
         headers: headers(),
         body: JSON.stringify(body),
