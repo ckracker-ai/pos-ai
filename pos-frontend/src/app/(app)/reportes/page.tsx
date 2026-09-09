@@ -11,6 +11,7 @@ import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
 import { SidebarMenu } from '@/components/organisms/SidebarMenu';
 import { Navbar } from '@/components/organisms/Navbar';
+import { NavGlyph } from '@/components/atoms/NavGlyph';
 import { RevenueTrendChart } from '@/components/organisms/RevenueTrendChart';
 import { exportRowsToExcel } from '@/utils/exportExcel';
 
@@ -399,25 +400,25 @@ export default function ReportesPage() {
                     title: 'Ingresos Totales',
                     value: formatMoney(summary?.totalRevenue ?? 0),
                     sub: `${formatMoney(summary?.todayRevenue ?? 0)} hoy`,
-                    icon: '$',
+                    icon: 'currency',
                   },
                   {
                     title: 'Ventas Totales',
                     value: String(summary?.totalSales ?? 0),
                     sub: `+${summary?.todaySales ?? 0} hoy`,
-                    icon: '🛍',
+                    icon: 'bag',
                   },
                   {
                     title: 'Sucursales Activas',
                     value: String(summary?.activeBranches ?? 0),
                     sub: 'En todo el sistema',
-                    icon: '🏪',
+                    icon: 'store',
                   },
                   {
                     title: 'Usuarios Registrados',
                     value: String(summary?.registeredUsers ?? 0),
                     sub: 'En todas las sucursales',
-                    icon: '👥',
+                    icon: 'users',
                   },
                 ].map((card) => (
                   <div key={card.title} className="app-card rounded-3xl p-5">
@@ -427,7 +428,9 @@ export default function ReportesPage() {
                         <p className="mt-2 text-3xl font-semibold text-[#3d4532]">{card.value}</p>
                         <p className="mt-1 text-xs text-[#6b7280]">{card.sub}</p>
                       </div>
-                      <span className="app-stat-chip">{card.icon}</span>
+                      <span className="app-stat-chip text-brand-olive">
+                        <NavGlyph name={card.icon} />
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -443,8 +446,8 @@ export default function ReportesPage() {
                 </div>
 
                 <div className="app-card rounded-3xl p-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-rose-600">⚠</span>
+                  <div className="flex items-center gap-2 text-rose-700">
+                    <NavGlyph name="warn" className="h-5 w-5" />
                     <h2 className="text-lg font-semibold text-[#3d4532]">Alertas de stock bajo</h2>
                   </div>
                   <p className="mt-1 text-sm app-text-muted">Productos que necesitan atención</p>

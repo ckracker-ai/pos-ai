@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/core/api/api-client';
 import { extractEntity, normalizeEmpresa, unwrapApiEnvelope } from '@/core/api/normalizers';
 import { Empresa, EmpresaEstado, UpdateEmpresaInput } from '@/core/interfaces';
@@ -15,6 +16,8 @@ import { Navbar } from '@/components/organisms/Navbar';
 import { useAuthStore } from '@/core/context/auth';
 import { getRoleProfile } from '@/core/config/role-access';
 import { canRenewSubscription } from '@/core/config/plan-access';
+import { buildEmpresaSetupSteps, empresaSetupProgress } from '@/core/config/empresa-setup';
+import { useBranchStore } from '@/store/branch';
 import { notifyApiError, notifySuccess } from '@/store/ui';
 import { EmpresaFormalizarPanel } from '@/components/molecules/EmpresaFormalizarPanel';
 import { EmpresaPrivacidadPanel } from '@/components/molecules/EmpresaPrivacidadPanel';
@@ -135,12 +138,16 @@ const inputClass =
   'w-full rounded-lg border border-brand-linen bg-white px-3 py-2 text-sm text-brand-ink outline-none focus:border-brand-olive focus:ring-2 focus:ring-brand-olive/20 read-only:bg-brand-vanilla/80 read-only:text-brand-ink-muted';
 
 export default function EmpresasPage() {
+  const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
   const canManageEmpresa = getRoleProfile(currentUser?.role).canManageEmpresa;
+  const branchId = useBranchStore((s) => s.selectedBranchId);
 
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [form, setForm] = useState<EmpresaForm>(emptyForm());
   const [activeTab, setActiveTab] = useState<EmpresaTab>('general');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [wspMenuEnabled, setWspMenuEnabled] = useState<boolean | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -181,6 +188,22 @@ export default function EmpresasPage() {
     );
   }, [form]);
 
+  const setupSteps = useMemo(
+    () => (empresa ? buildEmpresaSetupSteps(empresa, { wspMenuEnabled }) : []),
+    [empresa, wspMenuEnabled]
+  );
+  const setupProgress = empresaSetupProgress(setupSteps);
+
+  const openSetupStep = (tab: EmpresaTab, href?: string) => {
+    if (href) {
+      router.push(href);
+      return;
+    }
+    const nextTab = tab === 'formalizar' && !showFormalizarTab ? 'general' : tab;
+    setActiveTab(nextTab);
+    setShowAdvanced(true);
+  };
+
   const loadEmpresa = async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -191,6 +214,20 @@ export default function EmpresasPage() {
       const normalized = normalizeEmpresa(raw);
       setEmpresa(normalized);
       setForm(empresaToForm(normalized));
+      const whatsapp = normalized.plan?.features?.assistantWhatsapp === true;
+      if (whatsapp && branchId) {
+        try {
+          const menuRes = await api.getWspMenu(branchId);
+          const menuData = unwrapApiEnvelope(menuRes.data ?? menuRes) as {
+            menu?: { isEnabled?: boolean };
+          };
+          setWspMenuEnabled(menuData.menu?.isEnabled === true);
+        } catch {
+          setWspMenuEnabled(false);
+        }
+      } else {
+        setWspMenuEnabled(null);
+      }
     } catch (error) {
       const { displayMessage } = notifyApiError('empresas.load', error, { toast: false });
       setErrorMessage(displayMessage);
@@ -201,7 +238,7 @@ export default function EmpresasPage() {
 
   useEffect(() => {
     loadEmpresa();
-  }, []);
+  }, [branchId]);
 
   const handleFieldChange = (field: keyof EmpresaForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -253,7 +290,7 @@ export default function EmpresasPage() {
       <AppPageContent narrow>
           <AppPageHeader
             title="Perfil de empresa"
-            description="Organiza la información por sección. Los datos de transferencia alimentan al asistente IA para validar comprobantes de pago."
+            description="Completa la guía para operar: datos, transferencia y plan. La edición por pestañas queda para ajustes finos."
           />
 
           {errorMessage && (
@@ -278,6 +315,59 @@ export default function EmpresasPage() {
                   void handleSave();
                 }}
               >
+                {setupSteps.length > 0 ? (
+                  <div className="border-b border-brand-linen/60 p-4 sm:p-6">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-brand-olive">
+                      Listo para operar
+                    </p>
+                    <p className="mt-1 text-sm text-brand-ink">
+                      {setupProgress.done} de {setupProgress.total} pasos completos
+                    </p>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-brand-linen/50">
+                      <div
+                        className="h-full rounded-full bg-brand-olive"
+                        style={{
+                          width: `${Math.round((setupProgress.done / Math.max(setupProgress.total, 1)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <ul className="mt-4 space-y-2">
+                      {setupSteps.map((step) => (
+                        <li key={step.id}>
+                          <button
+                            type="button"
+                            onClick={() => openSetupStep(step.tab, step.href)}
+                            className="flex w-full items-start gap-3 rounded-xl border border-brand-linen/70 bg-white px-3 py-3 text-left hover:border-brand-olive/40"
+                          >
+                            <span
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                                step.done
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-brand-surface text-brand-ink-muted'
+                              }`}
+                            >
+                              {step.done ? 'OK' : ''}
+                            </span>
+                            <span>
+                              <span className="block text-sm font-semibold text-brand-ink">{step.title}</span>
+                              <span className="mt-0.5 block text-xs text-brand-ink-muted">{step.hint}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced((v) => !v)}
+                      className="mt-4 text-sm font-medium text-brand-olive underline-offset-2 hover:underline"
+                    >
+                      {showAdvanced ? 'Ocultar edición avanzada' : 'Edición avanzada (pestañas)'}
+                    </button>
+                  </div>
+                ) : null}
+
+                {showAdvanced ? (
+                  <>
                 <div className="border-b border-brand-linen/60 p-4 sm:p-6">
                   <TabList tabs={empresaTabs} active={activeTab} onChange={setActiveTab} />
                 </div>
@@ -577,7 +667,10 @@ export default function EmpresasPage() {
                   )}
                 </div>
 
-                {canManageEmpresa && activeTab !== 'plan' && activeTab !== 'privacidad' && (
+                {canManageEmpresa &&
+                  showAdvanced &&
+                  activeTab !== 'plan' &&
+                  activeTab !== 'privacidad' && (
                   <div className="flex flex-wrap gap-3 border-t border-brand-linen/60 px-4 py-4 sm:px-6">
                     <button
                       type="submit"
@@ -596,6 +689,8 @@ export default function EmpresasPage() {
                     </button>
                   </div>
                 )}
+                  </>
+                ) : null}
               </form>
             ) : (
               <p className="p-6 text-sm text-brand-ink-muted">No hay datos de empresa disponibles.</p>

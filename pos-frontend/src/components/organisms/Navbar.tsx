@@ -7,6 +7,8 @@ import { useState } from 'react';
 import { BranchSelector } from '@/components/molecules/BranchSelector';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
+import { getRoleLabel } from '@/core/config/role-access';
+import { NavGlyph } from '@/components/atoms/NavGlyph';
 
 export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const router = useRouter();
@@ -19,21 +21,10 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
     router.push('/login');
   };
 
-  const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      admin: 'Administrador',
-      seller: 'Vendedor',
-      auditor: 'Auditor',
-      comanda: 'Comanda',
-      user: 'Usuario',
-    };
-    return labels[role] || role;
-  };
-
   return (
     <nav className="bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 gap-3">
+        <div className="flex min-h-16 items-center justify-between gap-3 py-2">
           {/* Mobile toggle + Logo */}
           <div className="flex items-center">
             <button
@@ -55,10 +46,10 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
             </Link>
           </div>
 
-          <div className="hidden min-w-0 flex-1 flex-col items-end sm:flex md:max-w-[280px]">
+          <div className="min-w-0 flex-1 flex flex-col items-stretch sm:items-end md:max-w-[280px]">
             {empresaName ? (
               <p
-                className="truncate text-sm font-semibold text-brand-ink"
+                className="hidden truncate text-sm font-semibold text-brand-ink sm:block"
                 title={empresaName}
               >
                 {empresaName}
@@ -96,7 +87,7 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
               <div className="absolute right-0 top-16 mt-2 w-48 rounded-lg border border-brand-linen/60 bg-white py-1 shadow-lg">
                 <div className="border-b border-brand-linen/40 px-4 py-2">
                   <p className="text-sm font-semibold text-brand-ink">{user?.name}</p>
-                  <p className="text-xs text-brand-ink-muted">{getRoleLabel(user?.role || '')}</p>
+                  <p className="text-xs text-brand-ink-muted">{getRoleLabel(user?.role)}</p>
                   <p className="text-xs text-brand-ink-muted">{user?.email}</p>
                 </div>
                 <button
@@ -104,9 +95,10 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                     setIsOpen(false);
                     router.push('/manual');
                   }}
-                  className="w-full px-4 py-2 text-left text-sm text-brand-olive transition hover:bg-brand-surface"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-brand-olive transition hover:bg-brand-surface"
                 >
-                  ❓ Ayuda y manual
+                  <NavGlyph name="help" className="h-4 w-4" />
+                  Ayuda y manual
                 </button>
                 <button
                   onClick={() => {

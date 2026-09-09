@@ -98,13 +98,13 @@ test('buildPosQuickActions usa productos del tenant en sesion', () => {
     { id: 'beb', name: 'Coca Cola 1L', price: 1700, stock: 5, category: 'Bebidas' },
   ];
   const actions = buildPosQuickActions(fusionCatalog);
-  assert.equal(actions.length, 5);
+  assert.equal(actions.length, 3);
   assert.deepEqual(
     actions.map((a) => a.label),
-    ['buscar', 'agregar', 'quitar', 'ayuda', 'vaciar carrito']
+    ['Buscar «Hamburguesa Italiana»', 'Ayuda', 'Vaciar']
   );
   assert.match(actions[0].command, /buscar Hamburguesa Italiana/);
-  assert.match(actions[1].command, /agrega Hamburguesa Italiana/);
+  assert.equal(actions[2].runImmediately, true);
   assert.match(posAiInputPlaceholder(fusionCatalog), /buscar Hamburguesa Italiana/);
 });
 

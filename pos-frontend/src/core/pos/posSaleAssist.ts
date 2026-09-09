@@ -140,7 +140,12 @@ export function suggestionReasonLabel(reason: PosSuggestion['reason']): string {
   }
 }
 
-export type PosQuickAction = { label: string; command: string };
+export type PosQuickAction = {
+  label: string;
+  command: string;
+  /** Si true, el chip ejecuta el comando; si no, solo lo deja en el input. */
+  runImmediately?: boolean;
+};
 
 function sampleProductLabel(products: PosAssistProduct[]): string {
   const name = products.find((p) => p.stock > 0)?.name?.trim();
@@ -148,15 +153,13 @@ function sampleProductLabel(products: PosAssistProduct[]): string {
   return name.split(/\s+/).slice(0, 3).join(' ');
 }
 
-/** Chips de búsqueda rápida — usan el catálogo con stock de la sucursal activa. */
+/** Acciones de caja: ejemplos de búsqueda y vaciar (inmediato). */
 export function buildPosQuickActions(products: PosAssistProduct[]): PosQuickAction[] {
   const sample = sampleProductLabel(products);
   return [
-    { label: 'buscar', command: `buscar ${sample}` },
-    { label: 'agregar', command: `agrega ${sample}` },
-    { label: 'quitar', command: 'quitar' },
-    { label: 'ayuda', command: 'ayuda' },
-    { label: 'vaciar carrito', command: 'vaciar carrito' },
+    { label: `Buscar «${sample}»`, command: `buscar ${sample}` },
+    { label: 'Ayuda', command: 'ayuda', runImmediately: true },
+    { label: 'Vaciar', command: 'vaciar carrito', runImmediately: true },
   ];
 }
 

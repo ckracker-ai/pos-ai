@@ -152,7 +152,7 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
                   : 'border-brand-olive/30 bg-brand-vanilla/60 text-brand-ink hover:border-brand-olive'
               }`}
             >
-              {listening ? '● Escuchando…' : '🎤 Voz'}
+              {listening ? 'Escuchando…' : 'Voz'}
             </button>
           ) : (
             <p className="max-w-[11rem] text-right text-[10px] leading-snug text-brand-ink-muted">
@@ -173,41 +173,58 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-          <label className="block">
-            <span className="sr-only">Comando de venta</span>
-            <input
-              ref={inputRef}
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={disabled || loading}
-              placeholder={inputPlaceholder}
-              className="app-input w-full"
-              autoComplete="off"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
+        <form onSubmit={handleSubmit} className="mt-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+            <label className="block min-w-0 flex-1">
+              <span className="sr-only">Comando de venta</span>
+              <input
+                ref={inputRef}
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                disabled={disabled || loading}
+                placeholder={inputPlaceholder}
+                className="app-input w-full"
+                autoComplete="off"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={disabled || loading || !text.trim()}
+              className="app-btn-primary shrink-0 rounded-2xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+            >
+              {loading ? 'Interpretando…' : 'Enviar'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-brand-ink-muted">
+            Enter envía el comando · F2 enfoca el campo
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
             {quickActions.map((action) => (
               <button
                 key={action.label}
                 type="button"
                 disabled={disabled || loading}
-                onClick={() => setText(action.command)}
+                onClick={() => {
+                  if (action.runImmediately) {
+                    void onSubmit(action.command);
+                    setText('');
+                    return;
+                  }
+                  setText(action.command);
+                  inputRef.current?.focus();
+                }}
                 title={action.command}
-                className="rounded-full border border-[rgba(74,83,60,0.2)] bg-brand-surface/80 px-3 py-1 text-xs text-brand-ink-muted transition hover:border-brand-olive hover:text-brand-ink disabled:opacity-50"
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                  action.command === 'vaciar carrito'
+                    ? 'border-rose-200 bg-white text-rose-800 hover:bg-rose-50'
+                    : 'border-brand-linen bg-white text-brand-ink hover:border-brand-olive'
+                }`}
               >
                 {action.label}
               </button>
             ))}
           </div>
-          <button
-            type="submit"
-            disabled={disabled || loading || !text.trim()}
-            className="app-btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
-          >
-            {loading ? 'Interpretando…' : 'Ejecutar comando'}
-          </button>
         </form>
 
         {showProductPicker && (

@@ -73,6 +73,19 @@ interface ReceiptData {
   deliveryAddress?: string;
   branchName: string;
   sellerName: string;
+  empresaName?: string;
+}
+
+const LAST_TICKET_KEY = 'pos-ai.last-ticket';
+
+function formatTicketMoney(value: number) {
+  return `$${Math.round(value).toLocaleString('es-CL')}`;
+}
+
+function formatTicketDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 export default function PosPage() {
@@ -117,6 +130,19 @@ export default function PosPage() {
     setMessageType(type);
     setMessage(text);
     setMessageKey((k) => k + 1);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(LAST_TICKET_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as ReceiptData;
+      if (parsed?.saleReference && Array.isArray(parsed.items)) {
+        setReceiptData(parsed);
+      }
+    } catch {
+      /* ticket previo no usable */
+    }
   }, []);
 
   useEffect(() => {
@@ -401,6 +427,27 @@ export default function PosPage() {
     setCart((current) => current.filter((item) => item.id !== itemId));
   };
 
+  const setCartLineQuantity = (itemId: string, rawQty: number) => {
+    const qty = Math.floor(Number(rawQty));
+    if (!Number.isFinite(qty) || qty < 1) {
+      handleRemoveItem(itemId);
+      return;
+    }
+    const product = products.find((p) => p.id === itemId);
+    const stock = Number(product?.stock ?? 0);
+    if (product && stock > 0 && qty > stock) {
+      showPosFeedback('error', `Stock máximo de "${product.name}": ${stock} u.`);
+      return;
+    }
+    setCart((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? { ...item, quantity: qty, total: qty * item.unitPrice }
+          : item
+      )
+    );
+  };
+
   const handleConfirmSale = async (cartOverride?: PosLineItem[]) => {
     const saleCart = cartOverride ?? cart;
     const saleSubtotal = saleCart.reduce((sum, item) => sum + item.total, 0);
@@ -451,7 +498,7 @@ export default function PosPage() {
       await api.createSale(salePayload);
       const reference = saleNumberInput.trim();
       const nowIso = new Date().toISOString();
-      setReceiptData({
+      const ticket: ReceiptData = {
         items: saleCart.map((item) => ({ ...item })),
         subtotal: saleSubtotal,
         deliveryAmount,
@@ -466,7 +513,14 @@ export default function PosPage() {
         deliveryAddress: requiresDelivery ? deliveryAddress.trim() : undefined,
         branchName: activeBranchName,
         sellerName: user?.name || 'Usuario',
-      });
+        empresaName: empresaDisplayName,
+      };
+      setReceiptData(ticket);
+      try {
+        sessionStorage.setItem(LAST_TICKET_KEY, JSON.stringify(ticket));
+      } catch {
+        /* ignore quota */
+      }
       // En POS mostramos el número ingresado por caja.
       setCart([]);
       setRequiresDelivery(false);
@@ -487,6 +541,18 @@ export default function PosPage() {
     window.print();
   };
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'F9') return;
+      e.preventDefault();
+      if (!isSubmitting && cart.length > 0) {
+        void handleConfirmSale();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [cart.length, handleConfirmSale, isSubmitting]);
+
   return (
     <DashboardLayout sidebar={<SidebarMenu />} header={<Navbar />}>
       <AppPageContent className="overflow-x-hidden">
@@ -495,9 +561,23 @@ export default function PosPage() {
             title="Registrar Venta"
             meta={<p>Sucursal activa: {activeBranchName}</p>}
             actions={
-              <div className="app-card rounded-2xl px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-ink-muted">Vendedor</p>
-                <p className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {receiptData ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReceipt(true);
+                    }}
+                    className="app-btn-secondary text-sm"
+                  >
+                    Último ticket
+                  </button>
+                ) : null}
+                <div className="app-card rounded-2xl px-5 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-ink-muted">Vendedor</p>
+                  <p className="font-semibold text-brand-ink">{user?.name || 'Usuario'}</p>
+                  <p className="mt-1 text-[10px] text-brand-ink-muted">F9 confirma la venta</p>
+                </div>
               </div>
             }
           />
@@ -623,13 +703,43 @@ export default function PosPage() {
                     </div>
                   ) : (
                     cart.map((item) => (
-                      <div key={item.id} className="app-panel flex items-center justify-between gap-4 rounded-3xl p-4">
-                        <div>
+                      <div key={item.id} className="app-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl p-4">
+                        <div className="min-w-0 flex-1">
                           <p className="font-semibold text-[#3d4532]">{item.name}</p>
-                          <p className="text-sm app-text-muted">{item.quantity} × ${item.unitPrice}</p>
+                          <p className="text-sm app-text-muted">{formatTicketMoney(item.unitPrice)} c/u</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-linen text-lg"
+                            onClick={() => setCartLineQuantity(item.id, item.quantity - 1)}
+                            aria-label="Menos"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const n = parsePositiveInt(e.target.value);
+                              if (n) setCartLineQuantity(item.id, n);
+                              if (e.target.value === '') setCartLineQuantity(item.id, 0);
+                            }}
+                            className="app-input w-14 py-1 text-center"
+                            aria-label={`Cantidad de ${item.name}`}
+                          />
+                          <button
+                            type="button"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-linen text-lg"
+                            onClick={() => setCartLineQuantity(item.id, item.quantity + 1)}
+                            aria-label="Más"
+                          >
+                            +
+                          </button>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-[#3d4532]">${item.total}</p>
+                          <p className="font-semibold text-[#3d4532]">{formatTicketMoney(item.total)}</p>
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.id)}
@@ -795,8 +905,9 @@ export default function PosPage() {
                     <p className="app-eyebrow text-sm tracking-[0.28em] text-[#4a533c]">
                       Venta registrada exitosamente
                     </p>
-                    <h3 className="mt-3 text-2xl font-bold text-[#3d4532]">ERP Multi Sucursal</h3>
-                    <p className="text-sm app-text-muted">{empresaDisplayName}</p>
+                    <h3 className="mt-3 text-2xl font-bold text-[#3d4532]">
+                      {empresaDisplayName}
+                    </h3>
                     {isInformalTicket && (
                       <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                         Documento interno — no constituye boleta electrónica ni documento tributario.
@@ -824,7 +935,7 @@ export default function PosPage() {
                     </div>
                     <div>
                       <p className="font-semibold text-[#3d4532]">Fecha</p>
-                      <p>{new Date(receiptData.createdAtIso).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                      <p>{new Date(receiptData.createdAtIso).toLocaleString('es-CL', { dateStyle: 'long', timeStyle: 'short' })}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-[#3d4532]">Folio</p>
@@ -903,89 +1014,48 @@ export default function PosPage() {
           )}
 
           <div id="ticket-print-area" className="hidden print:block">
-            <div className="pos-ticket mx-auto bg-white p-3 text-slate-900">
-              <div className="mb-6 text-center">
-                <p className="text-sm font-semibold uppercase text-brand-olive">ERP Multi Sucursal</p>
-                <p className="mt-2 text-xs text-brand-ink-muted">{empresaDisplayName}</p>
-                {isInformalTicket && (
-                  <p className="mt-2 text-[10px] leading-snug text-amber-800">
-                    Documento interno — no constituye boleta electrónica ni documento tributario.
+            <div className="pos-ticket">
+              <p className="pos-ticket-center pos-ticket-strong">
+                {receiptData?.empresaName || empresaDisplayName}
+              </p>
+              {isInformalTicket ? (
+                <p className="pos-ticket-center">Documento interno — no es boleta SII</p>
+              ) : null}
+              <p className="pos-ticket-rule">--------------------------------</p>
+              <p>Sucursal: {receiptData?.branchName}</p>
+              <p>Vendedor: {receiptData?.sellerName}</p>
+              <p>Fecha: {receiptData ? formatTicketDate(receiptData.createdAtIso) : ''}</p>
+              <p>Folio: #{receiptData?.saleReference}</p>
+              <p>Pago: {receiptData?.paymentType === 'cash' ? 'Efectivo' : 'POS de pago'}</p>
+              {receiptData?.requiresDelivery ? (
+                <>
+                  <p>Delivery: {receiptData.deliveryCustomerName}</p>
+                  <p>Tel: {receiptData.deliveryPhone}</p>
+                  <p>{receiptData.deliveryAddress}</p>
+                </>
+              ) : null}
+              <p className="pos-ticket-rule">--------------------------------</p>
+              {(receiptData?.items ?? []).map((item) => (
+                <div key={item.id} className="pos-ticket-line">
+                  <p>{item.name}</p>
+                  <p>
+                    {item.quantity} x {formatTicketMoney(item.unitPrice)}  {formatTicketMoney(item.total)}
                   </p>
-                )}
-              </div>
-              <div className="mb-6 grid gap-4 sm:grid-cols-2 text-xs text-brand-ink-muted">
-                <div>
-                  <p className="font-semibold text-slate-900">Sucursal</p>
-                  <p>{receiptData?.branchName}</p>
                 </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Vendedor</p>
-                  <p>{receiptData?.sellerName}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Fecha</p>
-                  <p>{receiptData ? new Date(receiptData.createdAtIso).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' }) : ''}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Folio</p>
-                  <p>#{receiptData?.saleReference}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Pago</p>
-                  <p>{receiptData?.paymentType === 'cash' ? 'Efectivo' : 'POS de pago'}</p>
-                </div>
-                {receiptData?.requiresDelivery && (
-                  <>
-                    <div>
-                      <p className="font-semibold text-slate-900">Cliente delivery</p>
-                      <p>{receiptData.deliveryCustomerName}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">Teléfono delivery</p>
-                      <p>{receiptData.deliveryPhone}</p>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <p className="font-semibold text-slate-900">Dirección delivery</p>
-                      <p>{receiptData.deliveryAddress}</p>
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="mb-6 border-t border-slate-200 pt-4">
-                {(receiptData?.items ?? []).map((item) => (
-                  <div key={item.id} className="mb-4 flex justify-between text-sm">
-                    <div>
-                      <p className="font-semibold text-slate-900">{item.name}</p>
-                      <p className="text-brand-ink-muted">{item.quantity} x ${item.unitPrice}</p>
-                    </div>
-                    <p className="font-semibold text-slate-900">${item.total}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-brand-ink-muted">Subtotal</span>
-                  <span className="font-semibold text-slate-900">${receiptData?.subtotal ?? 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-brand-ink-muted">{CHILE_IVA_LABEL}</span>
-                  <span className="font-semibold text-slate-900">${receiptData?.tax ?? 0}</span>
-                </div>
-                {(receiptData?.requiresDelivery ?? false) && (
-                  <div className="flex justify-between">
-                    <span className="text-brand-ink-muted">Delivery</span>
-                    <span className="font-semibold text-slate-900">${receiptData?.deliveryAmount ?? 0}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-base font-semibold text-slate-900">
-                  <span>Total</span>
-                  <span>${receiptData?.total ?? 0}</span>
-                </div>
-              </div>
-              <p className="mt-8 text-center text-xs text-brand-ink-muted">
+              ))}
+              <p className="pos-ticket-rule">--------------------------------</p>
+              <p>Subtotal {formatTicketMoney(receiptData?.subtotal ?? 0)}</p>
+              <p>
+                {CHILE_IVA_LABEL} {formatTicketMoney(receiptData?.tax ?? 0)}
+              </p>
+              {receiptData?.requiresDelivery ? (
+                <p>Delivery {formatTicketMoney(receiptData.deliveryAmount ?? 0)}</p>
+              ) : null}
+              <p className="pos-ticket-strong">TOTAL {formatTicketMoney(receiptData?.total ?? 0)}</p>
+              <p className="pos-ticket-center pos-ticket-footer">
                 {isInformalTicket
-                  ? 'Comprobante interno de venta · Conserve este documento'
-                  : 'Gracias por su compra · Conserve este comprobante'}
+                  ? 'Comprobante interno · Conserve este documento'
+                  : 'Gracias por su compra'}
               </p>
             </div>
           </div>
@@ -995,27 +1065,49 @@ export default function PosPage() {
         @media print {
           @page {
             size: 80mm auto;
-            margin: 0;
+            margin: 2mm;
           }
           body * {
             visibility: hidden;
           }
           #ticket-print-area,
           #ticket-print-area * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #ticket-print-area {
             position: absolute;
             left: 0;
             top: 0;
             width: 80mm;
+            color: #000 !important;
+            background: #fff !important;
+          }
+          #ticket-print-area,
+          #ticket-print-area .pos-ticket,
+          #ticket-print-area .pos-ticket * {
+            font-family: 'Courier New', Courier, ui-monospace, monospace !important;
+            font-size: 12px !important;
+            line-height: 1.3 !important;
+            color: #000 !important;
+            background: #fff !important;
           }
           #ticket-print-area .pos-ticket {
-            width: 80mm;
-            max-width: 80mm;
-            padding: 3mm;
-            font-size: 11px;
-            line-height: 1.25;
+            width: 72mm;
+            max-width: 72mm;
+            padding: 0;
+          }
+          #ticket-print-area .pos-ticket-center {
+            text-align: center;
+          }
+          #ticket-print-area .pos-ticket-strong {
+            font-weight: 700;
+          }
+          #ticket-print-area .pos-ticket-rule,
+          #ticket-print-area .pos-ticket-footer {
+            margin: 6px 0;
+          }
+          #ticket-print-area .pos-ticket-line {
+            margin-bottom: 6px;
           }
         }
       `}</style>

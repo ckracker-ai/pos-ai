@@ -2,14 +2,15 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
+import { NavGlyph } from '@/components/atoms/NavGlyph';
 import { APP_VERSION_LABEL } from '@/core/constants/version';
 import { usePlatformAuthStore } from '@/core/context/platform-auth';
 
 const NAV_ITEMS = [
-  { href: '/platform/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/platform/empresas', label: 'Empresas', icon: '🏢' },
-  { href: '/platform/whatsapp', label: 'Simular WSP', icon: '💬' },
-  { href: '/platform/voice', label: 'Simular voz', icon: '🎙️' },
+  { href: '/platform/dashboard', label: 'Dashboard', icon: 'chart' },
+  { href: '/platform/empresas', label: 'Empresas', icon: 'building' },
+  { href: '/platform/whatsapp', label: 'Simular WSP', icon: 'chat' },
+  { href: '/platform/voice', label: 'Simular voz', icon: 'register' },
 ] as const;
 
 function navButtonClass(isActive: boolean) {
@@ -57,8 +58,8 @@ export function PlatformSidebarMenu({ onClose }: { onClose?: () => void } = {}) 
                   onClick={() => navigate(item.href)}
                   className={navButtonClass(isActive)}
                 >
-                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-base leading-none">
-                    {item.icon}
+                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                    <NavGlyph name={item.icon} />
                   </span>
                   <span className="truncate">{item.label}</span>
                 </button>

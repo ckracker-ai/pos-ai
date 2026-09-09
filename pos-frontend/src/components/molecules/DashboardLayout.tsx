@@ -3,7 +3,6 @@
 
 import React, { ReactNode, useState, useEffect, useRef } from 'react';
 import { useBranchStore } from '@/store/branch';
-import { ActiveBranchBar } from '@/components/molecules/ActiveBranchBar';
 import { SupportSessionBanner } from '@/components/molecules/SupportSessionBanner';
 import { TenantSubscriptionBanner } from '@/components/molecules/TenantSubscriptionBanner';
 
@@ -90,7 +89,6 @@ export function DashboardLayout({
             {headerNode}
             {!hideBranchBar ? <SupportSessionBanner /> : null}
             {!hideBranchBar ? <TenantSubscriptionBanner /> : null}
-            {!hideBranchBar ? <ActiveBranchBar /> : null}
           </header>
         )}
         <main key={branchId} className="app-surface-page flex-1 overflow-auto">

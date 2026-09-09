@@ -176,15 +176,6 @@ export function LoginForm() {
           <a href="/" className="font-medium text-brand-olive underline-offset-2 hover:underline">
             Volver al inicio
           </a>
-          <span className="mx-2 text-brand-linen">·</span>
-          <a
-            href="/platform/login"
-            className="font-medium text-brand-olive underline-offset-2 hover:underline"
-          >
-            Acceso plataforma
-          </a>
-          <br />
-          <span className="mt-2 inline-block text-xs">Tenant demo: admin@empanadascostaazul.cl</span>
         </p>
       </div>
     </div>

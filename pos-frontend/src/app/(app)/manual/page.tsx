@@ -181,7 +181,7 @@ const sections: ManualSection[] = [
     hint: 'Configuración que el asistente WhatsApp muestra al cliente.',
     allowed: ['admin'],
     bullets: [
-      'Menú Mantenedores → Empresa → pestaña Transferencia.',
+          'Configurar → Negocio → Empresa: guía «Listo para operar»; pestañas en edición avanzada.',
       'Completa banco, tipo de cuenta, número, titular y RUT; el bot los envía tras confirmar pedido.',
       'Datos incorrectos generan comprobantes con destinatario incorrecto o revisión manual.',
       'El teléfono del canal WhatsApp y bindings se gestionan en Plataforma POS-AI (soporte o implementación).',
