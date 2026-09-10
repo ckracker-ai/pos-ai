@@ -16,6 +16,8 @@ class Sale extends Model {
   public deliveryAmount!: number;
   public deliveryStatus?: string | null;
   public assignedDriverId?: string | null;
+  public tradeCustomerId?: string | null;
+  public onCredit!: boolean;
   public notes?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -95,6 +97,17 @@ Sale.init(
       type: DataTypes.CHAR(36),
       allowNull: true,
       field: 'assigned_driver_id',
+    },
+    tradeCustomerId: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+      field: 'trade_customer_id',
+    },
+    onCredit: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'on_credit',
     },
     notes: {
       type: DataTypes.TEXT,

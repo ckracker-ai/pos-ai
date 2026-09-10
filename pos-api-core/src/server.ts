@@ -29,6 +29,7 @@ import { APP_NAME, APP_VERSION } from './version';
 import territoryRoutes from './modules/territory/routes/territory.routes';
 import paymentRoutes from './modules/payments/routes/payment.routes';
 import { legalPublicRoutes, legalProtectedRoutes } from './modules/legal/routes/legal.routes';
+import wholesaleRoutes from './modules/wholesale/routes/wholesale.routes';
 import virtualMenuRoutes from './modules/wsp/routes/virtualMenu.routes';
 import { startTenantDeletionJob } from './jobs/tenantDeletionJob';
 import { getRedis, isRedisConfigured } from './lib/redis';
@@ -120,6 +121,7 @@ async function bootstrap(): Promise<void> {
   app.use('/virtual-menu', virtualMenuRoutes);
   app.use('/inventory', inventoryRoutes);
   app.use('/catalog', catalogRoutes);
+  app.use('/wholesale', wholesaleRoutes);
   app.use('/branch', branchRoutes);
   app.use('/territory', territoryRoutes);
   

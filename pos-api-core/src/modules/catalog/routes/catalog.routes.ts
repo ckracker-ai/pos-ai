@@ -8,6 +8,7 @@ import catalogProductDelegate from '../delegates/CatalogProductDelegate';
 import categoryDelegate from '../delegates/CategoryDelegate';
 import { getEffectiveBranchId } from '../../../utils/branchContext';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
+import { readProductMerchFromBody } from '../utils/productMerch';
 
 const router = Router();
 
@@ -179,6 +180,7 @@ const parseCreateProductBody = (
       isActive: b?.isActive !== false,
       initialStock,
       minStock,
+      ...readProductMerchFromBody(b),
     },
   };
 };
@@ -235,6 +237,8 @@ const parseUpdateProductBody = (
     payload.isActive = b.isActive !== false;
   }
 
+  Object.assign(payload, readProductMerchFromBody(b));
+
   if (Object.keys(payload).length === 0) {
     return { valid: false, error: 'VALIDATION_ERROR: no fields to update' };
   }
@@ -244,7 +248,7 @@ const parseUpdateProductBody = (
 
 const statusForProductError = (error: string): number => {
   if (error.startsWith('VALIDATION_ERROR')) return 422;
-  if (error === 'PRODUCT_NOT_FOUND' || error === 'CATEGORY_NOT_FOUND' || error === 'SUPPLIER_NOT_FOUND') {
+  if (error === 'PRODUCT_NOT_FOUND' || error === 'CATEGORY_NOT_FOUND' || error === 'SUPPLIER_NOT_FOUND' || error === 'PARENT_PRODUCT_NOT_FOUND') {
     return 404;
   }
   if (error === 'CATEGORY_NOT_LEAF' || error === 'CATEGORY_INACTIVE') return 409;

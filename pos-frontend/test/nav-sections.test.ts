@@ -67,3 +67,9 @@ test('admin ferretería bloquea cocina y envíos', () => {
   assert.equal(canAccessPath('admin', '/comandas', fullPlan, 'FERRETERIA'), false);
   assert.equal(canAccessPath('admin', '/delivery', fullPlan, 'FERRETERIA'), false);
 });
+
+test('clientes mayoristas solo con pack MAYORISTA', () => {
+  assert.equal(canAccessPath('admin', '/clientes', fullPlan, 'MAYORISTA'), true);
+  assert.equal(canAccessPath('seller', '/clientes', fullPlan, 'MAYORISTA'), true);
+  assert.equal(canAccessPath('admin', '/clientes', fullPlan, 'GASTRONOMIA'), false);
+});

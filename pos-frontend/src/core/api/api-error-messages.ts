@@ -37,6 +37,8 @@ export type ApiErrorContext =
   | 'mermas.reject'
   | 'inventory.stock'
   | 'sales.create'
+  | 'clientes.list'
+  | 'clientes.save'
   | 'comandas.list'
   | 'comandas.update'
   | 'comprobantes.list'
@@ -91,6 +93,8 @@ const CONTEXT_TITLES: Record<ApiErrorContext, string> = {
   'mermas.reject': 'No se pudo rechazar la merma',
   'inventory.stock': 'No se pudo actualizar el inventario',
   'sales.create': 'No se pudo registrar la venta',
+  'clientes.list': 'No se pudieron cargar los clientes',
+  'clientes.save': 'No se pudo guardar el cliente',
   'comandas.list': 'No se pudieron cargar las comandas',
   'comandas.update': 'No se pudo actualizar la comanda',
   'comprobantes.list': 'No se pudieron cargar los comprobantes',
@@ -163,6 +167,11 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   ERROR_DELETING_PRODUCT: 'No se pudo eliminar el producto.',
   ERROR_FETCHING_SALES: 'No se pudieron cargar las ventas.',
   INSUFFICIENT_STOCK: 'No hay stock suficiente para completar la operación.',
+  CREDIT_OVERDUE: 'Este cliente tiene mora. El crédito está bloqueado.',
+  CREDIT_LIMIT: 'La venta supera el cupo de crédito del cliente.',
+  CREDIT_BLOCKED: 'El crédito de este cliente está bloqueado.',
+  CUSTOMER_REQUIRED: 'Selecciona un cliente para vender a crédito o aplicar precio mayorista.',
+  CUSTOMER_NOT_FOUND: 'El cliente mayorista no existe o no pertenece a esta empresa.',
   PLAN_LIMIT_BRANCHES: 'Límite de sucursales del plan alcanzado. Mejora el plan en plataforma.',
   PLAN_LIMIT_USERS: 'Límite de usuarios del plan alcanzado. Mejora el plan en plataforma.',
   DELETION_CONFIRMATION_MISMATCH:

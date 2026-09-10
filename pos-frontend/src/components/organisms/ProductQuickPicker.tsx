@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Product } from '@/core/interfaces';
+import { productMatchesEquivalenceSearch } from '@/core/pos/unit-equivalence';
 
 export function ProductQuickPicker({
   products,
@@ -26,10 +27,7 @@ export function ProductQuickPicker({
     const q = query.trim().toLowerCase();
     if (!q) return products.slice(0, 12);
     return products
-      .filter((p) => {
-        const hay = `${p.name} ${p.sku ?? ''} ${p.category ?? ''}`.toLowerCase();
-        return hay.includes(q);
-      })
+      .filter((p) => productMatchesEquivalenceSearch(p, query))
       .slice(0, 12);
   }, [products, query]);
 

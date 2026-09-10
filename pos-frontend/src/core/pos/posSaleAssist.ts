@@ -31,13 +31,17 @@ export function roundSaleQty(value: number): number {
   return Math.round(Number(value) * 1000) / 1000;
 }
 
-export function findProductByExactSku<T extends { sku?: string | null }>(
+export function findProductByExactSku<T extends { sku?: string | null; barcode?: string | null }>(
   products: T[],
   scanned: string
 ): T | undefined {
   const code = scanned.trim().toLowerCase();
   if (!code) return undefined;
-  return products.find((p) => String(p.sku ?? '').trim().toLowerCase() === code);
+  return products.find((p) => {
+    const sku = String(p.sku ?? '').trim().toLowerCase();
+    const barcode = String(p.barcode ?? '').trim().toLowerCase();
+    return sku === code || (barcode !== '' && barcode === code);
+  });
 }
 
 export function validateAddToCart(input: {

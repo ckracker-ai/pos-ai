@@ -6,6 +6,7 @@ import {
   EmpresaPlanSummary,
   KitchenOrder,
   Product,
+  TradeCustomer,
   SaasMetodoPago,
   SaasPlan,
   SaasPlanCodigo,
@@ -147,10 +148,30 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
     cost: Number(readProductScalar(raw, 'cost', 'cost') ?? 0),
     stock: resolvedStock,
     sku: String(readProductScalar(raw, 'sku', 'sku') ?? ''),
+    barcode: String(readProductScalar(raw, 'barcode', 'barcode') ?? ''),
     unit: String(readProductScalar(raw, 'unit', 'unit') ?? 'unit'),
     category: categoryName,
     categoryId,
     supplierId,
+    parentProductId: (() => {
+      const parent = readProductScalar(raw, 'parentProductId', 'parent_product_id');
+      return parent != null && String(parent).trim() ? String(parent) : null;
+    })(),
+    variantSize: String(readProductScalar(raw, 'variantSize', 'variant_size') ?? ''),
+    variantColor: String(readProductScalar(raw, 'variantColor', 'variant_color') ?? ''),
+    packQty: Number(readProductScalar(raw, 'packQty', 'pack_qty') ?? 1) || 1,
+    sizeMm: (() => {
+      const mm = readProductScalar(raw, 'sizeMm', 'size_mm');
+      if (mm == null || mm === '') return null;
+      const n = Number(mm);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+    priceTiers: Array.isArray(raw.priceTiers)
+      ? (raw.priceTiers as Array<Record<string, unknown>>).map((t) => ({
+          minQty: Number(t.minQty ?? t.min_qty ?? 0),
+          unitPrice: Number(t.unitPrice ?? t.unit_price ?? 0),
+        }))
+      : [],
     isActive: isActiveRaw !== false && isActiveRaw !== 0 && isActiveRaw !== '0',
     inBranch: Boolean(
       raw.stockRecordId ??
@@ -178,6 +199,19 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
     updatedAt: String(
       readProductScalar(raw, 'updatedAt', 'updated_at') ?? new Date().toISOString()
     ),
+  };
+}
+
+export function normalizeTradeCustomer(raw: Record<string, unknown>): TradeCustomer {
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    rut: raw.rut != null && String(raw.rut).trim() ? String(raw.rut) : null,
+    creditLimit: Number(raw.creditLimit ?? raw.credit_limit ?? 0),
+    creditUsed: Number(raw.creditUsed ?? raw.credit_used ?? 0),
+    isOverdue: raw.isOverdue === true || raw.is_overdue === true || raw.isOverdue === 1 || raw.is_overdue === 1,
+    isActive: raw.isActive !== false && raw.is_active !== false && raw.is_active !== 0,
+    notes: raw.notes != null ? String(raw.notes) : null,
   };
 }
 

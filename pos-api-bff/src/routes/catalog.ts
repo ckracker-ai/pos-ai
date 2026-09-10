@@ -41,6 +41,26 @@ const catalogProductCreateSchema = z.object({
   unit: z.string().optional(),
   initialStock: z.coerce.number().min(0).optional(),
   minStock: z.coerce.number().min(0).optional(),
+  barcode: z.string().max(64).optional().nullable(),
+  parentProductId: z.preprocess(
+    (v) => (v === '' ? null : v),
+    z.string().nullable().optional()
+  ),
+  variantSize: z.string().max(32).optional().nullable(),
+  variantColor: z.string().max(32).optional().nullable(),
+  packQty: z.coerce.number().positive().optional(),
+  sizeMm: z.preprocess(
+    (v) => (v === '' || v === undefined ? undefined : v === null ? null : v),
+    z.union([z.coerce.number().positive(), z.null()]).optional()
+  ),
+  priceTiers: z
+    .array(
+      z.object({
+        minQty: z.coerce.number().positive(),
+        unitPrice: z.coerce.number().positive(),
+      })
+    )
+    .optional(),
 });
 
 const catalogProductUpdateSchema = z.object({
@@ -52,6 +72,26 @@ const catalogProductUpdateSchema = z.object({
   description: z.string().optional().nullable(),
   unit: z.string().optional(),
   isActive: z.boolean().optional(),
+  barcode: z.string().max(64).optional().nullable(),
+  parentProductId: z.preprocess(
+    (v) => (v === '' ? null : v),
+    z.string().nullable().optional()
+  ),
+  variantSize: z.string().max(32).optional().nullable(),
+  variantColor: z.string().max(32).optional().nullable(),
+  packQty: z.coerce.number().positive().optional(),
+  sizeMm: z.preprocess(
+    (v) => (v === '' || v === undefined ? undefined : v === null ? null : v),
+    z.union([z.coerce.number().positive(), z.null()]).optional()
+  ),
+  priceTiers: z
+    .array(
+      z.object({
+        minQty: z.coerce.number().positive(),
+        unitPrice: z.coerce.number().positive(),
+      })
+    )
+    .optional(),
 });
 
 const catalogRoutes = async (app: FastifyInstance) => {

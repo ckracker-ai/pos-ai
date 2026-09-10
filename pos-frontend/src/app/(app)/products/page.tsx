@@ -13,6 +13,9 @@ import {
   unwrapApiEnvelope,
 } from '@/core/api/normalizers';
 import { Category, Product, Supplier } from '@/core/interfaces';
+import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
+import { resolveRubroCapabilities } from '@/core/config/rubro-packs';
+import { productMatchesEquivalenceSearch } from '@/core/pos/unit-equivalence';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
 import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
@@ -56,6 +59,8 @@ import {
 export default function ProductsPage() {
 
   const currentUser = useAuthStore((state) => state.user);
+  const { empresa } = useTenantEmpresa();
+  const rubroCaps = resolveRubroCapabilities(empresa?.rubroNegocio);
   const branchId = useBranchStore((state) => state.selectedBranchId);
   const activeBranchName = useBranchStore((state) => state.activeBranchLabel);
 
@@ -81,6 +86,16 @@ const [products, setProducts] = useState<Product[]>([]);
     stock: '',
     minStock: '0',
     unit: 'unit',
+    barcode: '',
+    parentProductId: '',
+    variantSize: '',
+    variantColor: '',
+    packQty: '1',
+    sizeMm: '',
+    tierMin1: '',
+    tierPrice1: '',
+    tierMin2: '',
+    tierPrice2: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -132,13 +147,8 @@ const [products, setProducts] = useState<Product[]>([]);
 
     if (!searchTerm.trim()) return source;
 
-    const lowerQuery = searchTerm.toLowerCase();
-    return source.filter((product) =>
-      [product.name, product.sku, product.category, product.description]
-        .join(' ')
-        .toLowerCase()
-        .includes(lowerQuery)
-    );
+    const lowerQuery = searchTerm.trim();
+    return source.filter((product) => productMatchesEquivalenceSearch(product, lowerQuery));
   }, [products, searchTerm, onlyAssignedToBranch]);
 
   const paginatedProducts = useMemo(
@@ -304,6 +314,16 @@ const [products, setProducts] = useState<Product[]>([]);
       stock: '0',
       minStock: String(product.minStock ?? 0),
       unit: product.unit ?? 'unit',
+      barcode: product.barcode ?? '',
+      parentProductId: product.parentProductId ?? '',
+      variantSize: product.variantSize ?? '',
+      variantColor: product.variantColor ?? '',
+      packQty: String(product.packQty ?? 1),
+      sizeMm: product.sizeMm != null ? String(product.sizeMm) : '',
+      tierMin1: product.priceTiers?.[0] ? String(product.priceTiers[0].minQty) : '',
+      tierPrice1: product.priceTiers?.[0] ? String(product.priceTiers[0].unitPrice) : '',
+      tierMin2: product.priceTiers?.[1] ? String(product.priceTiers[1].minQty) : '',
+      tierPrice2: product.priceTiers?.[1] ? String(product.priceTiers[1].unitPrice) : '',
     });
     setShowModal(true);
   };
@@ -421,6 +441,24 @@ const [products, setProducts] = useState<Product[]>([]);
         price: priceNum,
         cost: costNum,
         unit: form.unit.trim() || 'unit',
+        barcode: form.barcode.trim() || null,
+        parentProductId: form.parentProductId.trim() || null,
+        variantSize: form.variantSize.trim() || null,
+        variantColor: form.variantColor.trim() || null,
+        packQty: parsePositiveDecimal(form.packQty) ?? 1,
+        sizeMm: parsePositiveDecimal(form.sizeMm),
+        ...(rubroCaps.wholesale
+          ? {
+              priceTiers: [
+                ...(parsePositiveDecimal(form.tierMin1) && parsePositiveDecimal(form.tierPrice1)
+                  ? [{ minQty: parsePositiveDecimal(form.tierMin1)!, unitPrice: parsePositiveDecimal(form.tierPrice1)! }]
+                  : []),
+                ...(parsePositiveDecimal(form.tierMin2) && parsePositiveDecimal(form.tierPrice2)
+                  ? [{ minQty: parsePositiveDecimal(form.tierMin2)!, unitPrice: parsePositiveDecimal(form.tierPrice2)! }]
+                  : []),
+              ],
+            }
+          : {}),
       });
       await saveBranchInventory(editingProduct.id, Number(editingProduct.stock ?? 0));
 
@@ -476,6 +514,24 @@ const [products, setProducts] = useState<Product[]>([]);
       initialStock: stockNum,
       minStock: minStockNum,
       unit: form.unit.trim() || 'unit',
+      barcode: form.barcode.trim() || null,
+      parentProductId: form.parentProductId.trim() || null,
+      variantSize: form.variantSize.trim() || null,
+      variantColor: form.variantColor.trim() || null,
+      packQty: parsePositiveDecimal(form.packQty) ?? 1,
+      sizeMm: parsePositiveDecimal(form.sizeMm),
+      ...(rubroCaps.wholesale
+        ? {
+            priceTiers: [
+              ...(parsePositiveDecimal(form.tierMin1) && parsePositiveDecimal(form.tierPrice1)
+                ? [{ minQty: parsePositiveDecimal(form.tierMin1)!, unitPrice: parsePositiveDecimal(form.tierPrice1)! }]
+                : []),
+              ...(parsePositiveDecimal(form.tierMin2) && parsePositiveDecimal(form.tierPrice2)
+                ? [{ minQty: parsePositiveDecimal(form.tierMin2)!, unitPrice: parsePositiveDecimal(form.tierPrice2)! }]
+                : []),
+            ],
+          }
+        : {}),
     };
 
     setIsSaving(true);
@@ -497,6 +553,16 @@ const [products, setProducts] = useState<Product[]>([]);
         stock: '0',
         minStock: '0',
         unit: 'unit',
+        barcode: '',
+        parentProductId: '',
+        variantSize: '',
+        variantColor: '',
+        packQty: '1',
+        sizeMm: '',
+        tierMin1: '',
+        tierPrice1: '',
+        tierMin2: '',
+        tierPrice2: '',
       });
       setSuccessMessage('Producto creado con stock inicial en la sucursal activa.');
       setModalError(null);
@@ -651,6 +717,16 @@ const [products, setProducts] = useState<Product[]>([]);
                     stock: '0',
                     minStock: '0',
                     unit: 'unit',
+                    barcode: '',
+                    parentProductId: '',
+                    variantSize: '',
+                    variantColor: '',
+                    packQty: '1',
+                    sizeMm: '',
+                    tierMin1: '',
+                    tierPrice1: '',
+                    tierMin2: '',
+                    tierPrice2: '',
                   });
                   setSuccessMessage(null);
                   setModalError(null);
@@ -1009,14 +1085,90 @@ const [products, setProducts] = useState<Product[]>([]);
                   className="app-input mt-2"
                 >
                   <option value="unit">Unidad</option>
+                  <option value="caja">Caja</option>
                   <option value="kg">Kilogramo (kg)</option>
                   <option value="g">Gramo (g)</option>
                   <option value="lt">Litro (lt)</option>
                 </select>
                 <p className="mt-2 text-xs text-[#6b7280]">
-                  kg / g / lt permiten cantidad decimal en caja (granel).
+                  kg / g / lt permiten cantidad decimal en caja (granel). Caja usa unidades por pack.
                 </p>
               </label>
+              {rubroCaps.barcode || rubroCaps.unitEquivalence ? (
+                <label className="block text-sm text-[#3d4532]">
+                  Código de barras
+                  <input
+                    value={form.barcode}
+                    onChange={(event) => handleInputChange('barcode', event.target.value)}
+                    className="app-input mt-2"
+                    placeholder="Opcional si el SKU no es el código"
+                  />
+                </label>
+              ) : null}
+              {rubroCaps.unitEquivalence ? (
+                <>
+                  <label className="block text-sm text-[#3d4532]">
+                    Unidades por caja
+                    <input
+                      value={form.packQty}
+                      onChange={(event) => handleInputChange('packQty', event.target.value)}
+                      className="app-input mt-2"
+                      placeholder="12"
+                    />
+                  </label>
+                  <label className="block text-sm text-[#3d4532]">
+                    Medida (mm)
+                    <input
+                      value={form.sizeMm}
+                      onChange={(event) => handleInputChange('sizeMm', event.target.value)}
+                      className="app-input mt-2"
+                      placeholder="50.8 para 2 pulgadas"
+                    />
+                    <p className="mt-2 text-xs text-[#6b7280]">
+                      En caja se busca por mm o pulgadas (2&quot; = 50.8 mm).
+                    </p>
+                  </label>
+                </>
+              ) : null}
+              {rubroCaps.variants ? (
+                <>
+                  <label className="block text-sm text-[#3d4532]">
+                    Producto padre (estilo)
+                    <select
+                      value={form.parentProductId}
+                      onChange={(event) => handleInputChange('parentProductId', event.target.value)}
+                      className="app-input mt-2"
+                    >
+                      <option value="">Ninguno (este es el estilo)</option>
+                      {products
+                        .filter((p) => !p.parentProductId && p.id !== editingProduct?.id)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} · {p.sku}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm text-[#3d4532]">
+                    Talla
+                    <input
+                      value={form.variantSize}
+                      onChange={(event) => handleInputChange('variantSize', event.target.value)}
+                      className="app-input mt-2"
+                      placeholder="S, M, L…"
+                    />
+                  </label>
+                  <label className="block text-sm text-[#3d4532]">
+                    Color
+                    <input
+                      value={form.variantColor}
+                      onChange={(event) => handleInputChange('variantColor', event.target.value)}
+                      className="app-input mt-2"
+                      placeholder="Negro, azul…"
+                    />
+                  </label>
+                </>
+              ) : null}
               <label className="block text-sm text-[#3d4532]">
                 Subcategoría (hoja)
                 <select
@@ -1088,6 +1240,33 @@ const [products, setProducts] = useState<Product[]>([]);
                 />
               </label>
             </div>
+
+            {rubroCaps.wholesale ? (
+              <div className="mt-6 rounded-2xl border border-brand-linen p-5 md:col-span-2">
+                <p className="text-sm font-semibold text-[#3d4532]">Tramos de precio (mayorista)</p>
+                <p className="mt-1 text-xs text-[#6b7280]">
+                  Si la cantidad llega al mínimo, el POS usa ese precio. Vacío = solo precio de lista.
+                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-4">
+                  <label className="text-sm">
+                    Desde (u.)
+                    <input className="app-input mt-2" value={form.tierMin1} onChange={(e) => handleInputChange('tierMin1', e.target.value)} />
+                  </label>
+                  <label className="text-sm">
+                    Precio
+                    <input className="app-input mt-2" value={form.tierPrice1} onChange={(e) => handleInputChange('tierPrice1', e.target.value)} />
+                  </label>
+                  <label className="text-sm">
+                    Desde (u.)
+                    <input className="app-input mt-2" value={form.tierMin2} onChange={(e) => handleInputChange('tierMin2', e.target.value)} />
+                  </label>
+                  <label className="text-sm">
+                    Precio
+                    <input className="app-input mt-2" value={form.tierPrice2} onChange={(e) => handleInputChange('tierPrice2', e.target.value)} />
+                  </label>
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-6 rounded-2xl border border-[rgba(74,83,60,0.25)] bg-[rgba(74,83,60,0.06)] p-5 md:col-span-2">
               <p className="app-eyebrow text-xs tracking-[0.28em]">Inventario por sucursal</p>

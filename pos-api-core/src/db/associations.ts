@@ -15,6 +15,8 @@ import EmpresaSuscripcion from '../modules/saas/models/EmpresaSuscripcion.model'
 import Region from '../modules/territory/models/Region.model';
 import Comuna from '../modules/territory/models/Comuna.model';
 import SaleDeliveryEvent from '../modules/delivery/models/SaleDeliveryEvent.model';
+import TradeCustomer from '../modules/wholesale/models/TradeCustomer.model';
+import ProductPriceTier from '../modules/wholesale/models/ProductPriceTier.model';
 import LegalDocument from '../modules/legal/models/LegalDocument.model';
 import LegalAcceptance from '../modules/legal/models/LegalAcceptance.model';
 import VirtualMenu from '../modules/wsp/models/VirtualMenu.model';
@@ -68,9 +70,18 @@ export function defineAssociations(): void {
 
   Supplier.hasMany(Product, { foreignKey: 'supplierId', as: 'products' });
   Product.belongsTo(Supplier, { foreignKey: 'supplierId', as: 'supplier' });
+  Product.hasMany(Product, { foreignKey: 'parentProductId', as: 'variants' });
+  Product.belongsTo(Product, { foreignKey: 'parentProductId', as: 'parentProduct' });
 
   Product.hasMany(InventoryStock, { foreignKey: 'productId', as: 'stockEntries' });
   InventoryStock.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+  Product.hasMany(ProductPriceTier, { foreignKey: 'productId', as: 'priceTiers' });
+  ProductPriceTier.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+  Empresa.hasMany(ProductPriceTier, { foreignKey: 'empresaId', as: 'priceTiers' });
+  Empresa.hasMany(TradeCustomer, { foreignKey: 'empresaId', as: 'tradeCustomers' });
+  TradeCustomer.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+  TradeCustomer.hasMany(Sale, { foreignKey: 'tradeCustomerId', as: 'sales' });
+  Sale.belongsTo(TradeCustomer, { foreignKey: 'tradeCustomerId', as: 'tradeCustomer' });
 
   Branch.hasMany(InventoryStock, { foreignKey: 'branchId', as: 'stockEntries' });
   InventoryStock.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });

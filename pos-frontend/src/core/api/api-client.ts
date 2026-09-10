@@ -232,6 +232,12 @@ export const api = {
     getApiClient().post(`/pos/proxy/catalog/categories/${id}/restore`, {}, config),
   getSuppliers: (config?: AxiosRequestConfig) =>
     getApiClient().get('/pos/proxy/catalog/suppliers', config),
+  getTradeCustomers: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/wholesale/customers', config),
+  createTradeCustomer: (data: unknown, config?: AxiosRequestConfig) =>
+    getApiClient().post('/pos/proxy/wholesale/customers', data, config),
+  updateTradeCustomer: (id: string, data: unknown, config?: AxiosRequestConfig) =>
+    getApiClient().put(`/pos/proxy/wholesale/customers/${id}`, data, config),
   createSupplier: (data: unknown, config?: AxiosRequestConfig) =>
     getApiClient().post('/pos/proxy/catalog/suppliers', data, config),
   updateSupplier: (id: string, data: unknown, config?: AxiosRequestConfig) =>

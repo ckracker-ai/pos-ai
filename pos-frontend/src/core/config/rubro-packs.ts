@@ -168,6 +168,7 @@ export function isRubroPackSelected(raw?: string | null): boolean {
 const MODULE_RUBRO_CAP: Partial<Record<string, keyof RubroCapabilities>> = {
   comandas: 'kitchen',
   delivery: 'delivery',
+  clientes: 'wholesale',
 };
 
 export function isRubroModuleEnabled(moduleKey: string, rubroNegocio?: string | null): boolean {

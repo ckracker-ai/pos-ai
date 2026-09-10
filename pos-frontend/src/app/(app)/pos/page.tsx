@@ -6,9 +6,11 @@ import { useBranchStore } from '@/store/branch';
 import { api, ApiError, getApiErrorMessage } from '@/core/api/api-client';
 import {
   extractEntity,
+  extractList,
   fetchProductsForBranch,
   normalizeCategoryTreeNode,
   normalizeEmpresa,
+  normalizeTradeCustomer,
   unwrapApiEnvelope,
 } from '@/core/api/normalizers';
 import {
@@ -45,6 +47,10 @@ import {
 import { applyDecimalInput, applyDigitsOnlyInput, parsePositiveDecimal, parsePositiveInt } from '@/core/utils/numeric-input';
 import { isWeightUnit, resolveRubroCapabilities } from '@/core/config/rubro-packs';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
+import { packUnitsForSaleQty } from '@/core/pos/unit-equivalence';
+import { buildVariantMatrix, canSellVariantCell } from '@/core/pos/product-variants';
+import { creditAllowsSale, creditBlockMessage, priceForQty } from '@/core/pos/wholesale';
+import type { TradeCustomer } from '@/core/interfaces';
 import {
   CHILE_IVA_LABEL,
   calculateIvaFromNet,
@@ -71,7 +77,7 @@ interface ReceiptData {
   total: number;
   createdAtIso: string;
   saleReference: string;
-  paymentType: 'cash' | 'pos';
+  paymentType: 'cash' | 'pos' | 'credit';
   requiresDelivery: boolean;
   deliveryCustomerName?: string;
   deliveryPhone?: string;
@@ -79,6 +85,7 @@ interface ReceiptData {
   branchName: string;
   sellerName: string;
   empresaName?: string;
+  isQuote?: boolean;
 }
 
 const LAST_TICKET_KEY = 'pos-ai.last-ticket';
@@ -93,6 +100,12 @@ function formatTicketDate(iso: string) {
   return d.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function paymentTypeLabel(type: 'cash' | 'pos' | 'credit') {
+  if (type === 'cash') return 'Efectivo';
+  if (type === 'credit') return 'Crédito';
+  return 'POS de pago';
+}
+
 export default function PosPage() {
   const { user } = useAuthStore();
   const { empresa } = useTenantEmpresa();
@@ -104,7 +117,9 @@ export default function PosPage() {
   const [quantityInput, setQuantityInput] = useState('1');
   const [cart, setCart] = useState<PosLineItem[]>([]);
   const [notes, setNotes] = useState('');
-  const [paymentType, setPaymentType] = useState<'cash' | 'pos'>('cash');
+  const [paymentType, setPaymentType] = useState<'cash' | 'pos' | 'credit'>('cash');
+  const [tradeCustomers, setTradeCustomers] = useState<TradeCustomer[]>([]);
+  const [tradeCustomerId, setTradeCustomerId] = useState('');
   const [requiresDelivery, setRequiresDelivery] = useState(false);
   const [deliveryCustomerName, setDeliveryCustomerName] = useState('');
   const [deliveryPhone, setDeliveryPhone] = useState('');
@@ -128,6 +143,7 @@ export default function PosPage() {
   const [empresaDisplayName, setEmpresaDisplayName] = useState('Mi negocio');
   const [isInformalTicket, setIsInformalTicket] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [sellAsPack, setSellAsPack] = useState(false);
   const posAiPanelRef = useRef<PosAiCommandPanelHandle>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -214,9 +230,15 @@ export default function PosPage() {
 
 
   const selectedProduct = products.find((product) => product.id === selectedProductId);
+  const variantMatrix = useMemo(() => {
+    if (!rubroCaps.variants || !selectedProduct) return null;
+    return buildVariantMatrix(products, selectedProduct);
+  }, [products, rubroCaps.variants, selectedProduct]);
+
   const availableProducts = useMemo(() => {
     return products.filter((p) => {
-      if (Number(p.stock ?? 0) <= 0) return false;
+      const isParentStyle = products.some((child) => child.parentProductId === p.id);
+      if (Number(p.stock ?? 0) <= 0 && !isParentStyle) return false;
       return productMatchesPrincipalCategory(p.categoryId, categoryFilter, leafToPrincipal);
     });
   }, [products, categoryFilter, leafToPrincipal]);
@@ -228,10 +250,32 @@ export default function PosPage() {
   }, [availableProducts, selectedProductId]);
 
   useEffect(() => {
+    if (!rubroCaps.wholesale) return;
+    const loadCustomers = async () => {
+      try {
+        const res = await api.getTradeCustomers();
+        const list = extractList<Record<string, unknown>>(unwrapApiEnvelope(res.data), ['customers']);
+        setTradeCustomers(list.map(normalizeTradeCustomer).filter((c) => c.isActive));
+      } catch {
+        setTradeCustomers([]);
+      }
+    };
+    void loadCustomers();
+  }, [rubroCaps.wholesale]);
+
+  const selectedTradeCustomer = tradeCustomers.find((c) => c.id === tradeCustomerId) ?? null;
+
+  useEffect(() => {
     if (!rubroCaps.delivery && requiresDelivery) {
       setRequiresDelivery(false);
     }
   }, [requiresDelivery, rubroCaps.delivery]);
+
+  useEffect(() => {
+    if (selectedTradeCustomer?.isOverdue && paymentType === 'credit') {
+      setPaymentType('cash');
+    }
+  }, [selectedTradeCustomer, paymentType]);
 
 
   const subtotal = useMemo(
@@ -268,13 +312,18 @@ export default function PosPage() {
 
     setCart((current) => {
       const existing = current.find((item) => item.id === product.id);
+      const nextQty = existing ? roundSaleQty(existing.quantity + qty) : roundSaleQty(qty);
+      const unitPrice = rubroCaps.wholesale
+        ? priceForQty(product.price, nextQty, product.priceTiers)
+        : product.price;
       if (existing) {
         return current.map((item) =>
           item.id === product.id
             ? {
                 ...item,
-          quantity: roundSaleQty(item.quantity + qty),
-          total: roundSaleQty(item.quantity + qty) * item.unitPrice,
+                quantity: nextQty,
+                unitPrice,
+                total: nextQty * unitPrice,
               }
             : item
         );
@@ -293,8 +342,8 @@ export default function PosPage() {
           id: product.id,
           name: lineName,
           quantity: roundSaleQty(qty),
-          unitPrice: product.price,
-          total: product.price * roundSaleQty(qty),
+          unitPrice,
+          total: unitPrice * roundSaleQty(qty),
           unit: product.unit,
         },
       ];
@@ -315,15 +364,31 @@ export default function PosPage() {
 
   const handleAddProduct = () => {
     if (!selectedProduct) return;
+    if (
+      rubroCaps.variants &&
+      variantMatrix &&
+      selectedProduct.id === variantMatrix.parentId &&
+      !selectedProduct.variantSize &&
+      !selectedProduct.variantColor
+    ) {
+      showPosFeedback('error', 'Elige talla y color en la matriz. No se vende la celda en 0.');
+      return;
+    }
     const allowDecimal = isWeightUnit(selectedProduct.unit);
-    const qty = allowDecimal
+    const typedQty = allowDecimal
       ? parsePositiveDecimal(quantityInput)
       : parsePositiveInt(quantityInput) ?? 1;
-    if (!qty) {
+    if (!typedQty) {
       showPosFeedback('error', 'Ingresa una cantidad válida.');
       return;
     }
-    addProductToCart(selectedProduct, roundSaleQty(qty));
+    const packQty = Number(selectedProduct.packQty ?? 1) || 1;
+    const qty = roundSaleQty(
+      rubroCaps.unitEquivalence
+        ? packUnitsForSaleQty(typedQty, packQty, sellAsPack && packQty > 1)
+        : typedQty
+    );
+    addProductToCart(selectedProduct, qty);
   };
 
   const handleBarcodeCommit = () => {
@@ -482,11 +547,14 @@ export default function PosPage() {
       return;
     }
     setCart((current) =>
-      current.map((item) =>
-        item.id === itemId
-          ? { ...item, quantity: nextQty, total: nextQty * item.unitPrice }
-          : item
-      )
+      current.map((item) => {
+        if (item.id !== itemId) return item;
+        const unitPrice =
+          product && rubroCaps.wholesale
+            ? priceForQty(product.price, nextQty, product.priceTiers)
+            : item.unitPrice;
+        return { ...item, quantity: nextQty, unitPrice, total: nextQty * unitPrice };
+      })
     );
   };
 
@@ -511,10 +579,23 @@ export default function PosPage() {
       return;
     }
 
+    if (rubroCaps.wholesale && !tradeCustomerId) {
+      showPosFeedback('error', 'Selecciona el cliente mayorista antes de cobrar.');
+      return;
+    }
+    const onCredit = paymentType === 'credit';
+    if (onCredit) {
+      const credit = creditAllowsSale(selectedTradeCustomer, saleTotal, true);
+      if (!credit.ok) {
+        showPosFeedback('error', creditBlockMessage(credit.reason));
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     dismissPosMessage();
 
-    const paymentLabel = paymentType === 'cash' ? 'Efectivo' : 'POS de pago';
+    const paymentLabel = paymentTypeLabel(paymentType);
     const paymentNote = `Venta #${saleNumberInput.trim()} (${paymentLabel})`;
     const finalNotes = [notes.trim() || null, paymentNote].filter(Boolean).join(' • ');
 
@@ -528,6 +609,8 @@ export default function PosPage() {
       deliveryAddress: requiresDelivery ? deliveryAddress.trim() : undefined,
       deliveryAmount: requiresDelivery ? deliveryAmount : 0,
       notes: finalNotes || undefined,
+      tradeCustomerId: tradeCustomerId || undefined,
+      onCredit,
       details: saleCart.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
@@ -579,6 +662,36 @@ export default function PosPage() {
     }
   };
 
+  const handleSaveQuote = () => {
+    if (cart.length === 0) {
+      showPosFeedback('error', 'Agrega productos para cotizar.');
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    const ticket: ReceiptData = {
+      items: cart.map((item) => ({ ...item })),
+      subtotal,
+      deliveryAmount,
+      tax,
+      total,
+      createdAtIso: nowIso,
+      saleReference: `COT-${Date.now().toString().slice(-6)}`,
+      paymentType,
+      requiresDelivery,
+      deliveryCustomerName: requiresDelivery ? deliveryCustomerName.trim() : undefined,
+      deliveryPhone: requiresDelivery ? deliveryPhone.trim() : undefined,
+      deliveryAddress: requiresDelivery ? deliveryAddress.trim() : undefined,
+      branchName: activeBranchName,
+      sellerName: user?.name || 'Usuario',
+      empresaName: empresaDisplayName,
+      isQuote: true,
+    };
+    setReceiptData(ticket);
+    setCart([]);
+    setShowReceipt(true);
+    showPosFeedback('success', 'Cotización lista. No descuenta stock ni crea venta.');
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -623,6 +736,39 @@ export default function PosPage() {
               </div>
             }
           />
+
+          {rubroCaps.wholesale ? (
+            <section className="app-card mb-6 rounded-3xl p-4 sm:p-6">
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-brand-ink">Cliente mayorista</span>
+                <p className="text-xs text-brand-ink-muted">
+                  Obligatorio para cobrar. El precio por tramo se aplica en el carrito; el crédito se valida al
+                  confirmar.
+                </p>
+                <select
+                  value={tradeCustomerId}
+                  onChange={(e) => setTradeCustomerId(e.target.value)}
+                  className="app-select"
+                >
+                  <option value="">Selecciona cliente</option>
+                  {tradeCustomers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.rut ? ` · ${c.rut}` : ''}
+                      {c.isOverdue ? ' · mora' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {selectedTradeCustomer ? (
+                <p className="mt-3 text-xs text-brand-ink-muted">
+                  Cupo ${Math.round(selectedTradeCustomer.creditLimit).toLocaleString('es-CL')} · usado $
+                  {Math.round(selectedTradeCustomer.creditUsed).toLocaleString('es-CL')}
+                  {selectedTradeCustomer.isOverdue ? ' · crédito bloqueado por mora' : ''}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
 
           {rubroCaps.barcode ? (
             <section className="app-card mb-6 rounded-3xl p-4 sm:p-6">
@@ -751,6 +897,66 @@ export default function PosPage() {
                     />
                   </label>
                 </div>
+                {rubroCaps.unitEquivalence && Number(selectedProduct?.packQty ?? 1) > 1 ? (
+                  <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-brand-ink">
+                    <input
+                      type="checkbox"
+                      checked={sellAsPack}
+                      onChange={(e) => setSellAsPack(e.target.checked)}
+                      className="h-4 w-4 rounded border-brand-linen accent-brand-olive"
+                    />
+                    Cantidad en cajas ({selectedProduct?.packQty} u. c/u)
+                  </label>
+                ) : null}
+                {rubroCaps.variants && variantMatrix ? (
+                  <div className="mt-4 overflow-x-auto">
+                    <p className="mb-2 text-xs text-brand-ink-muted">
+                      Matriz talla × color. Celdas en 0 no se cobran.
+                    </p>
+                    <table className="min-w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          <th className="px-2 py-1 text-left text-xs text-brand-ink-muted"> </th>
+                          {variantMatrix.sizes.map((size) => (
+                            <th key={size} className="px-2 py-1 text-xs font-semibold text-brand-ink">
+                              {size}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {variantMatrix.colors.map((color) => (
+                          <tr key={color}>
+                            <th className="px-2 py-1 text-left text-xs font-semibold text-brand-ink">
+                              {color}
+                            </th>
+                            {variantMatrix.sizes.map((size) => {
+                              const cell = variantMatrix.cell(size, color);
+                              const ok = canSellVariantCell(cell?.stock);
+                              const selected = cell?.id === selectedProductId;
+                              return (
+                                <td key={`${size}-${color}`} className="px-1 py-1">
+                                  <button
+                                    type="button"
+                                    disabled={!ok || !cell}
+                                    onClick={() => cell && setSelectedProductId(cell.id)}
+                                    className={`w-full rounded-xl px-2 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                                      selected
+                                        ? 'bg-brand-olive text-white'
+                                        : 'border border-brand-linen bg-white text-brand-ink'
+                                    }`}
+                                  >
+                                    {ok ? cell?.stock : '0'}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
                 {availableProducts.length === 0 && (
                   <p className="mt-3 text-xs text-brand-olive">
                     No hay productos con stock para esta sucursal. Cambia la sucursal activa o carga inventario.
@@ -854,11 +1060,12 @@ export default function PosPage() {
                         Forma de pago
                         <select
                           value={paymentType}
-                          onChange={(e) => setPaymentType(e.target.value as 'cash' | 'pos')}
+                          onChange={(e) => setPaymentType(e.target.value as 'cash' | 'pos' | 'credit')}
                           className="app-select mt-2"
                         >
                           <option value="cash">Efectivo</option>
                           <option value="pos">POS de pago</option>
+                          {rubroCaps.credit ? <option value="credit">Crédito</option> : null}
                         </select>
                       </label>
 
@@ -868,7 +1075,13 @@ export default function PosPage() {
                           value={saleNumberInput}
                           onChange={(e) => setSaleNumberInput(e.target.value)}
                           className="app-input mt-2"
-                          placeholder={paymentType === 'cash' ? 'Ej: EF-000123' : 'Ej: POS-000123'}
+                          placeholder={
+                            paymentType === 'cash'
+                              ? 'Ej: EF-000123'
+                              : paymentType === 'credit'
+                                ? 'Ej: CR-000123'
+                                : 'Ej: POS-000123'
+                          }
                         />
                       </label>
                     </div>
@@ -954,6 +1167,16 @@ export default function PosPage() {
                   >
                     {isSubmitting ? 'Procesando venta...' : 'Confirmar Venta'}
                   </button>
+                  {rubroCaps.unitEquivalence ? (
+                    <button
+                      type="button"
+                      onClick={handleSaveQuote}
+                      disabled={isSubmitting || cart.length === 0}
+                      className="app-btn-secondary mt-3 w-full rounded-3xl px-6 py-3 text-sm font-semibold disabled:opacity-60"
+                    >
+                      Guardar cotización (sin stock)
+                    </button>
+                  ) : null}
                 </div>
               </section>
             </div>
@@ -998,7 +1221,7 @@ export default function PosPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="app-eyebrow text-sm tracking-[0.28em] text-[#4a533c]">
-                      Venta registrada exitosamente
+                      {receiptData.isQuote ? 'Cotización (no es venta)' : 'Venta registrada exitosamente'}
                     </p>
                     <h3 className="mt-3 text-2xl font-bold text-[#3d4532]">
                       {empresaDisplayName}
@@ -1038,7 +1261,7 @@ export default function PosPage() {
                     </div>
                     <div>
                       <p className="font-semibold text-[#3d4532]">Pago</p>
-                      <p>{receiptData.paymentType === 'cash' ? 'Efectivo' : 'POS de pago'}</p>
+                      <p>{paymentTypeLabel(receiptData.paymentType)}</p>
                     </div>
                     {receiptData.requiresDelivery && (
                       <>
@@ -1116,12 +1339,15 @@ export default function PosPage() {
               {isInformalTicket ? (
                 <p className="pos-ticket-center">Documento interno — no es boleta SII</p>
               ) : null}
+              {receiptData?.isQuote ? (
+                <p className="pos-ticket-center pos-ticket-strong">COTIZACIÓN — no descuenta stock</p>
+              ) : null}
               <p className="pos-ticket-rule">--------------------------------</p>
               <p>Sucursal: {receiptData?.branchName}</p>
               <p>Vendedor: {receiptData?.sellerName}</p>
               <p>Fecha: {receiptData ? formatTicketDate(receiptData.createdAtIso) : ''}</p>
               <p>Folio: #{receiptData?.saleReference}</p>
-              <p>Pago: {receiptData?.paymentType === 'cash' ? 'Efectivo' : 'POS de pago'}</p>
+              <p>Pago: {receiptData ? paymentTypeLabel(receiptData.paymentType) : ''}</p>
               {receiptData?.requiresDelivery ? (
                 <>
                   <p>Delivery: {receiptData.deliveryCustomerName}</p>

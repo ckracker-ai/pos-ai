@@ -16,6 +16,9 @@ import Product from '../../catalog/models/Product.model';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import deliveryTrackingDelegate from '../../delivery/delegates/DeliveryTrackingDelegate';
 import { parseDeliveryStatus } from '../../delivery/deliveryTransitions';
+import TradeCustomer from '../../wholesale/models/TradeCustomer.model';
+import ProductPriceTier from '../../wholesale/models/ProductPriceTier.model';
+import { creditAllowsSale, priceForQty } from '../../wholesale/priceTiers';
 
 const router = Router();
 
@@ -42,6 +45,21 @@ function mapSaleCreationError(error: unknown): { message: string; status: number
   const combined = `${sqlMsg} ${msg} ${validationDetail}`.toLowerCase();
   const fallbackDetail = (validationDetail || sqlMsg || msg).trim();
 
+  if (msg.startsWith('CREDIT_BLOCKED') || msg.startsWith('CREDIT_OVERDUE') || msg.startsWith('CREDIT_LIMIT')) {
+    return {
+      message:
+        msg.includes('OVERDUE')
+          ? 'Este cliente tiene mora. El crédito está bloqueado.'
+          : 'La venta supera el cupo de crédito del cliente.',
+      status: 409,
+    };
+  }
+  if (msg.startsWith('CUSTOMER_REQUIRED')) {
+    return { message: 'Selecciona un cliente para vender a crédito.', status: 422 };
+  }
+  if (msg.startsWith('CUSTOMER_NOT_FOUND')) {
+    return { message: 'El cliente mayorista no existe o no pertenece a esta empresa.', status: 404 };
+  }
   if (msg.startsWith('INSUFFICIENT_STOCK')) {
     return {
       message:
@@ -254,6 +272,8 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
       deliveryAddress?: string;
       deliveryAmount?: number;
       notes?: string;
+      tradeCustomerId?: string;
+      onCredit?: boolean;
       details?: Array<{
         productId: string;
         quantity: number;
@@ -263,6 +283,36 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
     };
 
     const details = Array.isArray(body.details) ? body.details : [];
+    const onCredit = Boolean(body.onCredit);
+    const tradeCustomerId = String(body.tradeCustomerId ?? '').trim() || null;
+
+    let tradeCustomer: TradeCustomer | null = null;
+    if (tradeCustomerId) {
+      tradeCustomer = await TradeCustomer.findOne({
+        where: { id: tradeCustomerId, empresaId: getEffectiveEmpresaId(req), isActive: true },
+        transaction,
+      });
+      if (!tradeCustomer) {
+        throw new Error('CUSTOMER_NOT_FOUND');
+      }
+    }
+    if (onCredit && !tradeCustomer) {
+      throw new Error('CUSTOMER_REQUIRED');
+    }
+    if (onCredit && tradeCustomer) {
+      const credit = creditAllowsSale(
+        {
+          creditLimit: Number(tradeCustomer.creditLimit ?? 0),
+          creditUsed: Number(tradeCustomer.creditUsed ?? 0),
+          isOverdue: tradeCustomer.isOverdue === true,
+        },
+        Number(body.total ?? 0),
+        true
+      );
+      if (!credit.ok) {
+        throw new Error(credit.reason === 'overdue' ? 'CREDIT_OVERDUE' : 'CREDIT_LIMIT');
+      }
+    }
     const requiresDelivery = Boolean(body.requiresDelivery);
     const deliveryCustomerName = String(body.deliveryCustomerName ?? '').trim();
     const deliveryPhone = String(body.deliveryPhone ?? '').trim();
@@ -286,6 +336,18 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
     const branchId = req.user!.branchId;
     const sellerId = req.user!.userId;
     const empresaId = getEffectiveEmpresaId(req);
+    const productIds = details.map((d) => String(d.productId ?? '').trim()).filter(Boolean);
+    const tierRows =
+      productIds.length > 0
+        ? await ProductPriceTier.findAll({ where: { empresaId, productId: productIds }, transaction })
+        : [];
+    const tiersByProduct = new Map<string, Array<{ minQty: number; unitPrice: number }>>();
+    for (const row of tierRows) {
+      const pid = String(row.productId);
+      const list = tiersByProduct.get(pid) ?? [];
+      list.push({ minQty: Number(row.minQty), unitPrice: Number(row.unitPrice) });
+      tiersByProduct.set(pid, list);
+    }
 
     await Sale.create(
       {
@@ -299,6 +361,8 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
         deliveryAddress: requiresDelivery ? deliveryAddress : null,
         deliveryAmount: requiresDelivery ? deliveryAmount : 0,
         notes: body.notes ?? null,
+        tradeCustomerId,
+        onCredit,
         empresaId,
         branchId,
         sellerId,
@@ -329,7 +393,12 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
       if (!Number.isFinite(quantity) || quantity <= 0) {
         throw new Error('VALIDATION_ERROR: quantity must be greater than zero');
       }
-      const unitPrice = Number(line.unitPrice ?? 0);
+      const unitPrice = priceForQty(
+        Number(product.getDataValue('price') ?? 0),
+        quantity,
+        tiersByProduct.get(productId) ?? []
+      );
+      const subtotal = Number((quantity * unitPrice).toFixed(2));
 
       await SaleDetail.create(
         {
@@ -338,12 +407,17 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
           productId,
           quantity,
           unitPrice,
-          subtotal: Number(line.subtotal ?? quantity * unitPrice),
+          subtotal,
         },
         { transaction }
       );
 
       await deductBranchStock(productId, branchId, quantity, transaction);
+    }
+
+    if (onCredit && tradeCustomer) {
+      tradeCustomer.creditUsed = Number(tradeCustomer.creditUsed ?? 0) + Number(body.total ?? 0);
+      await tradeCustomer.save({ transaction });
     }
 
     if (requiresDelivery) {

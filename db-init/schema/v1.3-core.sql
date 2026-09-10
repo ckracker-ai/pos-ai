@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS `platform_users`;
 DROP TABLE IF EXISTS `audit_logs`;
 DROP TABLE IF EXISTS `sale_details`;
 DROP TABLE IF EXISTS `sales`;
+DROP TABLE IF EXISTS `product_price_tiers`;
+DROP TABLE IF EXISTS `trade_customers`;
 DROP TABLE IF EXISTS `shrinkages`;
 DROP TABLE IF EXISTS `inventory_stock`;
 DROP TABLE IF EXISTS `users`;
@@ -174,22 +176,60 @@ CREATE TABLE `products` (
   `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `category_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `supplier_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `parent_product_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sku` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `barcode` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
   `price` decimal(10,2) NOT NULL DEFAULT '0.00',
   `unit` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unit',
+  `variant_size` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `variant_color` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pack_qty` decimal(12,3) NOT NULL DEFAULT '1.000',
+  `size_mm` decimal(12,3) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_products_empresa_sku` (`empresa_id`,`sku`),
   KEY `idx_products_empresa_active` (`empresa_id`,`is_active`),
+  KEY `idx_products_parent` (`empresa_id`,`parent_product_id`),
   KEY `idx_products_category` (`category_id`),
   KEY `idx_products_supplier` (`supplier_id`),
   CONSTRAINT `fk_products_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_products_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `product_price_tiers` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `min_qty` decimal(12,3) NOT NULL,
+  `unit_price` decimal(10,2) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_price_tiers_product` (`empresa_id`,`product_id`,`min_qty`),
+  CONSTRAINT `fk_price_tiers_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_price_tiers_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `trade_customers` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `rut` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `credit_limit` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `credit_used` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `is_overdue` tinyint(1) NOT NULL DEFAULT '0',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `notes` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_trade_customers_empresa` (`empresa_id`,`is_active`),
+  CONSTRAINT `fk_trade_customers_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `users` (
@@ -236,6 +276,8 @@ CREATE TABLE `sales` (
   `empresa_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `branch_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `seller_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trade_customer_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `on_credit` tinyint(1) NOT NULL DEFAULT '0',
   `total` decimal(10,2) NOT NULL DEFAULT '0.00',
   `discount` decimal(10,2) NOT NULL DEFAULT '0.00',
   `status` enum('PENDING','COMPLETED','CANCELLED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'COMPLETED',
@@ -250,9 +292,11 @@ CREATE TABLE `sales` (
   PRIMARY KEY (`id`),
   KEY `idx_sales_empresa_branch_created` (`empresa_id`,`branch_id`,`created_at`),
   KEY `idx_sales_seller` (`seller_id`),
+  KEY `idx_sales_trade_customer` (`trade_customer_id`),
   CONSTRAINT `fk_sales_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_sales_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_sales_seller` FOREIGN KEY (`seller_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_sales_seller` FOREIGN KEY (`seller_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_sales_trade_customer` FOREIGN KEY (`trade_customer_id`) REFERENCES `trade_customers` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `sale_details` (

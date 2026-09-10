@@ -36,10 +36,17 @@ export interface Product {
   cost: number;
   stock: number;
   sku: string;
+  barcode?: string;
   unit?: string;
   category: string;
   categoryId?: string;
   supplierId?: string;
+  parentProductId?: string | null;
+  variantSize?: string;
+  variantColor?: string;
+  packQty?: number;
+  sizeMm?: number | null;
+  priceTiers?: Array<{ minQty: number; unitPrice: number }>;
   image?: string;
   isActive: boolean;
   /** Producto con fila en inventory_stock para la sucursal activa. */
@@ -48,6 +55,17 @@ export interface Product {
   minStock?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TradeCustomer {
+  id: string;
+  name: string;
+  rut?: string | null;
+  creditLimit: number;
+  creditUsed: number;
+  isOverdue: boolean;
+  isActive: boolean;
+  notes?: string | null;
 }
 
 export interface CartItem {

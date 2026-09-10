@@ -24,6 +24,8 @@ const saleCreateSchema = z.object({
   deliveryAddress: z.string().optional(),
   deliveryAmount: z.coerce.number().nonnegative().optional(),
   notes: z.string().optional(),
+  tradeCustomerId: z.string().optional().nullable(),
+  onCredit: z.boolean().optional(),
   details: z.array(saleDetailSchema).min(1),
 });
 

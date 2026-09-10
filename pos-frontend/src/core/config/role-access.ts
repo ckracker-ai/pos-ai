@@ -309,6 +309,17 @@ export const APP_MODULES: readonly AppModule[] = [
     navSection: 'configure',
     navCluster: 'business',
   },
+  {
+    key: 'clientes',
+    title: 'Clientes',
+    description: 'Clientes mayoristas, cupo y mora',
+    icon: 'users',
+    path: '/clientes',
+    allowed: ['admin', 'auditor', 'seller'],
+    showInNav: true,
+    navSection: 'configure',
+    navCluster: 'business',
+  },
 ] as const;
 
 const NAV_SECTION_ORDER: readonly NavSectionId[] = ['operate', 'control', 'configure'];

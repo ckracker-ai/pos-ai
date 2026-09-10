@@ -26,6 +26,13 @@ export class ApiCoreServiceProduct extends ApiCoreBaseService {
       unit?: string;
       initialStock?: number;
       minStock?: number;
+      barcode?: string | null;
+      parentProductId?: string | null;
+      variantSize?: string | null;
+      variantColor?: string | null;
+      packQty?: number;
+      sizeMm?: number | null;
+      priceTiers?: Array<{ minQty: number; unitPrice: number }>;
     },
     token: string,
     internalKey: string,
@@ -55,6 +62,13 @@ export class ApiCoreServiceProduct extends ApiCoreBaseService {
       description?: string | null;
       unit?: string;
       isActive?: boolean;
+      barcode?: string | null;
+      parentProductId?: string | null;
+      variantSize?: string | null;
+      variantColor?: string | null;
+      packQty?: number;
+      sizeMm?: number | null;
+      priceTiers?: Array<{ minQty: number; unitPrice: number }>;
     },
     token: string,
     internalKey: string,

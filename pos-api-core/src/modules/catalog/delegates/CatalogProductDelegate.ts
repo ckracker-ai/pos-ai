@@ -1,11 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import { QueryTypes } from 'sequelize';
+import { QueryTypes, Transaction } from 'sequelize';
 import sequelize from '../../../config/database';
 import Product from '../models/Product.model';
 import Category from '../models/Category.model';
 import Supplier from '../models/Supplier.model';
 import categoryDelegate from './CategoryDelegate';
 import InventoryStock from '../../inventory/models/InventoryStock.model';
+import ProductPriceTier from '../../wholesale/models/ProductPriceTier.model';
+import { normalizePriceTiers } from '../../wholesale/priceTiers';
 import Branch from '../../branch/models/Branch.model';
 import { Result, ok, fail } from '../../../types/result';
 
@@ -24,6 +26,12 @@ export interface ProductWithBranchStock {
   price: number;
   unit: string;
   isActive: boolean;
+  barcode?: string | null;
+  parentProductId?: string | null;
+  variantSize?: string | null;
+  variantColor?: string | null;
+  packQty: number;
+  sizeMm?: number | null;
   categoryId: string;
   supplierId: string;
   createdAt: Date;
@@ -34,6 +42,7 @@ export interface ProductWithBranchStock {
   minStock: number;
   inBranch: boolean;
   stockRecordId: string | null;
+  priceTiers?: Array<{ minQty: number; unitPrice: number }>;
 }
 
 export interface CreateProductInput {
@@ -47,6 +56,13 @@ export interface CreateProductInput {
   isActive?: boolean;
   initialStock?: number;
   minStock?: number;
+  barcode?: string | null;
+  parentProductId?: string | null;
+  variantSize?: string | null;
+  variantColor?: string | null;
+  packQty?: number;
+  sizeMm?: number | null;
+  priceTiers?: Array<{ minQty: number; unitPrice: number }>;
 }
 
 export interface UpdateProductInput {
@@ -58,6 +74,13 @@ export interface UpdateProductInput {
   description?: string | null;
   unit?: string;
   isActive?: boolean;
+  barcode?: string | null;
+  parentProductId?: string | null;
+  variantSize?: string | null;
+  variantColor?: string | null;
+  packQty?: number;
+  sizeMm?: number | null;
+  priceTiers?: Array<{ minQty: number; unitPrice: number }>;
 }
 
 type BranchStockRow = {
@@ -68,6 +91,69 @@ type BranchStockRow = {
 };
 
 class CatalogProductDelegate {
+  private async assertParentProduct(
+    empresaId: string,
+    parentProductId: string | null | undefined,
+    childId?: string
+  ): Promise<Result<true>> {
+    if (!parentProductId) return ok(true);
+    if (childId && parentProductId === childId) {
+      return fail('VALIDATION_ERROR: parentProductId cannot be the same product');
+    }
+    const parent = await Product.findOne({ where: { id: parentProductId, empresaId } });
+    if (!parent) return fail('PARENT_PRODUCT_NOT_FOUND');
+    const parentOfParent = String(parent.getDataValue('parentProductId') ?? '');
+    if (parentOfParent) {
+      return fail('VALIDATION_ERROR: parent cannot be a variant of another product');
+    }
+    return ok(true);
+  }
+
+  private merchCreateFields(input: CreateProductInput) {
+    return {
+      barcode: input.barcode ?? null,
+      parentProductId: input.parentProductId ?? null,
+      variantSize: input.variantSize ?? null,
+      variantColor: input.variantColor ?? null,
+      packQty: Number(input.packQty) > 0 ? Number(input.packQty) : 1,
+      sizeMm: input.sizeMm ?? null,
+    };
+  }
+
+  private merchPatchFields(input: UpdateProductInput, patch: Record<string, unknown>) {
+    if (input.barcode !== undefined) patch.barcode = input.barcode;
+    if (input.parentProductId !== undefined) patch.parentProductId = input.parentProductId;
+    if (input.variantSize !== undefined) patch.variantSize = input.variantSize;
+    if (input.variantColor !== undefined) patch.variantColor = input.variantColor;
+    if (input.packQty !== undefined) {
+      const packQty = Number(input.packQty);
+      patch.packQty = Number.isFinite(packQty) && packQty > 0 ? packQty : 1;
+    }
+    if (input.sizeMm !== undefined) patch.sizeMm = input.sizeMm;
+  }
+
+  private async replacePriceTiers(
+    empresaId: string,
+    productId: string,
+    tiers: Array<{ minQty: number; unitPrice: number }> | undefined,
+    transaction?: Transaction
+  ): Promise<void> {
+    if (tiers === undefined) return;
+    const normalized = normalizePriceTiers(tiers);
+    await ProductPriceTier.destroy({ where: { empresaId, productId }, transaction });
+    for (const tier of normalized) {
+      await ProductPriceTier.create(
+        {
+          id: uuidv4(),
+          empresaId,
+          productId,
+          minQty: tier.minQty,
+          unitPrice: tier.unitPrice,
+        },
+        { transaction }
+      );
+    }
+  }
   private resolveProductId(product: Product): string {
     return String(product.getDataValue('id') ?? product.id ?? '');
   }
@@ -127,9 +213,25 @@ class CatalogProductDelegate {
       stockByProductId.set(mapped.productId, mapped);
     }
 
+    const tierRows =
+      productIds.length > 0
+        ? await ProductPriceTier.findAll({ where: { empresaId, productId: productIds } })
+        : [];
+    const tiersByProductId = new Map<string, Array<{ minQty: number; unitPrice: number }>>();
+    for (const row of tierRows) {
+      const productId = String(row.productId);
+      const list = tiersByProductId.get(productId) ?? [];
+      list.push({ minQty: Number(row.minQty), unitPrice: Number(row.unitPrice) });
+      tiersByProductId.set(productId, list);
+    }
+
     return ok(
       products.map((row) =>
-        this.toProductWithBranchStock(row, stockByProductId.get(this.resolveProductId(row)))
+        this.toProductWithBranchStock(
+          row,
+          stockByProductId.get(this.resolveProductId(row)),
+          tiersByProductId.get(this.resolveProductId(row))
+        )
       )
     );
   }
@@ -150,6 +252,9 @@ class CatalogProductDelegate {
 
     const supplier = await Supplier.findOne({ where: { id: input.supplierId, empresaId } });
     if (!supplier) return fail('SUPPLIER_NOT_FOUND');
+
+    const parentCheck = await this.assertParentProduct(empresaId, input.parentProductId ?? null);
+    if (!parentCheck.success) return parentCheck;
 
     const initialStock = Number.isFinite(input.initialStock) ? Number(input.initialStock) : 0;
     const minStock = Number.isFinite(input.minStock) ? Number(input.minStock) : 0;
@@ -173,6 +278,7 @@ class CatalogProductDelegate {
           description: input.description ?? null,
           unit: input.unit ?? 'unit',
           isActive: input.isActive !== false,
+          ...this.merchCreateFields(input),
         },
         { transaction }
       );
@@ -194,6 +300,8 @@ class CatalogProductDelegate {
         },
         { transaction }
       );
+
+      await this.replacePriceTiers(empresaId, resolvedProductId, input.priceTiers, transaction);
 
       await transaction.commit();
 
@@ -271,11 +379,19 @@ class CatalogProductDelegate {
       patch.isActive = input.isActive;
     }
 
+    this.merchPatchFields(input, patch);
+
+    if (input.parentProductId !== undefined) {
+      const parentCheck = await this.assertParentProduct(empresaId, input.parentProductId, productId);
+      if (!parentCheck.success) return parentCheck;
+    }
+
     if (Object.keys(patch).length === 0) {
       return fail('VALIDATION_ERROR: no fields to update');
     }
 
     await product.update(patch);
+    await this.replacePriceTiers(empresaId, productId, input.priceTiers);
     await product.reload({
       include: [
         { model: Category, as: 'category', attributes: ['id', 'name'] },
@@ -288,7 +404,8 @@ class CatalogProductDelegate {
 
   private toProductWithBranchStock(
     product: Product,
-    stockEntry?: BranchStockRow | null
+    stockEntry?: BranchStockRow | null,
+    priceTiers?: Array<{ minQty: number; unitPrice: number }>
   ): ProductWithBranchStock {
     const plain = product.get({ plain: true }) as ProductWithBranchStock & {
       category?: { id: string; name: string };
@@ -310,6 +427,12 @@ class CatalogProductDelegate {
       price: Number(product.getDataValue('price') ?? plain.price ?? 0),
       unit: String(plain.unit ?? 'unit'),
       isActive: plain.isActive !== false,
+      barcode: (plain.barcode as string | null | undefined) ?? null,
+      parentProductId: (plain.parentProductId as string | null | undefined) ?? null,
+      variantSize: (plain.variantSize as string | null | undefined) ?? null,
+      variantColor: (plain.variantColor as string | null | undefined) ?? null,
+      packQty: Number(plain.packQty ?? 1) || 1,
+      sizeMm: plain.sizeMm != null ? Number(plain.sizeMm) : null,
       categoryId: plain.categoryId,
       supplierId: plain.supplierId,
       createdAt: plain.createdAt,
@@ -320,6 +443,7 @@ class CatalogProductDelegate {
       minStock: branchStock.minStock,
       inBranch: branchStock.inBranch,
       stockRecordId: branchStock.stockId,
+      priceTiers: normalizePriceTiers(priceTiers),
     };
   }
 }
