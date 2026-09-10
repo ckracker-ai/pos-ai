@@ -19,6 +19,7 @@ class Empresa extends Model {
   public estado!: EmpresaEstado;
   public estadoTributario!: EmpresaEstadoTributario;
   public rubroNegocio?: string | null;
+  public aiGlossary?: Record<string, unknown> | null;
   public telefonoNegocio?: string | null;
   public formalizacionProgreso?: Record<string, unknown> | null;
   public planId!: string;
@@ -99,6 +100,11 @@ Empresa.init(
       type: DataTypes.STRING(120),
       allowNull: true,
       field: 'rubro_negocio',
+    },
+    aiGlossary: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'ai_glossary',
     },
     telefonoNegocio: {
       type: DataTypes.STRING(32),

@@ -19,6 +19,7 @@ import { canRenewSubscription } from '@/core/config/plan-access';
 import { buildEmpresaSetupSteps, empresaSetupProgress } from '@/core/config/empresa-setup';
 import { notifyEmpresaUpdated } from '@/core/hooks/useTenantEmpresa';
 import { RUBRO_PACKS, getRubroPack, isRubroPackSelected } from '@/core/config/rubro-packs';
+import { getRubroAiPack, suggestRubroFromBusinessText } from '@/core/pos/rubro-ai';
 import { useBranchStore } from '@/store/branch';
 import { notifyApiError, notifySuccess } from '@/store/ui';
 import { EmpresaFormalizarPanel } from '@/components/molecules/EmpresaFormalizarPanel';
@@ -55,6 +56,8 @@ type EmpresaForm = {
   transferHolderName: string;
   transferRut: string;
   rubroNegocio: string;
+  aiBusinessDescription: string;
+  aiSynonymLines: string;
 };
 
 const emptyForm = (): EmpresaForm => ({
@@ -71,6 +74,8 @@ const emptyForm = (): EmpresaForm => ({
   transferHolderName: '',
   transferRut: '',
   rubroNegocio: '',
+  aiBusinessDescription: '',
+  aiSynonymLines: '',
 });
 
 function empresaToForm(empresa: Empresa): EmpresaForm {
@@ -88,6 +93,8 @@ function empresaToForm(empresa: Empresa): EmpresaForm {
     transferHolderName: empresa.transferHolderName ?? '',
     transferRut: empresa.transferRut ?? '',
     rubroNegocio: empresa.rubroNegocio ?? '',
+    aiBusinessDescription: empresa.aiGlossary?.businessDescription ?? '',
+    aiSynonymLines: (empresa.aiGlossary?.synonyms ?? []).map((s) => `${s.from} = ${s.to}`).join('\n'),
   };
 }
 
@@ -133,6 +140,21 @@ function buildPatchPayload(form: EmpresaForm, original: Empresa): UpdateEmpresaI
   }
   if (trim(form.rubroNegocio) !== (original.rubroNegocio ?? '')) {
     payload.rubroNegocio = trim(form.rubroNegocio) || null;
+  }
+  const nextGlossary = {
+    businessDescription: trim(form.aiBusinessDescription),
+    synonyms: form.aiSynonymLines
+      .split('\n')
+      .map((line) => line.split('=').map((p) => p.trim()))
+      .filter((parts) => parts.length >= 2 && parts[0] && parts[1])
+      .map((parts) => ({ from: parts[0], to: parts.slice(1).join(' = ') })),
+  };
+  const prevG = original.aiGlossary ?? { businessDescription: '', synonyms: [] };
+  const glossaryChanged =
+    nextGlossary.businessDescription !== (prevG.businessDescription ?? '') ||
+    JSON.stringify(nextGlossary.synonyms) !== JSON.stringify(prevG.synonyms ?? []);
+  if (glossaryChanged) {
+    payload.aiGlossary = nextGlossary;
   }
 
   return payload;
@@ -433,7 +455,7 @@ export default function EmpresasPage() {
                         <FieldLabel>Tipo de negocio (rubro)</FieldLabel>
                         <p className="mb-3 text-sm text-brand-ink-muted">
                           Condiciona cocina, envíos y caja (código de barras / granel). Costa Azul y locales de
-                          comida quedan en gastronomía.
+                          comida quedan en gastronomía. Café, pub y bar = gastronomía; mueblería ≈ ferretería.
                         </p>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {RUBRO_PACKS.map((pack) => {
@@ -460,6 +482,51 @@ export default function EmpresasPage() {
                             );
                           })}
                         </div>
+                      </div>
+                      <div>
+                        <FieldLabel>Cómo describes tu negocio (IA)</FieldLabel>
+                        <p className="mb-2 text-sm text-brand-ink-muted">
+                          El pack de rubro trae un diccionario. Aquí puedes decir «tengo un café» o agregar
+                          sinónimos propios (una línea: <span className="font-mono">cortado = cafe</span>).
+                        </p>
+                        <textarea
+                          value={form.aiBusinessDescription}
+                          onChange={(e) => handleFieldChange('aiBusinessDescription', e.target.value)}
+                          readOnly={!canManageEmpresa}
+                          rows={2}
+                          className={inputClass}
+                          placeholder="Ej: café de barrio; mueblería con despacho de living"
+                        />
+                        {canManageEmpresa ? (
+                          <button
+                            type="button"
+                            className="mt-2 text-sm text-brand-olive underline"
+                            onClick={() => {
+                              const suggested = suggestRubroFromBusinessText(form.aiBusinessDescription);
+                              if (suggested) handleFieldChange('rubroNegocio', suggested);
+                            }}
+                          >
+                            Sugerir pack según la descripción
+                          </button>
+                        ) : null}
+                        <p className="mt-3 text-xs font-semibold text-brand-ink">
+                          Prompt del pack: {getRubroAiPack(form.rubroNegocio).promptHint}
+                        </p>
+                        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-brand-ink-muted">
+                          Sinónimos del tenant (encima del pack)
+                        </p>
+                        <textarea
+                          value={form.aiSynonymLines}
+                          onChange={(e) => handleFieldChange('aiSynonymLines', e.target.value)}
+                          readOnly={!canManageEmpresa}
+                          rows={4}
+                          className={inputClass}
+                          placeholder={'living = sofa\ncortado = cafe'}
+                        />
+                        <p className="mt-3 text-xs text-brand-ink-muted">
+                          Frases de prueba del pack:{' '}
+                          {getRubroAiPack(form.rubroNegocio).utterances.join(' · ')}
+                        </p>
                       </div>
                       <div>
                         <FieldLabel>Giro SII</FieldLabel>

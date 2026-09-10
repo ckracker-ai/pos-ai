@@ -23,6 +23,12 @@ test('minimarket apaga cocina y enciende barcode/granel', () => {
   assert.equal(isRubroModuleEnabled('delivery', 'MINIMARKET'), true);
 });
 
+test('café, pub y bar son gastronomía; mueblería usa ferretería', () => {
+  assert.equal(normalizeRubroCodigo('cafe'), 'GASTRONOMIA');
+  assert.equal(normalizeRubroCodigo('pub'), 'GASTRONOMIA');
+  assert.equal(normalizeRubroCodigo('muebleria'), 'FERRETERIA');
+});
+
 test('isWeightUnit reconoce kg y litros', () => {
   assert.equal(isWeightUnit('kg'), true);
   assert.equal(isWeightUnit('LT'), true);

@@ -10,6 +10,16 @@ const updateEmpresaSchema = z.object({
   nombreFantasia: z.string().nullable().optional(),
   giroSii: z.string().nullable().optional(),
   rubroNegocio: z.string().max(120).nullable().optional(),
+  aiGlossary: z
+    .object({
+      businessDescription: z.string().max(500).optional(),
+      synonyms: z
+        .array(z.object({ from: z.string().max(80), to: z.string().max(120) }))
+        .max(20)
+        .optional(),
+    })
+    .nullable()
+    .optional(),
   direccionComercial: z.string().nullable().optional(),
   correoFacturacion: z.string().nullable().optional(),
   urlLogo: z.string().nullable().optional(),

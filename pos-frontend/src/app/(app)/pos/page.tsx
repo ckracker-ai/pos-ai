@@ -28,6 +28,7 @@ import { Navbar } from '@/components/organisms/Navbar';
 import { PosActionAlert } from '@/components/molecules/PosActionAlert';
 import { ProductQuickPicker } from '@/components/organisms/ProductQuickPicker';
 import { interpretPosCartClient } from '@/core/pos/posAiRulesClient';
+import { applySynonyms, mergeGlossary, parseTenantAiGlossary } from '@/core/pos/rubro-ai';
 import { normalizePosVoiceCommand } from '@/core/pos/posSaleAssist';
 import {
   PosAiCommandPanel,
@@ -439,6 +440,11 @@ export default function PosPage() {
 
   const handlePosAiCommand = async (userText: string) => {
     const normalizedText = normalizePosVoiceCommand(userText);
+    const glossary = parseTenantAiGlossary(empresa?.aiGlossary);
+    const interpretedText = applySynonyms(
+      normalizedText,
+      mergeGlossary(empresa?.rubroNegocio, glossary)
+    );
     setAiLoading(true);
     const stocksPayload = posAiProducts.map((p) => ({
       id: p.id,
@@ -457,7 +463,7 @@ export default function PosPage() {
     try {
       const clientResult = enrichPosAiResult(
         interpretPosCartClient({
-          userText: normalizedText,
+          userText: interpretedText,
           stocks: stocksPayload,
           cart: cartPayload,
         }),
@@ -472,7 +478,7 @@ export default function PosPage() {
       if (!clientAdds) {
         try {
           const res = await api.interpretPosCommand({
-            userText: normalizedText,
+            userText: interpretedText,
             stocks: stocksPayload,
             cart: cartPayload,
           });

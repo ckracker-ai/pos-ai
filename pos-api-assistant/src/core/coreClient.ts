@@ -53,6 +53,8 @@ export type AssistantContext = {
     holderName: string | null;
     holderRut: string | null;
   } | null;
+  rubroNegocio?: string | null;
+  aiGlossary?: unknown;
 };
 
 export const coreClient = {

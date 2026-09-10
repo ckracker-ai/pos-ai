@@ -7,7 +7,7 @@ import { loadAssistantPlan, AssistantRequest } from '../middleware/assistantCont
 const router = Router();
 
 const mapError = (error: string): number => {
-  if (error.startsWith('VALIDATION_ERROR') || error === 'TRANSFER_PROFILE_INCOMPLETE') return 422;
+  if (error.startsWith('VALIDATION_ERROR') || error === 'TRANSFER_PROFILE_INCOMPLETE' || error === 'BRANCH_REQUIRED') return 422;
   if (
     error === 'ASSISTANT_BINDING_NOT_FOUND' ||
     error === 'BRANCH_NOT_FOUND' ||

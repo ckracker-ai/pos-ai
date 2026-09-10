@@ -5,6 +5,10 @@ export type UpdateEmpresaTenantInput = {
   nombreFantasia?: string | null;
   giroSii?: string | null;
   rubroNegocio?: string | null;
+  aiGlossary?: {
+    businessDescription?: string;
+    synonyms?: Array<{ from: string; to: string }>;
+  } | null;
   direccionComercial?: string | null;
   correoFacturacion?: string | null;
   urlLogo?: string | null;

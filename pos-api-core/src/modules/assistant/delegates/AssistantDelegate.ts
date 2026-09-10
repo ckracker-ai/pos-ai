@@ -63,6 +63,8 @@ export type AssistantContext = {
   features: SaasPlanFeatures;
   planCodigo: string;
   transferProfile: TransferProfile | null;
+  rubroNegocio: string | null;
+  aiGlossary: unknown;
 };
 
 class AssistantDelegate {
@@ -111,6 +113,8 @@ class AssistantDelegate {
       features,
       planCodigo: String(plan.getDataValue('codigo') ?? ''),
       transferProfile: buildTransferProfileFromEmpresa(empresa),
+      rubroNegocio: (empresa.getDataValue('rubroNegocio') as string | null | undefined) ?? null,
+      aiGlossary: empresa.getDataValue('aiGlossary') ?? null,
     });
   }
 
@@ -276,6 +280,9 @@ class AssistantDelegate {
     items: Array<{ productId: string; quantity: number }>;
     metodoPago: string;
   }): Promise<Result<{ pedido_id: string; total: number; status: string }>> {
+    if (!String(input.branchId ?? '').trim()) {
+      return fail('BRANCH_REQUIRED');
+    }
     const branch = await Branch.findOne({ where: { id: input.branchId, empresaId: input.empresaId } });
     if (!branch) return fail('BRANCH_NOT_FOUND');
 

@@ -61,6 +61,7 @@ CREATE TABLE `empresas` (
   `estado` enum('ACTIVO','SUSPENDIDO','PENDIENTE_ONBOARDING') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDIENTE_ONBOARDING',
   `estado_tributario` enum('INFORMAL','EN_TRAMITE','FORMAL') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'FORMAL',
   `rubro_negocio` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ai_glossary` json DEFAULT NULL,
   `telefono_negocio` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `formalizacion_progreso` json DEFAULT NULL,
   `plan_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,

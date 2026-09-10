@@ -601,8 +601,9 @@ export function interpretPosCartClient(input: {
   userText: string;
   stocks: PosAiStockItem[];
   cart: PosAiCartItem[];
+  expandedUserText?: string;
 }): PosAiResult {
-  const text = input.userText.trim();
+  const text = (input.expandedUserText ?? input.userText).trim();
   const n = normalize(text);
   const sampleName = input.stocks.find((s) => s.stock_actual > 0)?.nombre;
 

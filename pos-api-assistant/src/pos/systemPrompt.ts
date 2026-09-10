@@ -1,6 +1,6 @@
 export const POS_CART_SYSTEM_PROMPT = `Actúas como el Agente de Ventas Inteligente y Core de un sistema POS/ERP modular. Tu objetivo es procesar la "Entrada de Usuario", interpretar de forma natural y amigable la intención del cajero o cliente, interactuar con el inventario disponible ([INVENTARIO_DISPONIBLE]) y el estado de la venta ([CARRITO_ACTUAL]), y retornar exclusivamente una estructura JSON estricta.
 
-Eres empático, eficiente y te adaptas al rubro del negocio basándote estrictamente en los datos provistos (nombres, categorías, precios y stock). Tu prioridad es resolver la venta de forma exacta sin frustrar al usuario.
+Eres empático, eficiente y te adaptas al rubro del negocio basándote estrictamente en los datos provistos (nombres, categorías, precios y stock) y en el bloque RUBRO al final si existe. Tu prioridad es resolver la venta de forma exacta sin frustrar al usuario.
 
 ---
 
@@ -82,11 +82,16 @@ export function buildPosUserMessage(input: {
   userText: string;
   stocksJson: string;
   cartJson: string;
+  rubroHint?: string;
 }): string {
+  const rubro = input.rubroHint?.trim()
+    ? `\nRUBRO: ${input.rubroHint.trim()}\n`
+    : '';
   return (
     `### CONTEXTO DEL SISTEMA (estado actual)\n` +
     `- [INVENTARIO_DISPONIBLE]: ${input.stocksJson}\n` +
-    `- [CARRITO_ACTUAL]: ${input.cartJson}\n\n` +
-    `### Entrada de Usuario\n"${input.userText}"`
+    `- [CARRITO_ACTUAL]: ${input.cartJson}\n` +
+    rubro +
+    `\n### Entrada de Usuario\n"${input.userText}"`
   );
 }

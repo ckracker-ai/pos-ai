@@ -401,6 +401,34 @@ export function normalizeEmpresa(raw: Record<string, unknown>): Empresa {
         : raw.rubro_negocio != null
           ? String(raw.rubro_negocio)
           : null,
+    aiGlossary: (() => {
+      const rawG = raw.aiGlossary ?? raw.ai_glossary;
+      if (rawG == null) return { businessDescription: '', synonyms: [] as Array<{ from: string; to: string }> };
+      if (typeof rawG === 'string') {
+        try {
+          const obj = JSON.parse(rawG) as Record<string, unknown>;
+          return {
+            businessDescription: String(obj.businessDescription ?? ''),
+            synonyms: Array.isArray(obj.synonyms)
+              ? (obj.synonyms as Array<Record<string, unknown>>)
+                  .map((r) => ({ from: String(r.from ?? ''), to: String(r.to ?? '') }))
+                  .filter((r) => r.from && r.to)
+              : [],
+          };
+        } catch {
+          return { businessDescription: '', synonyms: [] };
+        }
+      }
+      const obj = rawG as Record<string, unknown>;
+      return {
+        businessDescription: String(obj.businessDescription ?? ''),
+        synonyms: Array.isArray(obj.synonyms)
+          ? (obj.synonyms as Array<Record<string, unknown>>)
+              .map((r) => ({ from: String(r.from ?? ''), to: String(r.to ?? '') }))
+              .filter((r) => r.from && r.to)
+          : [],
+      };
+    })(),
     telefonoNegocio:
       raw.telefonoNegocio != null
         ? String(raw.telefonoNegocio)

@@ -22,6 +22,7 @@ import {
   parseFormalizacionProgreso,
   planRequiresFormal,
 } from '../utils/tributarioStatus';
+import { parseEmpresaAiGlossary } from '../utils/aiGlossary';
 import { slugify, uniqueSlug } from '../../../utils/slug';
 import { readModelString } from '../../../utils/modelAttributes';
 import { isValidEmail } from '../../../utils/empresaAccess';
@@ -60,6 +61,7 @@ export interface EmpresaRecord {
   estado: EmpresaEstado;
   estadoTributario: EmpresaEstadoTributario;
   rubroNegocio: string | null;
+  aiGlossary: { businessDescription: string; synonyms: Array<{ from: string; to: string }> };
   telefonoNegocio: string | null;
   formalizacionProgreso: FormalizacionProgreso;
   formalizacionPorcentaje: number;
@@ -117,6 +119,7 @@ export interface UpdateEmpresaTenantInput {
   transferHolderName?: string | null;
   transferRut?: string | null;
   rubroNegocio?: string | null;
+  aiGlossary?: { businessDescription?: string; synonyms?: Array<{ from: string; to: string }> } | null;
 }
 
 /** Solo plataforma / onboarding interno (x-internal-key). */
@@ -212,6 +215,7 @@ class EmpresaDelegate {
         plain.estadoTributario ?? plain.estado_tributario ?? 'FORMAL'
       ).toUpperCase() as EmpresaEstadoTributario,
       rubroNegocio: (plain.rubroNegocio as string | null | undefined) ?? null,
+      aiGlossary: parseEmpresaAiGlossary(plain.aiGlossary ?? plain.ai_glossary),
       telefonoNegocio: (plain.telefonoNegocio as string | null | undefined) ?? null,
       formalizacionProgreso: parseFormalizacionProgreso(
         plain.formalizacionProgreso ?? plain.formalizacion_progreso
@@ -501,6 +505,9 @@ class EmpresaDelegate {
     if (input.nombreFantasia !== undefined) patch.nombreFantasia = input.nombreFantasia?.trim() || null;
     if (input.giroSii !== undefined) patch.giroSii = input.giroSii?.trim() || null;
     if (input.rubroNegocio !== undefined) patch.rubroNegocio = input.rubroNegocio?.trim() || null;
+    if (input.aiGlossary !== undefined) {
+      patch.aiGlossary = parseEmpresaAiGlossary(input.aiGlossary);
+    }
     if (input.direccionComercial !== undefined) {
       patch.direccionComercial = input.direccionComercial?.trim() || null;
     }

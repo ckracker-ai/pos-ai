@@ -278,6 +278,10 @@ export interface Empresa {
   estado: EmpresaEstado;
   estadoTributario: EmpresaEstadoTributario;
   rubroNegocio: string | null;
+  aiGlossary?: {
+    businessDescription: string;
+    synonyms: Array<{ from: string; to: string }>;
+  };
   telefonoNegocio: string | null;
   formalizacionProgreso: FormalizacionProgreso | null;
   formalizacionPorcentaje: number;
@@ -309,6 +313,10 @@ export interface UpdateEmpresaInput {
   transferHolderName?: string | null;
   transferRut?: string | null;
   rubroNegocio?: string | null;
+  aiGlossary?: {
+    businessDescription?: string;
+    synonyms?: Array<{ from: string; to: string }>;
+  } | null;
 }
 
 export interface KitchenOrderLine {

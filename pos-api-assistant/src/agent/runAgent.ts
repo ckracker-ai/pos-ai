@@ -22,6 +22,18 @@ import { SYSTEM_PROMPT, VOICE_SYSTEM_PROMPT } from './systemPrompt.js';
 import { formatVoiceReply, isVoiceChannel } from './voiceFormat.js';
 import { voiceHelp } from './voiceMessages.js';
 import {
+  applySynonyms,
+  mergeRubroSynonyms,
+  parseTenantGlossary,
+  rubroPromptHint,
+} from './rubroGlossary.js';
+import {
+  isVoicePlaceOrderIntent,
+  looksLikeCardPan,
+  voiceNeedBranchMessage,
+  voiceNoCardMessage,
+} from './voiceGuards.js';
+import {
   wspHelp,
   wspNoPendingToConfirm,
   wspNoPendingOrder,
@@ -559,7 +571,11 @@ function finalizeReply(session: Session, reply: AgentReply): AgentReply {
 
 async function runAgentCore(session: Session, userText: string): Promise<AgentReply> {
 
-  const text = userText.trim();
+  const glossary = parseTenantGlossary(session.context.aiGlossary);
+  const text = applySynonyms(
+    userText.trim(),
+    mergeRubroSynonyms(session.context.rubroNegocio, glossary)
+  );
 
   const lower = text.toLowerCase();
 
@@ -570,6 +586,10 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
 
 
   try {
+
+    if (isVoiceChannel(context.channel) && looksLikeCardPan(text)) {
+      return { text: voiceNoCardMessage() };
+    }
 
     if (lower === 'ayuda' || lower === 'help') {
 
@@ -724,6 +744,9 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
 
 
     if (!branchId) {
+      if (isVoiceChannel(context.channel) && isVoicePlaceOrderIntent(text)) {
+        return { text: voiceNeedBranchMessage() };
+      }
       return { text: wspPickBranchPrompt() };
     }
 
@@ -852,7 +875,9 @@ async function runOpenAi(session: Session, userText: string): Promise<AgentReply
 
         {
           role: 'system',
-          content: isVoiceChannel(session.context.channel) ? VOICE_SYSTEM_PROMPT : SYSTEM_PROMPT,
+          content:
+            (isVoiceChannel(session.context.channel) ? VOICE_SYSTEM_PROMPT : SYSTEM_PROMPT) +
+            `\n\nRUBRO: ${rubroPromptHint(session.context.rubroNegocio, parseTenantGlossary(session.context.aiGlossary))}`,
         },
 
         {

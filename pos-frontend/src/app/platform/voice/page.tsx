@@ -25,6 +25,7 @@ const QUICK_COMMANDS = [
   '1',
   'pedido 1x2',
   'confirmar',
+  'mi tarjeta es 4111111111111111',
   'ayuda',
 ] as const;
 
@@ -182,11 +183,12 @@ export default function PlatformVoiceSimPage() {
     <div className="voice-sim-panel mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 p-4 sm:p-6">
       <PlatformPageHeader
         title="Simular llamada (voz IA)"
-        description="Plan Full · respuestas cortas para telefonía · mismo motor que WhatsApp"
+        description="Plan Full · mismo cerebro que WhatsApp: sucursal obligatoria, pedido real, nunca tarjeta por teléfono."
       />
 
       <p className="rounded-xl border border-brand-lino/60 bg-brand-vainilla/80 px-3 py-2 text-xs text-brand-ink-muted">
-        Demo: teléfono <strong>{DEMO_VOICE_PHONE}</strong> (Costa Azul plan Full tras migración v1.18).
+        Demo: teléfono <strong>{DEMO_VOICE_PHONE}</strong> (Costa Azul plan Full). Elige sucursal, busca, pide y
+        confirma. Si dictas un número de tarjeta, el asistente corta y manda el pago por WhatsApp.
         El pago siempre se envía por WhatsApp al mismo número.
       </p>
 
