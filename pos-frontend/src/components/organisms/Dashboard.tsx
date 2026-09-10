@@ -10,6 +10,7 @@ import {
   roleHasModuleAccess,
 } from '@/core/config/role-access';
 import { isPlanModuleEnabled } from '@/core/config/plan-access';
+import { isRubroModuleEnabled } from '@/core/config/rubro-packs';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 import { AppPageHeader } from '@/components/molecules/AppPageHeader';
@@ -23,11 +24,12 @@ function formatClp(value: number) {
 function canUseModule(
   role: string | undefined,
   plan: Parameters<typeof isPlanModuleEnabled>[1],
-  key: string
+  key: string,
+  rubroNegocio?: string | null
 ) {
   const module = APP_MODULES.find((m) => m.key === key);
   if (!module || !role || !roleHasModuleAccess(role, module)) return false;
-  return isPlanModuleEnabled(key, plan);
+  return isPlanModuleEnabled(key, plan) && isRubroModuleEnabled(key, rubroNegocio);
 }
 
 type OpsMetrics = {
@@ -46,14 +48,15 @@ export function Dashboard() {
   const { branchId } = useActiveBranch();
   const { empresa } = useTenantEmpresa();
   const plan = empresa?.plan ?? null;
+  const rubro = empresa?.rubroNegocio;
 
   const roleKey = resolveUserRole(role);
-  const canReports = canUseModule(role, plan, 'reportes');
-  const canPos = canUseModule(role, plan, 'pos');
-  const canProofs = canUseModule(role, plan, 'comprobantes');
-  const canPedidos = canUseModule(role, plan, 'pedidos');
-  const isKitchenHome = roleKey === 'comanda';
-  const isCourierHome = roleKey === 'delivery';
+  const canReports = canUseModule(role, plan, 'reportes', rubro);
+  const canPos = canUseModule(role, plan, 'pos', rubro);
+  const canProofs = canUseModule(role, plan, 'comprobantes', rubro);
+  const canPedidos = canUseModule(role, plan, 'pedidos', rubro);
+  const isKitchenHome = roleKey === 'comanda' && isRubroModuleEnabled('comandas', rubro);
+  const isCourierHome = roleKey === 'delivery' && isRubroModuleEnabled('delivery', rubro);
 
   const [metrics, setMetrics] = useState<OpsMetrics>({
     todayRevenue: 0,

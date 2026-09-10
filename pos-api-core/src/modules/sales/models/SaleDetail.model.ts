@@ -30,7 +30,7 @@ SaleDetail.init(
       field: 'product_id',
     },
     quantity: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.DECIMAL(12, 3),
       allowNull: false,
     },
     unitPrice: {

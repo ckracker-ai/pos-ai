@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  canAccessPath,
   countTopLevelNavEntries,
   getNavSectionsForRole,
 } from '../src/core/config/role-access.ts';
@@ -53,4 +54,16 @@ test('repartidor: Envíos queda al primer nivel (un solo ítem en Pedidos)', () 
   assert.equal(operate.clusters.length, 0);
   assert.ok(operate.items.some((i) => i.key === 'delivery'));
   assert.ok(countTopLevelNavEntries(sections) <= 7);
+});
+
+test('admin minimarket bloquea /comandas y conserva caja y envíos', () => {
+  assert.equal(canAccessPath('admin', '/comandas', fullPlan, 'MINIMARKET'), false);
+  assert.equal(canAccessPath('admin', '/pos', fullPlan, 'MINIMARKET'), true);
+  assert.equal(canAccessPath('admin', '/delivery', fullPlan, 'MINIMARKET'), true);
+  assert.equal(canAccessPath('admin', '/comandas', fullPlan, 'GASTRONOMIA'), true);
+});
+
+test('admin ferretería bloquea cocina y envíos', () => {
+  assert.equal(canAccessPath('admin', '/comandas', fullPlan, 'FERRETERIA'), false);
+  assert.equal(canAccessPath('admin', '/delivery', fullPlan, 'FERRETERIA'), false);
 });

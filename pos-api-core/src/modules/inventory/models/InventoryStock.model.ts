@@ -36,7 +36,7 @@ InventoryStock.init(
       field: 'branch_id',
     },
     quantity: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.DECIMAL(12, 3),
       allowNull: false,
       defaultValue: 0,
     },

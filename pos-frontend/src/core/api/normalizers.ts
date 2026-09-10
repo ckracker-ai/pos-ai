@@ -147,6 +147,7 @@ export function normalizeProduct(raw: Record<string, unknown>, stock = 0): Produ
     cost: Number(readProductScalar(raw, 'cost', 'cost') ?? 0),
     stock: resolvedStock,
     sku: String(readProductScalar(raw, 'sku', 'sku') ?? ''),
+    unit: String(readProductScalar(raw, 'unit', 'unit') ?? 'unit'),
     category: categoryName,
     categoryId,
     supplierId,

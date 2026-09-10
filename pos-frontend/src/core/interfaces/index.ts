@@ -36,6 +36,7 @@ export interface Product {
   cost: number;
   stock: number;
   sku: string;
+  unit?: string;
   category: string;
   categoryId?: string;
   supplierId?: string;
@@ -289,6 +290,7 @@ export interface UpdateEmpresaInput {
   transferAccount?: string | null;
   transferHolderName?: string | null;
   transferRut?: string | null;
+  rubroNegocio?: string | null;
 }
 
 export interface KitchenOrderLine {

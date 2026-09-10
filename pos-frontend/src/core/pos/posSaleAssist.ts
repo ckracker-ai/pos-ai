@@ -27,14 +27,27 @@ export function cartQuantityForProduct(cart: PosAssistCartLine[], productId: str
   return cart.find((l) => l.id === productId)?.quantity ?? 0;
 }
 
+export function roundSaleQty(value: number): number {
+  return Math.round(Number(value) * 1000) / 1000;
+}
+
+export function findProductByExactSku<T extends { sku?: string | null }>(
+  products: T[],
+  scanned: string
+): T | undefined {
+  const code = scanned.trim().toLowerCase();
+  if (!code) return undefined;
+  return products.find((p) => String(p.sku ?? '').trim().toLowerCase() === code);
+}
+
 export function validateAddToCart(input: {
   product: PosAssistProduct;
   quantity: number;
   cart: PosAssistCartLine[];
 }): { ok: true } | { ok: false; message: string } {
-  const qty = Math.floor(Number(input.quantity));
-  if (!Number.isFinite(qty) || qty < 1) {
-    return { ok: false, message: 'La cantidad debe ser al menos 1.' };
+  const qty = roundSaleQty(Number(input.quantity));
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return { ok: false, message: 'La cantidad debe ser mayor que 0.' };
   }
   const stock = Number(input.product.stock ?? 0);
   if (stock <= 0) {

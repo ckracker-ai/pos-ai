@@ -36,11 +36,15 @@ import type { PosAiResult } from '@/core/pos/posAiTypes';
 import { unwrapApiData } from '@/core/api/api-client';
 import {
   enrichPosAiResult,
+  findProductByExactSku,
   formatProductCartLabel,
+  roundSaleQty,
   validateAddToCart,
   validateSaleForm,
 } from '@/core/pos/posSaleAssist';
-import { applyDigitsOnlyInput, parsePositiveInt } from '@/core/utils/numeric-input';
+import { applyDecimalInput, applyDigitsOnlyInput, parsePositiveDecimal, parsePositiveInt } from '@/core/utils/numeric-input';
+import { isWeightUnit, resolveRubroCapabilities } from '@/core/config/rubro-packs';
+import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 import {
   CHILE_IVA_LABEL,
   calculateIvaFromNet,
@@ -56,6 +60,7 @@ interface PosLineItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  unit?: string;
 }
 
 interface ReceiptData {
@@ -90,6 +95,8 @@ function formatTicketDate(iso: string) {
 
 export default function PosPage() {
   const { user } = useAuthStore();
+  const { empresa } = useTenantEmpresa();
+  const rubroCaps = resolveRubroCapabilities(empresa?.rubroNegocio);
   const branchId = useBranchStore((state) => state.selectedBranchId);
   const activeBranchName = useBranchStore((state) => state.activeBranchLabel);
   const [products, setProducts] = useState<Product[]>([]);
@@ -120,7 +127,9 @@ export default function PosPage() {
   const [showManualProductForm, setShowManualProductForm] = useState(false);
   const [empresaDisplayName, setEmpresaDisplayName] = useState('Mi negocio');
   const [isInformalTicket, setIsInformalTicket] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
   const posAiPanelRef = useRef<PosAiCommandPanelHandle>(null);
+  const barcodeRef = useRef<HTMLInputElement>(null);
 
   const dismissPosMessage = useCallback(() => {
     setMessage(null);
@@ -218,6 +227,12 @@ export default function PosPage() {
     }
   }, [availableProducts, selectedProductId]);
 
+  useEffect(() => {
+    if (!rubroCaps.delivery && requiresDelivery) {
+      setRequiresDelivery(false);
+    }
+  }, [requiresDelivery, rubroCaps.delivery]);
+
 
   const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + item.total, 0),
@@ -258,8 +273,8 @@ export default function PosPage() {
           item.id === product.id
             ? {
                 ...item,
-                quantity: item.quantity + qty,
-                total: (item.quantity + qty) * item.unitPrice,
+          quantity: roundSaleQty(item.quantity + qty),
+          total: roundSaleQty(item.quantity + qty) * item.unitPrice,
               }
             : item
         );
@@ -277,9 +292,10 @@ export default function PosPage() {
         {
           id: product.id,
           name: lineName,
-          quantity: qty,
+          quantity: roundSaleQty(qty),
           unitPrice: product.price,
-          total: product.price * qty,
+          total: product.price * roundSaleQty(qty),
+          unit: product.unit,
         },
       ];
     });
@@ -299,8 +315,32 @@ export default function PosPage() {
 
   const handleAddProduct = () => {
     if (!selectedProduct) return;
-    const qty = parsePositiveInt(quantityInput) ?? 1;
-    addProductToCart(selectedProduct, qty);
+    const allowDecimal = isWeightUnit(selectedProduct.unit);
+    const qty = allowDecimal
+      ? parsePositiveDecimal(quantityInput)
+      : parsePositiveInt(quantityInput) ?? 1;
+    if (!qty) {
+      showPosFeedback('error', 'Ingresa una cantidad válida.');
+      return;
+    }
+    addProductToCart(selectedProduct, roundSaleQty(qty));
+  };
+
+  const handleBarcodeCommit = () => {
+    const code = barcodeInput.trim();
+    if (!code) return;
+    const product = findProductByExactSku(products, code);
+    setBarcodeInput('');
+    if (!product) {
+      showPosFeedback('error', `No hay producto con SKU ${code}.`);
+      return;
+    }
+    const allowDecimal = isWeightUnit(product.unit);
+    const qty = allowDecimal
+      ? parsePositiveDecimal(quantityInput) ?? 1
+      : parsePositiveInt(quantityInput) ?? 1;
+    addProductToCart(product, roundSaleQty(qty));
+    barcodeRef.current?.focus();
   };
 
   const handleQuickAddSuggestion = (productId: string, qty = 1) => {
@@ -428,21 +468,23 @@ export default function PosPage() {
   };
 
   const setCartLineQuantity = (itemId: string, rawQty: number) => {
-    const qty = Math.floor(Number(rawQty));
-    if (!Number.isFinite(qty) || qty < 1) {
+    const qty = roundSaleQty(Number(rawQty));
+    if (!Number.isFinite(qty) || qty <= 0) {
       handleRemoveItem(itemId);
       return;
     }
     const product = products.find((p) => p.id === itemId);
+    const allowDecimal = isWeightUnit(product?.unit);
+    const nextQty = allowDecimal ? qty : Math.max(1, Math.floor(qty));
     const stock = Number(product?.stock ?? 0);
-    if (product && stock > 0 && qty > stock) {
-      showPosFeedback('error', `Stock máximo de "${product.name}": ${stock} u.`);
+    if (product && stock > 0 && nextQty > stock) {
+      showPosFeedback('error', `Stock máximo de "${product.name}": ${stock}.`);
       return;
     }
     setCart((current) =>
       current.map((item) =>
         item.id === itemId
-          ? { ...item, quantity: qty, total: qty * item.unitPrice }
+          ? { ...item, quantity: nextQty, total: nextQty * item.unitPrice }
           : item
       )
     );
@@ -582,6 +624,33 @@ export default function PosPage() {
             }
           />
 
+          {rubroCaps.barcode ? (
+            <section className="app-card mb-6 rounded-3xl p-4 sm:p-6">
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-brand-ink">Código de barras / SKU</span>
+                <p className="text-xs text-brand-ink-muted">
+                  Enfoca este campo y escanea. Enter agrega el producto con coincidencia exacta de SKU.
+                </p>
+                <input
+                  ref={barcodeRef}
+                  type="text"
+                  value={barcodeInput}
+                  autoComplete="off"
+                  inputMode="numeric"
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleBarcodeCommit();
+                    }
+                  }}
+                  className="app-input font-mono"
+                  placeholder="Escanear o pegar SKU"
+                />
+              </label>
+            </section>
+          ) : null}
+
           <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
             <div className="space-y-6">
               <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-brand-linen/80 bg-brand-surface/40 px-4 py-3 text-sm text-brand-ink">
@@ -652,17 +721,29 @@ export default function PosPage() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm app-text-muted">Cantidad</span>
+                    <span className="text-sm app-text-muted">
+                      Cantidad{isWeightUnit(selectedProduct?.unit) ? ' (kg / lt)' : ''}
+                    </span>
                     <input
                       type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                      inputMode={isWeightUnit(selectedProduct?.unit) ? 'decimal' : 'numeric'}
+                      pattern={isWeightUnit(selectedProduct?.unit) ? undefined : '[0-9]*'}
                       value={quantityInput}
                       onChange={(event) => {
+                        if (isWeightUnit(selectedProduct?.unit)) {
+                          const { value } = applyDecimalInput(event.target.value);
+                          setQuantityInput(value);
+                          return;
+                        }
                         const { value } = applyDigitsOnlyInput(event.target.value);
                         setQuantityInput(value);
                       }}
                       onBlur={() => {
+                        if (isWeightUnit(selectedProduct?.unit)) {
+                          const qty = parsePositiveDecimal(quantityInput);
+                          setQuantityInput(qty ? String(roundSaleQty(qty)) : '0.1');
+                          return;
+                        }
                         const qty = parsePositiveInt(quantityInput);
                         setQuantityInput(qty ? String(qty) : '1');
                       }}
@@ -712,17 +793,24 @@ export default function PosPage() {
                           <button
                             type="button"
                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-linen text-lg"
-                            onClick={() => setCartLineQuantity(item.id, item.quantity - 1)}
+                            onClick={() =>
+                              setCartLineQuantity(
+                                item.id,
+                                item.quantity - (isWeightUnit(item.unit) ? 0.1 : 1)
+                              )
+                            }
                             aria-label="Menos"
                           >
                             −
                           </button>
                           <input
                             type="text"
-                            inputMode="numeric"
+                            inputMode={isWeightUnit(item.unit) ? 'decimal' : 'numeric'}
                             value={item.quantity}
                             onChange={(e) => {
-                              const n = parsePositiveInt(e.target.value);
+                              const n = isWeightUnit(item.unit)
+                                ? parsePositiveDecimal(e.target.value)
+                                : parsePositiveInt(e.target.value);
                               if (n) setCartLineQuantity(item.id, n);
                               if (e.target.value === '') setCartLineQuantity(item.id, 0);
                             }}
@@ -732,7 +820,12 @@ export default function PosPage() {
                           <button
                             type="button"
                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-linen text-lg"
-                            onClick={() => setCartLineQuantity(item.id, item.quantity + 1)}
+                            onClick={() =>
+                              setCartLineQuantity(
+                                item.id,
+                                item.quantity + (isWeightUnit(item.unit) ? 0.1 : 1)
+                              )
+                            }
                             aria-label="Más"
                           >
                             +
@@ -791,6 +884,7 @@ export default function PosPage() {
                     />
                   </div>
 
+                  {rubroCaps.delivery ? (
                   <div
                     className={`rounded-2xl border p-4 transition ${
                       requiresDelivery
@@ -851,6 +945,7 @@ export default function PosPage() {
                       </div>
                     )}
                   </div>
+                  ) : null}
 
                   <button
                     onClick={() => handleConfirmSale()}

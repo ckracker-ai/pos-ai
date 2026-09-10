@@ -1,6 +1,7 @@
 import { normalizeRoleName } from '@/core/api/normalizers';
 import type { EmpresaPlanSummary, UserRole } from '@/core/interfaces';
 import { isPlanModuleEnabled } from '@/core/config/plan-access';
+import { isRubroModuleEnabled } from '@/core/config/rubro-packs';
 
 export type NavSectionId = 'operate' | 'control' | 'configure';
 export type NavClusterId = 'orders' | 'catalog' | 'business';
@@ -357,37 +358,52 @@ export function roleHasModuleAccess(role: UserRole | string, module: AppModule):
   return module.allowed.includes(resolved);
 }
 
-function filterModulesForPlan(modules: AppModule[], plan?: EmpresaPlanSummary | null): AppModule[] {
-  return modules.filter((m) => isPlanModuleEnabled(m.key, plan));
+function filterModulesForTenant(
+  modules: AppModule[],
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
+): AppModule[] {
+  return modules.filter(
+    (m) => isPlanModuleEnabled(m.key, plan) && isRubroModuleEnabled(m.key, rubroNegocio)
+  );
 }
 
 export function getDashboardModulesForRole(
   role?: string,
-  plan?: EmpresaPlanSummary | null
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
 ): AppModule[] {
   const resolved = resolveUserRole(role);
-  return filterModulesForPlan(
+  return filterModulesForTenant(
     APP_MODULES.filter((m) => m.showOnDashboard && roleHasModuleAccess(resolved, m)),
-    plan
+    plan,
+    rubroNegocio
   );
 }
 
-export function getNavModulesForRole(role?: string, plan?: EmpresaPlanSummary | null): AppModule[] {
+export function getNavModulesForRole(
+  role?: string,
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
+): AppModule[] {
   const resolved = resolveUserRole(role);
-  return filterModulesForPlan(
+  return filterModulesForTenant(
     APP_MODULES.filter((m) => m.showInNav && roleHasModuleAccess(resolved, m)),
-    plan
+    plan,
+    rubroNegocio
   );
 }
 
 export function getCatalogModulesForRole(
   role?: string,
-  plan?: EmpresaPlanSummary | null
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
 ): AppModule[] {
   const resolved = resolveUserRole(role);
-  return filterModulesForPlan(
+  return filterModulesForTenant(
     APP_MODULES.filter((m) => m.catalogGroup && roleHasModuleAccess(resolved, m)),
-    plan
+    plan,
+    rubroNegocio
   );
 }
 
@@ -408,21 +424,24 @@ export type NavSection = {
 function modulesForCluster(
   clusterId: NavClusterId,
   role: UserRole,
-  plan?: EmpresaPlanSummary | null
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
 ): AppModule[] {
-  return filterModulesForPlan(
+  return filterModulesForTenant(
     APP_MODULES.filter((m) => m.navCluster === clusterId && roleHasModuleAccess(role, m)),
-    plan
+    plan,
+    rubroNegocio
   );
 }
 
 /** Menú lateral: Operar / Controlar / Configurar. Acordeones no cuentan como ítems extra. */
 export function getNavSectionsForRole(
   role?: string,
-  plan?: EmpresaPlanSummary | null
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
 ): NavSection[] {
   const resolved = resolveUserRole(role);
-  const topLevel = filterModulesForPlan(
+  const topLevel = filterModulesForTenant(
     APP_MODULES.filter(
       (m) =>
         m.showInNav &&
@@ -430,7 +449,8 @@ export function getNavSectionsForRole(
         !m.catalogGroup &&
         roleHasModuleAccess(resolved, m)
     ),
-    plan
+    plan,
+    rubroNegocio
   );
 
   return NAV_SECTION_ORDER.map((id) => {
@@ -440,7 +460,7 @@ export function getNavSectionsForRole(
       .filter((clusterId) => NAV_CLUSTER_META[clusterId].section === id)
       .filter((clusterId) => !(hideOrdersCluster && clusterId === 'orders'))
       .map((clusterId) => {
-        const clusterItems = modulesForCluster(clusterId, resolved, plan);
+        const clusterItems = modulesForCluster(clusterId, resolved, plan, rubroNegocio);
         if (clusterItems.length === 0) return null;
         if (clusterItems.length === 1) {
           return null;
@@ -458,7 +478,7 @@ export function getNavSectionsForRole(
       .filter((clusterId) => NAV_CLUSTER_META[clusterId].section === id)
       .filter((clusterId) => !(hideOrdersCluster && clusterId === 'orders'))
       .flatMap((clusterId) => {
-        const clusterItems = modulesForCluster(clusterId, resolved, plan);
+        const clusterItems = modulesForCluster(clusterId, resolved, plan, rubroNegocio);
         return clusterItems.length === 1 ? clusterItems : [];
       });
 
@@ -492,7 +512,8 @@ function findModulesForPath(pathname: string): AppModule[] {
 export function canAccessPath(
   role: string | undefined,
   pathname: string,
-  plan?: EmpresaPlanSummary | null
+  plan?: EmpresaPlanSummary | null,
+  rubroNegocio?: string | null
 ): boolean {
   if (!role?.trim()) return false;
 
@@ -512,5 +533,6 @@ export function canAccessPath(
   );
 
   if (!roleHasModuleAccess(resolved, bestMatch)) return false;
-  return isPlanModuleEnabled(bestMatch.key, plan);
+  if (!isPlanModuleEnabled(bestMatch.key, plan)) return false;
+  return isRubroModuleEnabled(bestMatch.key, rubroNegocio);
 }

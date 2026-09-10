@@ -62,6 +62,7 @@ test('setup incluye QR WhatsApp en plan Estándar y cuenta progreso', () => {
   const steps = buildEmpresaSetupSteps(baseEmpresa, { wspMenuEnabled: false });
   assert.ok(steps.some((s) => s.id === 'wsp' && s.done === false));
   const { done, total } = empresaSetupProgress(steps);
-  assert.equal(total, 6);
+  assert.equal(total, 7);
   assert.ok(done >= 4);
+  assert.ok(steps.some((s) => s.id === 'rubro' && s.done === false));
 });

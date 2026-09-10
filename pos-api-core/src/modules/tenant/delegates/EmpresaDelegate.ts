@@ -116,6 +116,7 @@ export interface UpdateEmpresaTenantInput {
   transferAccount?: string | null;
   transferHolderName?: string | null;
   transferRut?: string | null;
+  rubroNegocio?: string | null;
 }
 
 /** Solo plataforma / onboarding interno (x-internal-key). */
@@ -499,6 +500,7 @@ class EmpresaDelegate {
     }
     if (input.nombreFantasia !== undefined) patch.nombreFantasia = input.nombreFantasia?.trim() || null;
     if (input.giroSii !== undefined) patch.giroSii = input.giroSii?.trim() || null;
+    if (input.rubroNegocio !== undefined) patch.rubroNegocio = input.rubroNegocio?.trim() || null;
     if (input.direccionComercial !== undefined) {
       patch.direccionComercial = input.direccionComercial?.trim() || null;
     }

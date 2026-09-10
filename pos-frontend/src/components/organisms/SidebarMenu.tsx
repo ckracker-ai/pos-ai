@@ -66,7 +66,10 @@ export function SidebarMenu({ onClose }: { onClose?: () => void } = {}) {
   const currentRole = resolveUserRole(user?.role);
   const plan = empresa?.plan ?? null;
 
-  const navSections = useMemo(() => getNavSectionsForRole(currentRole, plan), [currentRole, plan]);
+  const navSections = useMemo(
+    () => getNavSectionsForRole(currentRole, plan, empresa?.rubroNegocio),
+    [currentRole, plan, empresa?.rubroNegocio]
+  );
 
   const [openClusters, setOpenClusters] = useState<Record<string, boolean>>({});
 

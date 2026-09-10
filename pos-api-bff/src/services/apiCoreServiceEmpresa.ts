@@ -4,6 +4,7 @@ export type UpdateEmpresaTenantInput = {
   razonSocial?: string;
   nombreFantasia?: string | null;
   giroSii?: string | null;
+  rubroNegocio?: string | null;
   direccionComercial?: string | null;
   correoFacturacion?: string | null;
   urlLogo?: string | null;

@@ -58,6 +58,14 @@ export function parsePositiveDecimal(value: string): number | null {
   return n;
 }
 
+export function parseNonNegativeDecimal(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed.replace(/,/g, '.'));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 /** Entero >= min (default 1). Para inputs controlados mientras se escribe. */
 export function coercePositiveIntInput(value: string, min = 1): number {
   const digits = sanitizeDigitsOnly(value);

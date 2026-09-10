@@ -37,10 +37,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (pathname && !canAccessPath(user?.role, pathname, empresa?.plan)) {
+    if (pathname && !canAccessPath(user?.role, pathname, empresa?.plan, empresa?.rubroNegocio)) {
       router.push('/dashboard');
     }
-  }, [isHydrated, isAuthenticated, pathname, router, user?.role, empresa?.plan]);
+  }, [isHydrated, isAuthenticated, pathname, router, user?.role, empresa?.plan, empresa?.rubroNegocio]);
 
   if (!isHydrated) {
     return (

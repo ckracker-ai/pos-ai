@@ -9,6 +9,7 @@ const updateEmpresaSchema = z.object({
   razonSocial: z.string().min(1).optional(),
   nombreFantasia: z.string().nullable().optional(),
   giroSii: z.string().nullable().optional(),
+  rubroNegocio: z.string().max(120).nullable().optional(),
   direccionComercial: z.string().nullable().optional(),
   correoFacturacion: z.string().nullable().optional(),
   urlLogo: z.string().nullable().optional(),

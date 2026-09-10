@@ -12,6 +12,7 @@ import {
 } from '@/core/api/normalizers';
 import { posProxyPath } from '@/core/constants/api-path';
 import { isPlanModuleEnabled } from '@/core/config/plan-access';
+import { resolveRubroCapabilities } from '@/core/config/rubro-packs';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 import { useAuthStore } from '@/store/auth';
@@ -67,6 +68,7 @@ export default function PedidosPage() {
   const { branchId } = useActiveBranch();
   const { empresa } = useTenantEmpresa();
   const plan = empresa?.plan ?? null;
+  const caps = resolveRubroCapabilities(empresa?.rubroNegocio);
   const canProofs = isPlanModuleEnabled('comprobantes', plan);
 
   const [filter, setFilter] = useState<'todos' | InboxKind>('todos');
@@ -104,51 +106,55 @@ export default function PedidosPage() {
       );
     }
 
-    jobs.push(
-      (async () => {
-        const headers: Record<string, string> = {
-          Authorization: `Bearer ${token ?? ''}`,
-          'x-internal-key': process.env.NEXT_PUBLIC_INTERNAL_KEY ?? 'supersecretkey',
-        };
-        if (branchId) headers['x-branch-id'] = branchId;
-        const pendingRes = await fetch(posProxyPath('sales/deliveries/pending'), { headers });
-        const pendingJson = await pendingRes.json();
-        const list = (pendingJson.data?.deliveries ?? pendingJson.data ?? []) as DeliveryRow[];
-        for (const row of Array.isArray(list) ? list : []) {
-          next.push({
-            id: `envio-${row.id}`,
-            kind: 'envio',
-            title: row.saleNumber ? `Venta ${row.saleNumber}` : 'Envío pendiente',
-            meta: [row.deliveryCustomerName, row.deliveryAddress, row.deliveryStatus]
-              .filter(Boolean)
-              .join(' · '),
-            amount: Number(row.total ?? 0),
-            createdAt: row.createdAt ?? new Date().toISOString(),
-            href: '/delivery',
-          });
-        }
-      })()
-    );
+    if (caps.delivery) {
+      jobs.push(
+        (async () => {
+          const headers: Record<string, string> = {
+            Authorization: `Bearer ${token ?? ''}`,
+            'x-internal-key': process.env.NEXT_PUBLIC_INTERNAL_KEY ?? 'supersecretkey',
+          };
+          if (branchId) headers['x-branch-id'] = branchId;
+          const pendingRes = await fetch(posProxyPath('sales/deliveries/pending'), { headers });
+          const pendingJson = await pendingRes.json();
+          const list = (pendingJson.data?.deliveries ?? pendingJson.data ?? []) as DeliveryRow[];
+          for (const row of Array.isArray(list) ? list : []) {
+            next.push({
+              id: `envio-${row.id}`,
+              kind: 'envio',
+              title: row.saleNumber ? `Venta ${row.saleNumber}` : 'Envío pendiente',
+              meta: [row.deliveryCustomerName, row.deliveryAddress, row.deliveryStatus]
+                .filter(Boolean)
+                .join(' · '),
+              amount: Number(row.total ?? 0),
+              createdAt: row.createdAt ?? new Date().toISOString(),
+              href: '/delivery',
+            });
+          }
+        })()
+      );
+    }
 
-    jobs.push(
-      (async () => {
-        const response = await api.getSales();
-        const sales = extractList<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['sales']);
-        const kitchen: KitchenOrder[] = sales
-          .map((sale) => normalizeKitchenOrder(sale, new Map()))
-          .filter((sale) => sale.status.toUpperCase() === 'PENDING');
-        for (const order of kitchen) {
-          next.push({
-            id: `cocina-${order.id}`,
-            kind: 'cocina',
-            title: order.displayReference || 'Pedido cocina',
-            meta: `${order.items.length} ítem(s)`,
-            createdAt: order.createdAt,
-            href: '/comandas',
-          });
-        }
-      })()
-    );
+    if (caps.kitchen) {
+      jobs.push(
+        (async () => {
+          const response = await api.getSales();
+          const sales = extractList<Record<string, unknown>>(unwrapApiEnvelope(response.data), ['sales']);
+          const kitchen: KitchenOrder[] = sales
+            .map((sale) => normalizeKitchenOrder(sale, new Map()))
+            .filter((sale) => sale.status.toUpperCase() === 'PENDING');
+          for (const order of kitchen) {
+            next.push({
+              id: `cocina-${order.id}`,
+              kind: 'cocina',
+              title: order.displayReference || 'Pedido cocina',
+              meta: `${order.items.length} ítem(s)`,
+              createdAt: order.createdAt,
+              href: '/comandas',
+            });
+          }
+        })()
+      );
+    }
 
     const results = await Promise.allSettled(jobs);
     next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -157,11 +163,16 @@ export default function PedidosPage() {
       setErrorMessage('Algunas colas no se pudieron cargar. Revisa pagos, envíos o comandas.');
     }
     setLoading(false);
-  }, [branchId, canProofs, token]);
+  }, [branchId, canProofs, caps.delivery, caps.kitchen, token]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (filter === 'cocina' && !caps.kitchen) setFilter('todos');
+    if (filter === 'envio' && !caps.delivery) setFilter('todos');
+  }, [caps.delivery, caps.kitchen, filter]);
 
   const visible = useMemo(
     () => (filter === 'todos' ? items : items.filter((item) => item.kind === filter)),
@@ -210,9 +221,9 @@ export default function PedidosPage() {
           {(
             [
               ['todos', 'Todos'],
-              ['pago', 'Pagos'],
-              ['envio', 'Envíos'],
-              ['cocina', 'Cocina'],
+              ...(canProofs ? ([['pago', 'Pagos']] as const) : []),
+              ...(caps.delivery ? ([['envio', 'Envíos']] as const) : []),
+              ...(caps.kitchen ? ([['cocina', 'Cocina']] as const) : []),
             ] as const
           ).map(([id, label]) => (
             <button

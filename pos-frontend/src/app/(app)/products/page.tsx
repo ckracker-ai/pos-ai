@@ -27,6 +27,7 @@ import {
   applyDecimalInput,
   applyDigitsOnlyInput,
   INVALID_NUMERIC_INPUT_MESSAGE,
+  parseNonNegativeDecimal,
   parseNonNegativeInt,
   parsePositiveDecimal,
 } from '@/core/utils/numeric-input';
@@ -79,6 +80,7 @@ const [products, setProducts] = useState<Product[]>([]);
     cost: '',
     stock: '',
     minStock: '0',
+    unit: 'unit',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -166,13 +168,13 @@ const [products, setProducts] = useState<Product[]>([]);
   }, [activeBranchName, products]);
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === 'stock' || field === 'minStock') {
+    if (field === 'minStock') {
       const { value: next, hadInvalid } = applyDigitsOnlyInput(value);
       setFormNumericWarning(hadInvalid ? INVALID_NUMERIC_INPUT_MESSAGE : null);
       setForm((current) => ({ ...current, [field]: next }));
       return;
     }
-    if (field === 'price' || field === 'cost') {
+    if (field === 'stock' || field === 'price' || field === 'cost') {
       const { value: next, hadInvalid } = applyDecimalInput(value);
       setFormNumericWarning(hadInvalid ? INVALID_NUMERIC_INPUT_MESSAGE : null);
       setForm((current) => ({ ...current, [field]: next }));
@@ -301,6 +303,7 @@ const [products, setProducts] = useState<Product[]>([]);
       cost: String(product.cost ?? ''),
       stock: '0',
       minStock: String(product.minStock ?? 0),
+      unit: product.unit ?? 'unit',
     });
     setShowModal(true);
   };
@@ -311,7 +314,7 @@ const [products, setProducts] = useState<Product[]>([]);
     if (!productId?.trim()) {
       throw new Error('No se pudo actualizar inventario: productId inválido.');
     }
-    const stockDeltaNum = parseNonNegativeInt(form.stock);
+    const stockDeltaNum = parseNonNegativeDecimal(form.stock);
     const minStockNum = parseNonNegativeInt(form.minStock);
 
     if (stockDeltaNum === null) {
@@ -351,7 +354,7 @@ const [products, setProducts] = useState<Product[]>([]);
       if (parsePositiveDecimal(form.price) === null) {
         return 'El precio debe ser un número mayor a 0 (sin símbolos como $).';
       }
-      const stockDeltaNum = parseNonNegativeInt(form.stock);
+      const stockDeltaNum = parseNonNegativeDecimal(form.stock);
       if (stockDeltaNum === null) {
         return 'El ingreso de stock debe ser un número mayor o igual a 0.';
       }
@@ -372,7 +375,7 @@ const [products, setProducts] = useState<Product[]>([]);
     if (parsePositiveDecimal(form.price) === null) {
       return 'El precio debe ser un número mayor a 0 (sin símbolos como $).';
     }
-    if (parseNonNegativeInt(form.stock) === null) {
+    if (parseNonNegativeDecimal(form.stock) === null) {
       return 'El stock inicial debe ser un número mayor o igual a 0.';
     }
     if (parseNonNegativeInt(form.minStock) === null) {
@@ -417,6 +420,7 @@ const [products, setProducts] = useState<Product[]>([]);
         supplierId: form.supplierId.trim(),
         price: priceNum,
         cost: costNum,
+        unit: form.unit.trim() || 'unit',
       });
       await saveBranchInventory(editingProduct.id, Number(editingProduct.stock ?? 0));
 
@@ -460,7 +464,7 @@ const [products, setProducts] = useState<Product[]>([]);
     const categoryId = form.categoryId.trim();
     const supplierId = form.supplierId.trim();
     const priceNum = parsePositiveDecimal(form.price)!;
-    const stockNum = parseNonNegativeInt(form.stock)!;
+    const stockNum = parseNonNegativeDecimal(form.stock)!;
     const minStockNum = parseNonNegativeInt(form.minStock) ?? 0;
 
     const payload = {
@@ -471,6 +475,7 @@ const [products, setProducts] = useState<Product[]>([]);
       price: priceNum,
       initialStock: stockNum,
       minStock: minStockNum,
+      unit: form.unit.trim() || 'unit',
     };
 
     setIsSaving(true);
@@ -491,6 +496,7 @@ const [products, setProducts] = useState<Product[]>([]);
         cost: '',
         stock: '0',
         minStock: '0',
+        unit: 'unit',
       });
       setSuccessMessage('Producto creado con stock inicial en la sucursal activa.');
       setModalError(null);
@@ -644,6 +650,7 @@ const [products, setProducts] = useState<Product[]>([]);
                     cost: '',
                     stock: '0',
                     minStock: '0',
+                    unit: 'unit',
                   });
                   setSuccessMessage(null);
                   setModalError(null);
@@ -995,6 +1002,22 @@ const [products, setProducts] = useState<Product[]>([]);
                 )}
               </label>
               <label className="block text-sm text-[#3d4532]">
+                Unidad
+                <select
+                  value={form.unit}
+                  onChange={(event) => handleInputChange('unit', event.target.value)}
+                  className="app-input mt-2"
+                >
+                  <option value="unit">Unidad</option>
+                  <option value="kg">Kilogramo (kg)</option>
+                  <option value="g">Gramo (g)</option>
+                  <option value="lt">Litro (lt)</option>
+                </select>
+                <p className="mt-2 text-xs text-[#6b7280]">
+                  kg / g / lt permiten cantidad decimal en caja (granel).
+                </p>
+              </label>
+              <label className="block text-sm text-[#3d4532]">
                 Subcategoría (hoja)
                 <select
                   value={form.categoryId}
@@ -1089,8 +1112,7 @@ const [products, setProducts] = useState<Product[]>([]);
                     className="app-input mt-2"
                     placeholder="0"
                     type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    inputMode="decimal"
                   />
                 </label>
                 <label className="block text-sm text-[#3d4532]">

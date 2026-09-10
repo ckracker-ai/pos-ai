@@ -326,6 +326,9 @@ const createSaleWithDetails = async (req: AuthenticatedRequest, res: Response) =
       }
 
       const quantity = Number(line.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new Error('VALIDATION_ERROR: quantity must be greater than zero');
+      }
       const unitPrice = Number(line.unitPrice ?? 0);
 
       await SaleDetail.create(

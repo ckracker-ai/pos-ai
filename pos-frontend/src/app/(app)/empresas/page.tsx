@@ -17,6 +17,8 @@ import { useAuthStore } from '@/core/context/auth';
 import { getRoleProfile } from '@/core/config/role-access';
 import { canRenewSubscription } from '@/core/config/plan-access';
 import { buildEmpresaSetupSteps, empresaSetupProgress } from '@/core/config/empresa-setup';
+import { notifyEmpresaUpdated } from '@/core/hooks/useTenantEmpresa';
+import { RUBRO_PACKS, getRubroPack, isRubroPackSelected } from '@/core/config/rubro-packs';
 import { useBranchStore } from '@/store/branch';
 import { notifyApiError, notifySuccess } from '@/store/ui';
 import { EmpresaFormalizarPanel } from '@/components/molecules/EmpresaFormalizarPanel';
@@ -52,6 +54,7 @@ type EmpresaForm = {
   transferAccount: string;
   transferHolderName: string;
   transferRut: string;
+  rubroNegocio: string;
 };
 
 const emptyForm = (): EmpresaForm => ({
@@ -67,6 +70,7 @@ const emptyForm = (): EmpresaForm => ({
   transferAccount: '',
   transferHolderName: '',
   transferRut: '',
+  rubroNegocio: '',
 });
 
 function empresaToForm(empresa: Empresa): EmpresaForm {
@@ -83,6 +87,7 @@ function empresaToForm(empresa: Empresa): EmpresaForm {
     transferAccount: empresa.transferAccount ?? '',
     transferHolderName: empresa.transferHolderName ?? '',
     transferRut: empresa.transferRut ?? '',
+    rubroNegocio: empresa.rubroNegocio ?? '',
   };
 }
 
@@ -125,6 +130,9 @@ function buildPatchPayload(form: EmpresaForm, original: Empresa): UpdateEmpresaI
   }
   if (trim(form.transferRut) !== (original.transferRut ?? '')) {
     payload.transferRut = trim(form.transferRut) || null;
+  }
+  if (trim(form.rubroNegocio) !== (original.rubroNegocio ?? '')) {
+    payload.rubroNegocio = trim(form.rubroNegocio) || null;
   }
 
   return payload;
@@ -277,6 +285,7 @@ export default function EmpresasPage() {
         await loadEmpresa();
       }
       notifySuccess('Empresa actualizada', 'Los datos se guardaron correctamente.');
+      notifyEmpresaUpdated();
     } catch (error) {
       const { displayMessage } = notifyApiError('empresas.save', error, { toast: true });
       setErrorMessage(displayMessage);
@@ -419,6 +428,38 @@ export default function EmpresasPage() {
                           readOnly={!canManageEmpresa}
                           className={inputClass}
                         />
+                      </div>
+                      <div>
+                        <FieldLabel>Tipo de negocio (rubro)</FieldLabel>
+                        <p className="mb-3 text-sm text-brand-ink-muted">
+                          Condiciona cocina, envíos y caja (código de barras / granel). Costa Azul y locales de
+                          comida quedan en gastronomía.
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {RUBRO_PACKS.map((pack) => {
+                            const selected = getRubroPack(form.rubroNegocio).codigo === pack.codigo &&
+                              isRubroPackSelected(form.rubroNegocio);
+                            const fallbackGastro =
+                              !isRubroPackSelected(form.rubroNegocio) && pack.codigo === 'GASTRONOMIA';
+                            const active = selected || fallbackGastro;
+                            return (
+                              <button
+                                key={pack.codigo}
+                                type="button"
+                                disabled={!canManageEmpresa}
+                                onClick={() => handleFieldChange('rubroNegocio', pack.codigo)}
+                                className={`rounded-2xl border px-3 py-3 text-left text-sm ${
+                                  active
+                                    ? 'border-brand-olive bg-brand-olive/10 text-brand-ink'
+                                    : 'border-brand-linen bg-white text-brand-ink'
+                                }`}
+                              >
+                                <span className="font-semibold">{pack.label}</span>
+                                <span className="mt-1 block text-xs text-brand-ink-muted">{pack.hint}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                       <div>
                         <FieldLabel>Giro SII</FieldLabel>

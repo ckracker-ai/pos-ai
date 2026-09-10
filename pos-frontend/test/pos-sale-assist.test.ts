@@ -5,6 +5,7 @@ import {
   buildPosSuggestions,
   cartQuantityForProduct,
   enrichPosAiResult,
+  findProductByExactSku,
   formatPosProductOptionLabel,
   formatProductCartLabel,
   normalizePosVoiceCommand,
@@ -19,6 +20,11 @@ const catalog = [
   { id: 'c', name: 'Jugo', price: 1800, stock: 8, categoryId: 'cat-beb', category: 'Bebidas' },
   { id: 'd', name: 'Sin stock', price: 1000, stock: 0, categoryId: 'cat-x', category: 'Otros' },
 ];
+
+test('validateAddToCart acepta cantidad decimal de granel', () => {
+  const ok = validateAddToCart({ product: { ...catalog[0], stock: 2.5 }, quantity: 0.25, cart: [] });
+  assert.equal(ok.ok, true);
+});
 
 test('validateAddToCart respeta stock incluyendo carrito', () => {
   const cart = [{ id: 'a', quantity: 9 }];
@@ -54,6 +60,18 @@ test('validateSaleForm exige carrito y número de venta', () => {
   });
   assert.equal(fail.ok, false);
   if (!fail.ok) assert.ok(fail.messages.length >= 2);
+});
+
+test('findProductByExactSku coincide sin importar mayúsculas', () => {
+  const found = findProductByExactSku(
+    [
+      { id: 'a', sku: '780123' },
+      { id: 'b', sku: 'ABC' },
+    ],
+    '780123'
+  );
+  assert.equal(found?.id, 'a');
+  assert.equal(findProductByExactSku([{ id: 'a', sku: 'x' }], 'nope'), undefined);
 });
 
 test('cartQuantityForProduct', () => {

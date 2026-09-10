@@ -9,7 +9,7 @@ import { ApiCoreServiceSales } from '../services/apiCoreServiceSales.js';
 
 const saleDetailSchema = z.object({
   productId: z.string().min(1),
-  quantity: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().positive(),
   unitPrice: z.coerce.number().nonnegative().optional(),
   subtotal: z.coerce.number().nonnegative().optional(),
 });

@@ -1,5 +1,6 @@
 import type { Empresa } from '@/core/interfaces';
 import { resolvePlanFeatures } from '@/core/config/plan-access';
+import { isRubroPackSelected } from '@/core/config/rubro-packs';
 
 export type EmpresaSetupTab =
   | 'general'
@@ -48,6 +49,13 @@ export function buildEmpresaSetupSteps(
       title: 'Datos del negocio',
       hint: 'Razón social y nombre con el que te reconocen los clientes.',
       done: filled(empresa.razonSocial) && filled(empresa.nombreFantasia),
+      tab: 'general',
+    },
+    {
+      id: 'rubro',
+      title: 'Tipo de negocio (rubro)',
+      hint: 'Define caja, cocina y envíos según el pack (minimarket, ferretería, ropa…).',
+      done: isRubroPackSelected(empresa.rubroNegocio),
       tab: 'general',
     },
     {
