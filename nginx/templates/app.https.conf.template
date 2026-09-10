@@ -1,8 +1,8 @@
 # Frontend — HTTPS (certificados detectados en /etc/letsencrypt)
 server {
-    listen 80;
-    listen [::]:80;
-    server_name ${APP_DOMAIN};
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name ${APP_DOMAIN} www.${APP_DOMAIN};
 
     include /etc/nginx/snippets/acme.conf;
 
@@ -12,10 +12,10 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
     http2 on;
-    server_name ${APP_DOMAIN};
+    server_name ${APP_DOMAIN} www.${APP_DOMAIN};
 
     ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
