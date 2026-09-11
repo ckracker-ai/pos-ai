@@ -11,6 +11,7 @@ export const LANDING_BRAND = {
 export const LANDING_MEDIA = {
   video: '/videos/pos-ai-2.mp4',
   videoPoster: '/images/landing-slide-1.png',
+  heroBackground: '/images/landing-hero-atmosphere.png',
   heroSlide: '/images/landing-slide-1.png',
   featureSlides: [
     {

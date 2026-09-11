@@ -4,6 +4,7 @@ import Sale from '../../sales/models/Sale.model';
 import Branch from '../../branch/models/Branch.model';
 import User from '../../auth/models/User.model';
 import { Result, ok, fail } from '../../../types/result';
+import { computeReorderDraftQty, santiagoHour } from '../operationalLearning';
 
 export interface ReportsSummary {
   totalRevenue: number;
@@ -88,6 +89,36 @@ export interface ShrinkageReportRow {
 export interface ShrinkageReportPayload {
   summary: ShrinkageReportSummary;
   shrinkages: ShrinkageReportRow[];
+}
+
+export interface HotSkuRow {
+  productId: string;
+  name: string;
+  sku: string | null;
+  qtySold: number;
+  hour: number;
+  fallback: boolean;
+}
+
+export interface ReorderDraftRow {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  branchId: string;
+  branchName: string;
+  quantity: number;
+  minStock: number;
+  qtySold7d: number;
+  suggestedQty: number;
+  status: 'DRAFT';
+}
+
+export interface BusinessInsightsPayload {
+  mix7d: Array<{ productName: string; qtySold: number }>;
+  peakHour: number | null;
+  peakSaleCount: number;
+  mermaQty7d: number;
+  mermaQty28d: number;
 }
 
 function startOfToday(): Date {
@@ -514,6 +545,245 @@ class ReportsDelegate {
     } catch (error) {
       console.error('[Reports] getShrinkageReport failed', error);
       return fail('ERROR_FETCHING_SHRINKAGE_REPORT');
+    }
+  }
+
+  async getHotSkus(
+    empresaId: string,
+    branchId: string | null,
+    hourInput?: number
+  ): Promise<Result<{ hour: number; items: HotSkuRow[] }>> {
+    const hour =
+      Number.isFinite(hourInput) && hourInput != null
+        ? Math.min(23, Math.max(0, Math.trunc(hourInput)))
+        : santiagoHour();
+    if (!branchId) {
+      return ok({ hour, items: [] });
+    }
+    try {
+      const run = async (restrictHour: boolean) => {
+        const hourClause = restrictHour
+          ? 'AND HOUR(CONVERT_TZ(s.created_at, \'+00:00\', \'-03:00\')) = :hour'
+          : '';
+        return sequelize.query<Record<string, unknown>>(
+          `SELECT
+             d.product_id,
+             p.name AS product_name,
+             p.sku,
+             SUM(d.quantity) AS qty_sold
+           FROM sale_details d
+           INNER JOIN sales s ON s.id = d.sale_id
+           INNER JOIN products p ON p.id = d.product_id AND p.empresa_id = s.empresa_id
+           WHERE s.empresa_id = :empresaId
+             AND s.branch_id = :branchId
+             AND s.status = 'COMPLETED'
+             AND s.created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 28 DAY)
+             ${hourClause}
+           GROUP BY d.product_id, p.name, p.sku
+           ORDER BY qty_sold DESC
+           LIMIT 8`,
+          {
+            replacements: { empresaId, branchId, hour },
+            type: QueryTypes.SELECT,
+          }
+        );
+      };
+
+      let rows = await run(true);
+      let fallback = false;
+      if (rows.length === 0) {
+        rows = await run(false);
+        fallback = true;
+      }
+
+      const items: HotSkuRow[] = rows.map((row) => ({
+        productId: String(readRowValue(row, 'product_id', 'productId') ?? ''),
+        name: String(readRowValue(row, 'product_name', 'productName') ?? 'Producto'),
+        sku: (() => {
+          const v = readRowValue(row, 'sku');
+          return v != null && String(v).trim() ? String(v) : null;
+        })(),
+        qtySold: Number(readRowValue(row, 'qty_sold', 'qtySold') ?? 0),
+        hour,
+        fallback,
+      })).filter((row) => row.productId);
+
+      return ok({ hour, items });
+    } catch (error) {
+      console.error('[Reports] getHotSkus failed', error);
+      return fail('ERROR_FETCHING_HOT_SKUS');
+    }
+  }
+
+  async getReorderDraft(
+    empresaId: string,
+    branchId: string | null,
+    limit = 20
+  ): Promise<Result<ReorderDraftRow[]>> {
+    try {
+      const branchClause = branchId ? 'AND st.branch_id = :branchId' : '';
+      const soldBranch = branchId ? 'AND s.branch_id = :branchId' : '';
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           st.product_id,
+           st.branch_id,
+           st.quantity,
+           st.min_stock,
+           p.name AS product_name,
+           p.sku,
+           b.name AS branch_name,
+           COALESCE(sold.qty7, 0) AS qty_7d
+         FROM inventory_stock st
+         INNER JOIN products p ON p.id = st.product_id AND p.empresa_id = st.empresa_id
+         INNER JOIN branches b ON b.id = st.branch_id AND b.empresa_id = st.empresa_id
+         LEFT JOIN (
+           SELECT s.branch_id, d.product_id, SUM(d.quantity) AS qty7
+           FROM sale_details d
+           INNER JOIN sales s ON s.id = d.sale_id
+           WHERE s.empresa_id = :empresaId
+             AND s.status = 'COMPLETED'
+             AND s.created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)
+             ${soldBranch}
+           GROUP BY s.branch_id, d.product_id
+         ) sold ON sold.product_id = st.product_id AND sold.branch_id = st.branch_id
+         WHERE st.empresa_id = :empresaId
+           ${branchClause}`,
+        {
+          replacements: branchId ? { empresaId, branchId } : { empresaId },
+          type: QueryTypes.SELECT,
+        }
+      );
+
+      const drafts: ReorderDraftRow[] = [];
+      for (const row of rows) {
+        const quantity = Number(readRowValue(row, 'quantity') ?? 0);
+        const minStock = Number(readRowValue(row, 'min_stock', 'minStock') ?? 0);
+        const qtySold7d = Number(readRowValue(row, 'qty_7d', 'qty7d') ?? 0);
+        const suggestedQty = computeReorderDraftQty(quantity, minStock, qtySold7d);
+        if (suggestedQty <= 0) continue;
+        drafts.push({
+          productId: String(readRowValue(row, 'product_id', 'productId') ?? ''),
+          productName: String(readRowValue(row, 'product_name', 'productName') ?? 'Producto'),
+          sku: (() => {
+            const v = readRowValue(row, 'sku');
+            return v != null && String(v).trim() ? String(v) : null;
+          })(),
+          branchId: String(readRowValue(row, 'branch_id', 'branchId') ?? ''),
+          branchName: String(readRowValue(row, 'branch_name', 'branchName') ?? 'Sucursal'),
+          quantity,
+          minStock,
+          qtySold7d,
+          suggestedQty,
+          status: 'DRAFT',
+        });
+      }
+
+      drafts.sort((a, b) => b.suggestedQty - a.suggestedQty || a.quantity - b.quantity);
+      if (drafts.length === 0) {
+        const low = await this.getLowStockAlerts(empresaId, branchId, limit);
+        if (low.success) {
+          for (const alert of low.value) {
+            const suggestedQty = computeReorderDraftQty(alert.quantity, alert.minStock, 0);
+            if (suggestedQty <= 0) continue;
+            drafts.push({
+              productId: alert.productId,
+              productName: alert.productName,
+              sku: null,
+              branchId: alert.branchId,
+              branchName: alert.branchName,
+              quantity: alert.quantity,
+              minStock: alert.minStock,
+              qtySold7d: 0,
+              suggestedQty,
+              status: 'DRAFT',
+            });
+          }
+        }
+      }
+      return ok(drafts.filter((d) => d.productId).slice(0, Math.min(50, Math.max(5, limit))));
+    } catch (error) {
+      console.error('[Reports] getReorderDraft failed', error);
+      return fail('ERROR_FETCHING_REORDER_DRAFT');
+    }
+  }
+
+  /** S15: agregados de mix / pico / merma. Solo lectura; no inventa stock. */
+  async getBusinessInsights(
+    empresaId: string,
+    branchId: string | null
+  ): Promise<Result<BusinessInsightsPayload>> {
+    const branchAndSales = branchId ? 'AND s.branch_id = :branchId' : '';
+    const branchAndSh = branchId ? 'AND sh.branch_id = :branchId' : '';
+    const replacements = branchId ? { empresaId, branchId } : { empresaId };
+
+    try {
+      const mixRows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           p.name AS product_name,
+           SUM(d.quantity) AS qty_sold
+         FROM sale_details d
+         INNER JOIN sales s ON s.id = d.sale_id
+         INNER JOIN products p ON p.id = d.product_id AND p.empresa_id = s.empresa_id
+         WHERE s.empresa_id = :empresaId
+           AND s.status <> 'CANCELLED'
+           AND s.created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)
+           ${branchAndSales}
+         GROUP BY p.id, p.name
+         ORDER BY qty_sold DESC
+         LIMIT 5`,
+        { replacements, type: QueryTypes.SELECT }
+      );
+
+      const peakRows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           HOUR(CONVERT_TZ(s.created_at, '+00:00', '-03:00')) AS peak_hour,
+           COUNT(*) AS sale_count
+         FROM sales s
+         WHERE s.empresa_id = :empresaId
+           AND s.status <> 'CANCELLED'
+           AND s.created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 28 DAY)
+           ${branchAndSales}
+         GROUP BY HOUR(CONVERT_TZ(s.created_at, '+00:00', '-03:00'))
+         HAVING peak_hour IS NOT NULL
+         ORDER BY sale_count DESC
+         LIMIT 1`,
+        { replacements, type: QueryTypes.SELECT }
+      );
+
+      const mermaRows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           COALESCE(SUM(CASE
+             WHEN sh.created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY) THEN sh.quantity
+             ELSE 0
+           END), 0) AS qty_7d,
+           COALESCE(SUM(sh.quantity), 0) AS qty_28d
+         FROM shrinkages sh
+         WHERE sh.empresa_id = :empresaId
+           AND sh.status = 'APPROVED'
+           AND sh.created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 28 DAY)
+           ${branchAndSh}`,
+        { replacements, type: QueryTypes.SELECT }
+      );
+
+      const peak = peakRows[0];
+      const merma = mermaRows[0];
+      const peakHourRaw = peak ? Number(readRowValue(peak, 'peak_hour', 'peakHour')) : NaN;
+
+      return ok({
+        mix7d: mixRows
+          .map((row) => ({
+            productName: String(readRowValue(row, 'product_name', 'productName') ?? '').trim(),
+            qtySold: Number(readRowValue(row, 'qty_sold', 'qtySold') ?? 0) || 0,
+          }))
+          .filter((row) => row.productName),
+        peakHour: Number.isFinite(peakHourRaw) ? Math.min(23, Math.max(0, Math.trunc(peakHourRaw))) : null,
+        peakSaleCount: peak ? Number(readRowValue(peak, 'sale_count', 'saleCount') ?? 0) || 0 : 0,
+        mermaQty7d: merma ? Number(readRowValue(merma, 'qty_7d', 'qty7d') ?? 0) || 0 : 0,
+        mermaQty28d: merma ? Number(readRowValue(merma, 'qty_28d', 'qty28d') ?? 0) || 0 : 0,
+      });
+    } catch (error) {
+      console.error('[Reports] getBusinessInsights failed', error);
+      return fail('ERROR_FETCHING_BUSINESS_INSIGHTS');
     }
   }
 }

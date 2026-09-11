@@ -1,10 +1,13 @@
 /** Copys canal voz — cortos, sin markdown ni emojis. */
 
-export function voiceHelp(empresaNombre: string): string {
+import { buscarExample } from './rubroGlossary.js';
+
+export function voiceHelp(empresaNombre: string, rubroNegocio?: string | null): string {
+  const buscar = buscarExample(rubroNegocio);
   return (
     `Hola, soy el asistente de ${empresaNombre}. ` +
-    `Di sucursales para elegir local, buscar más el producto, ` +
-    `luego el número por cantidad, y confirmar. ` +
+    `Di sucursales para elegir local, luego ${buscar}, ` +
+    `pedido 1 por 2, y confirmar. ` +
     `El pago te lo envío por WhatsApp al mismo número.`
   );
 }

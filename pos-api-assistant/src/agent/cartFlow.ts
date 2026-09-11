@@ -12,8 +12,8 @@ export function canAppendToOpenCart(awaitingCustomerConfirm: boolean): boolean {
   return awaitingCustomerConfirm;
 }
 
-export function branchSelectedSearchPrompt(branchName: string): string {
-  return wspBranchSelected(branchName);
+export function branchSelectedSearchPrompt(branchName: string, rubroNegocio?: string | null): string {
+  return wspBranchSelected(branchName, rubroNegocio);
 }
 
 export function searchResultsFooter(hasOpenCart: boolean): string {

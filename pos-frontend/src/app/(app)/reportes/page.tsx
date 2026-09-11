@@ -14,6 +14,8 @@ import { Navbar } from '@/components/organisms/Navbar';
 import { NavGlyph } from '@/components/atoms/NavGlyph';
 import { RevenueTrendChart } from '@/components/organisms/RevenueTrendChart';
 import { exportRowsToExcel } from '@/utils/exportExcel';
+import { BusinessAskPanel } from '@/components/molecules/BusinessAskPanel';
+import { coerceBusinessInsights, type BusinessInsights } from '@/core/pos/businessAgent';
 
 type ReportsSummary = {
   totalRevenue: number;
@@ -34,6 +36,19 @@ type LowStockAlert = {
   branchName: string;
   quantity: number;
   minStock: number;
+};
+
+type ReorderDraft = {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  branchId: string;
+  branchName: string;
+  quantity: number;
+  minStock: number;
+  qtySold7d: number;
+  suggestedQty: number;
+  status?: string;
 };
 
 type SaleRow = {
@@ -185,6 +200,8 @@ export default function ReportesPage() {
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [revenueTrend, setRevenueTrend] = useState<RevenuePoint[]>([]);
   const [lowStock, setLowStock] = useState<LowStockAlert[]>([]);
+  const [reorderDrafts, setReorderDrafts] = useState<ReorderDraft[]>([]);
+  const [insights, setInsights] = useState<BusinessInsights | null>(null);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [shrinkageSummary, setShrinkageSummary] = useState<ShrinkageReportSummary | null>(null);
@@ -222,11 +239,45 @@ export default function ReportesPage() {
         summary: ReportsSummary;
         revenueTrend: RevenuePoint[];
         lowStockAlerts: LowStockAlert[];
+        reorderDrafts?: ReorderDraft[];
+        businessInsights?: unknown;
       };
 
       setSummary(dashboard.summary);
+      setInsights(
+        coerceBusinessInsights(dashboard.businessInsights, {
+          todaySales: Number(dashboard.summary?.todaySales ?? 0),
+          todayRevenue: Number(dashboard.summary?.todayRevenue ?? 0),
+        })
+      );
       setRevenueTrend(dashboard.revenueTrend ?? []);
       setLowStock(dashboard.lowStockAlerts ?? []);
+      {
+        const fromApi = Array.isArray(dashboard.reorderDrafts) ? dashboard.reorderDrafts : [];
+        if (fromApi.length > 0) {
+          setReorderDrafts(fromApi);
+        } else {
+          setReorderDrafts(
+            (dashboard.lowStockAlerts ?? []).map((item) => {
+              const quantity = Number(item.quantity ?? 0);
+              const minStock = Number(item.minStock ?? 0);
+              const suggestedQty =
+                minStock > 0 ? Math.max(1, minStock + 1 - quantity) : Math.max(1, 6 - quantity);
+              return {
+                productId: item.productId,
+                productName: item.productName,
+                sku: null,
+                branchId: item.branchId,
+                branchName: item.branchName,
+                quantity,
+                minStock,
+                qtySold7d: 0,
+                suggestedQty,
+              };
+            }).filter((row) => row.suggestedQty > 0)
+          );
+        }
+      }
 
       const salesData = unwrapApiEnvelope(salesRes.data) as { sales?: unknown[] };
       const saleRows = Array.isArray(salesData?.sales) ? salesData.sales : [];
@@ -257,10 +308,11 @@ export default function ReportesPage() {
       );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
+      setInsights(null);
     } finally {
       setIsLoading(false);
     }
-  }, [reportParams, shrinkageReportParams]);
+  }, [reportParams, shrinkageReportParams, canGlobal]);
 
   useEffect(() => {
     setGlobalView(false);
@@ -477,6 +529,44 @@ export default function ReportesPage() {
                   </ul>
                 </div>
               </div>
+
+              {canGlobal ? (
+                <div id="reorden" className="app-card mt-6 rounded-3xl p-6">
+                  <h2 className="text-lg font-semibold text-[#3d4532]">Reorden (borrador)</h2>
+                  <p className="mt-1 text-sm app-text-muted">
+                    Pedir para cubrir 7 días de venta o el mínimo. Borrador: no genera orden de compra.
+                  </p>
+                  {reorderDrafts.length === 0 ? (
+                    <p className="mt-4 text-sm text-[#6b7280]">
+                      Sin sugerencias en esta sucursal (o vista global).
+                    </p>
+                  ) : (
+                    <ul className="mt-4 divide-y divide-brand-linen/70">
+                      {reorderDrafts.map((item) => (
+                        <li
+                          key={`${item.productId}-${item.branchId}`}
+                          className="flex items-center justify-between gap-3 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-[#3d4532]">{item.productName}</p>
+                            <p className="truncate text-xs text-[#6b7280]">
+                              {item.branchName}
+                              {item.sku ? ` · ${item.sku}` : ''} · stock {item.quantity}
+                              {item.minStock > 0 ? ` · mín. ${item.minStock}` : ''} · vendido 7d{' '}
+                              {item.qtySold7d}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-brand-olive/10 px-3 py-1 text-sm font-semibold text-brand-olive">
+                            Pedir {item.suggestedQty}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+
+              {canGlobal ? <BusinessAskPanel insights={insights} loading={isLoading} /> : null}
 
               <div className="app-card mt-8 rounded-3xl p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

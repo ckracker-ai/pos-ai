@@ -1,17 +1,21 @@
 /** Copys WSP P2 — tono claro, pasos numerados, sin jerga técnica. */
 
-export function wspHelp(empresaNombre: string): string {
+import { buscarExample } from './rubroGlossary.js';
+
+export function wspHelp(empresaNombre: string, rubroNegocio?: string | null): string {
+  const buscar = buscarExample(rubroNegocio);
   return (
     `Hola 👋 Soy el asistente de *${empresaNombre}*.\n\n` +
     `*Pedir en 3 pasos*\n` +
     `1️⃣ *sucursales* o *comuna [nombre]* → elige local\n` +
     `2️⃣ *buscar [producto]* → elige número × cantidad (*pedido 1x2*)\n` +
+    `   Ejemplo: *${buscar}*\n` +
     `3️⃣ *confirmar* → datos de pago y comprobante\n\n` +
     `*Útiles*\n` +
     `• *mi pedido* — ver carrito\n` +
     `• *agregar 2x1* — suma al mismo pedido\n` +
     `• *cancelar pedido* — anular y empezar de nuevo\n` +
-    `• *categorias* — ver familias del menú\n` +
+    `• *categorias* — ver familias del catálogo\n` +
     `• *menu* — carta digital con precios (link web)`
   );
 }
@@ -72,7 +76,7 @@ export function wspOrderCancelled(pedidoId: string, totalLabel: string): string 
     `Pedido #${pedidoId} *cancelado* ✅\n` +
     `(Total era ${totalLabel})\n\n` +
     'Stock liberado. Para pedir de nuevo:\n' +
-    '*buscar empanada* → *pedido 1 x2*'
+    '*buscar …* → *pedido 1x2*'
   );
 }
 
@@ -297,10 +301,11 @@ export function wspPickBranchPrompt(): string {
   return '¿En qué sucursal compras? Escribe *sucursales* y responde con el número.';
 }
 
-export function wspBranchSelected(branchName: string): string {
+export function wspBranchSelected(branchName: string, rubroNegocio?: string | null): string {
+  const buscar = buscarExample(rubroNegocio);
   return (
     `Listo ✅ Atendemos en *${branchName}*.\n\n` +
-    '¿Qué buscas? Ej: *buscar empanada* · *buscar bebida*\n' +
+    `¿Qué buscas? Escribe *${buscar}* o *buscar* y el nombre del producto.\n` +
     '📋 *menu* — carta digital con precios'
   );
 }
@@ -312,7 +317,7 @@ export function wspNoCategories(): string {
 export function wspCategoryMenu(resumen: string): string {
   return (
     `*Familias del menú:*\n\n${resumen}\n\n` +
-    'Busca con *buscar …* (ej. *buscar empanada* o el nombre de una familia).\n' +
+    'Busca con *buscar …* (nombre del producto o de una familia).\n' +
     'O escribe *menu* para la carta web con precios.'
   );
 }
@@ -382,8 +387,8 @@ export function wspPedidoHelpEmpty(): string {
     'Indica qué quieres pedir:\n' +
     '• *pedido 2x2* — ítem 2 del listado, cantidad 2\n' +
     '• *pedido 5x2, 2x1* — varios ítems (coma)\n' +
-    '• *pedido empanada 2* — por nombre\n\n' +
-    'Primero *buscar empanada* para ver el listado numerado.'
+    '• *pedido [nombre] 2* — por nombre\n\n' +
+    'Primero *buscar …* para ver el listado numerado.'
   );
 }
 
@@ -501,6 +506,7 @@ export function wspTerritoryResolveReply(options: {
   comunaNombre: string;
   branches: Array<{ name: string; address: string | null }>;
   empresaNombre: string;
+  rubroNegocio?: string | null;
 }): string {
   const { comunaNombre, branches, empresaNombre } = options;
   if (branches.length === 0) {
@@ -514,7 +520,7 @@ export function wspTerritoryResolveReply(options: {
     return (
       `Sucursal en *${comunaNombre}*: *${b.name}*.\n` +
       `${b.address ? `${b.address}\n\n` : ''}` +
-      'Ya puedes *buscar* productos. Ej: *buscar empanada*'
+      `Ya puedes *buscar* productos. Ej: *${buscarExample(options.rubroNegocio)}*`
     );
   }
   const lines = branches.map((b, i) => `${i + 1}. ${b.name}${b.address ? ` — ${b.address}` : ''}`);

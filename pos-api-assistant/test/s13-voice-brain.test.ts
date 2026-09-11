@@ -7,7 +7,7 @@ import {
   voiceNeedBranchMessage,
   voiceNoCardMessage,
 } from '../src/agent/voiceGuards.js';
-import { applySynonyms, mergeRubroSynonyms } from '../src/agent/rubroGlossary.js';
+import { applySynonyms, buscarExample, mergeRubroSynonyms } from '../src/agent/rubroGlossary.js';
 
 test('IA-V1 voz rechaza PAN de tarjeta', () => {
   assert.equal(looksLikeCardPan('4111111111111111'), true);
@@ -30,4 +30,10 @@ test('IA-V1 pedido de voz exige sucursal', () => {
 test('voz usa el mismo diccionario de rubro que caja', () => {
   const out = applySynonyms('agrega cortado', mergeRubroSynonyms('GASTRONOMIA', null));
   assert.match(out.toLowerCase(), /cafe/);
+});
+
+test('ejemplo de búsqueda sigue el rubro del tenant', () => {
+  assert.equal(buscarExample('FERRETERIA'), 'buscar tornillo');
+  assert.equal(buscarExample('GASTRONOMIA'), 'buscar cafe');
+  assert.ok(!buscarExample('FERRETERIA').includes('empanada'));
 });

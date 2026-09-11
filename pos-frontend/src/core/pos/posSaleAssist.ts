@@ -162,6 +162,14 @@ export type PosQuickAction = {
   command: string;
   /** Si true, el chip ejecuta el comando; si no, solo lo deja en el input. */
   runImmediately?: boolean;
+  productId?: string;
+  kind?: 'hot' | 'tool';
+};
+
+export type PosHotSku = {
+  productId: string;
+  name: string;
+  qtySold?: number;
 };
 
 function sampleProductLabel(products: PosAssistProduct[]): string {
@@ -170,13 +178,32 @@ function sampleProductLabel(products: PosAssistProduct[]): string {
   return name.split(/\s+/).slice(0, 3).join(' ');
 }
 
-/** Acciones de caja: ejemplos de búsqueda y vaciar (inmediato). */
-export function buildPosQuickActions(products: PosAssistProduct[]): PosQuickAction[] {
+/** Acciones de caja: SKU calientes de la hora + búsqueda y vaciar. */
+export function buildPosQuickActions(
+  products: PosAssistProduct[],
+  hotSkus: PosHotSku[] = []
+): PosQuickAction[] {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const hot: PosQuickAction[] = [];
+  for (const sku of hotSkus) {
+    const product = byId.get(sku.productId);
+    if (!product || product.stock <= 0) continue;
+    const short = product.name.trim().split(/\s+/).slice(0, 4).join(' ');
+    hot.push({
+      label: short,
+      command: `agregar ${product.name}`,
+      productId: product.id,
+      runImmediately: true,
+      kind: 'hot',
+    });
+    if (hot.length >= 5) break;
+  }
   const sample = sampleProductLabel(products);
   return [
+    ...hot,
     { label: `Buscar «${sample}»`, command: `buscar ${sample}` },
-    { label: 'Ayuda', command: 'ayuda', runImmediately: true },
-    { label: 'Vaciar', command: 'vaciar carrito', runImmediately: true },
+    { label: 'Ayuda', command: 'ayuda', runImmediately: true, kind: 'tool' },
+    { label: 'Vaciar', command: 'vaciar carrito', runImmediately: true, kind: 'tool' },
   ];
 }
 

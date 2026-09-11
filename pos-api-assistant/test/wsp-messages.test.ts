@@ -9,6 +9,12 @@ import {
   wspComunaSearchResults,
 } from '../src/agent/wspMessages.js';
 
+test('wspHelp de ferretería no cita empanada', () => {
+  const msg = wspHelp('FerreMax', 'FERRETERIA');
+  assert.match(msg, /buscar tornillo/);
+  assert.ok(!/empanada/i.test(msg));
+});
+
 test('wspHelp incluye pasos numerados y comandos clave', () => {
   const msg = wspHelp('Costa Azul');
   assert.match(msg, /Costa Azul/);

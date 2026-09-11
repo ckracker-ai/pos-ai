@@ -513,7 +513,7 @@ class AssistantDelegate {
       empresaIds.length > 0
         ? await Empresa.findAll({
             where: { id: empresaIds },
-            attributes: ['id', 'nombreFantasia', 'razonSocial'],
+            attributes: ['id', 'nombreFantasia', 'razonSocial', 'rubroNegocio'],
           })
         : [];
     const nameById = new Map(
@@ -526,12 +526,20 @@ class AssistantDelegate {
       })
     );
 
+    const rubroById = new Map(
+      empresas.map((e) => [
+        String(e.getDataValue('id') ?? ''),
+        (e.getDataValue('rubroNegocio') as string | null | undefined) ?? null,
+      ])
+    );
+
     return rows.map((b) => {
       const empresaId = String(b.getDataValue('empresaId') ?? '');
       return {
         id: String(b.getDataValue('id') ?? ''),
         empresaId,
         empresaNombre: nameById.get(empresaId) ?? 'Sin nombre',
+        rubroNegocio: rubroById.get(empresaId) ?? null,
         channel: String(b.getDataValue('channel') ?? ''),
         externalId: String(b.getDataValue('externalId') ?? ''),
         defaultBranchId: b.getDataValue('defaultBranchId') ?? null,

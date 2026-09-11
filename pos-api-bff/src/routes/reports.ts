@@ -79,6 +79,36 @@ const reportsRoutes = async (app: FastifyInstance) => {
       return sendFail(reply, err.response?.data?.error ?? 'Failed to load shrinkage report', err.response?.status ?? 500);
     }
   });
+
+  app.get('/hot-skus', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+    const hourRaw = Number((request.query as { hour?: string }).hour);
+    try {
+      const data = await reportsCore.getHotSkus(ctx.token, ctx.internalKey, ctx.branchId, {
+        hour: Number.isFinite(hourRaw) ? hourRaw : undefined,
+      });
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { error?: string } } };
+      return sendFail(reply, err.response?.data?.error ?? 'Failed to load hot SKUs', err.response?.status ?? 500);
+    }
+  });
+
+  app.get('/reorder-draft', { preHandler: [requireSeller] }, async (request, reply) => {
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
+    try {
+      const data = await reportsCore.getReorderDraft(ctx.token, ctx.internalKey, ctx.branchId, {
+        global: parseGlobal(request),
+        limit: Number((request.query as { limit?: string }).limit ?? 20),
+      });
+      return sendOk(reply, data);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { error?: string } } };
+      return sendFail(reply, err.response?.data?.error ?? 'Failed to load reorder draft', err.response?.status ?? 500);
+    }
+  });
 };
 
 export default reportsRoutes;

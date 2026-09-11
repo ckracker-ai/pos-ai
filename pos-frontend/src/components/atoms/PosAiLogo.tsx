@@ -39,7 +39,7 @@ export function PosAiLogo({
       priority={priority}
       unoptimized
       className={`block shrink-0 object-contain object-center ${className}`.trim()}
-      style={{ width: displayWidth, height: displayHeight, maxWidth: width }}
+      style={{ width: displayWidth, height: displayHeight }}
     />
   );
 

@@ -354,6 +354,10 @@ export const api = {
     getApiClient().get('/pos/proxy/reports/inventory', config),
   getReportsShrinkage: (config?: AxiosRequestConfig) =>
     getApiClient().get('/pos/proxy/reports/shrinkage', config),
+  getReportsHotSkus: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/reports/hot-skus', config),
+  getReportsReorderDraft: (config?: AxiosRequestConfig) =>
+    getApiClient().get('/pos/proxy/reports/reorder-draft', config),
 
   // Empresa (tenant profile)
   getEmpresaMe: (config?: AxiosRequestConfig) =>

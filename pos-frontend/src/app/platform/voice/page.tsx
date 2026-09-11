@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { platformFetch, usePlatformAuthStore } from '@/core/context/platform-auth';
 import { PlatformPageHeader } from '@/components/molecules/PlatformPageHeader';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
+import { buildAssistantHelpCommands, buscarExample } from '@/core/assistant/helpCommands';
 
 type ChatMessage = { id: string; role: 'user' | 'assistant'; text: string };
 type ApiEnvelope<T> = { success: boolean; data: T; error: string | null };
@@ -12,22 +13,13 @@ type AssistantBindingRow = {
   id: string;
   empresaId: string;
   empresaNombre?: string;
+  rubroNegocio?: string | null;
   channel: string;
   externalId: string;
   defaultBranchId: string | null;
   sessionBranchId: string | null;
 };
 type BranchRow = { id: string; name: string };
-
-const QUICK_COMMANDS = [
-  'sucursales',
-  'buscar empanada',
-  '1',
-  'pedido 1x2',
-  'confirmar',
-  'mi tarjeta es 4111111111111111',
-  'ayuda',
-] as const;
 
 const CUSTOM_PHONE = '__custom__';
 const DEMO_VOICE_PHONE = '56900000003';
@@ -178,6 +170,8 @@ export default function PlatformVoiceSimPage() {
   const activeBinding = voiceBindings.find(
     (b) => normalizePhoneDigits(b.externalId) === normalizePhoneDigits(phone)
   );
+  const helpCommands = buildAssistantHelpCommands(activeBinding?.rubroNegocio);
+  const searchHint = buscarExample(activeBinding?.rubroNegocio);
 
   return (
     <div className="voice-sim-panel mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 p-4 sm:p-6">
@@ -187,9 +181,8 @@ export default function PlatformVoiceSimPage() {
       />
 
       <p className="rounded-xl border border-brand-lino/60 bg-brand-vainilla/80 px-3 py-2 text-xs text-brand-ink-muted">
-        Demo: teléfono <strong>{DEMO_VOICE_PHONE}</strong> (Costa Azul plan Full). Elige sucursal, busca, pide y
-        confirma. Si dictas un número de tarjeta, el asistente corta y manda el pago por WhatsApp.
-        El pago siempre se envía por WhatsApp al mismo número.
+        Elige sucursal, busca un producto del catálogo, pide y confirma. Si dictas un número de
+        tarjeta, el asistente corta y manda el pago por WhatsApp al mismo número.
       </p>
 
       {error ? (
@@ -249,7 +242,7 @@ export default function PlatformVoiceSimPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {QUICK_COMMANDS.map((cmd) => (
+        {helpCommands.map((cmd) => (
           <button
             key={cmd}
             type="button"
@@ -301,7 +294,7 @@ export default function PlatformVoiceSimPage() {
               className="flex-1 rounded-full border border-brand-linen bg-white px-4 py-2 text-sm text-brand-ink outline-none focus:border-brand-olive"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder='Ej. "buscar empanada" o "sucursales"'
+              placeholder={`Ej. "${searchHint}" o "sucursales"`}
               disabled={sending}
             />
             <button

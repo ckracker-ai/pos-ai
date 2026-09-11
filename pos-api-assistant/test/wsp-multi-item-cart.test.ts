@@ -4,7 +4,7 @@
  * Escenario (usuario):
  * 1. El bot pregunta qué buscar tras elegir sucursal
  * 2. buscar cafe → agregar café al carrito
- * 3. buscar empanada → agregar empanada al mismo carrito
+ * 3. buscar otro producto → agregar al mismo carrito
  * 4. opcional: otro producto
  * 5. confirmar → pago / comprobante
  */
@@ -20,7 +20,8 @@ import {
 test('tras elegir sucursal invita a buscar (no pedir UUID)', () => {
   const msg = branchSelectedSearchPrompt('Sucursal Central');
   assert.match(msg, /qué buscas/i);
-  assert.match(msg, /buscar empanada/i);
+  assert.match(msg, /buscar/i);
+  assert.ok(!/empanada/i.test(msg));
 });
 
 test('carrito abierto permite agregar más ítems antes de confirmar', () => {
@@ -72,7 +73,7 @@ test('flujo completo en pasos (contrato de mensajes)', () => {
   steps.push('buscar cafe');
   steps.push(searchResultsFooter(false));
   steps.push('pedido 1x1');
-  steps.push('buscar empanada');
+  steps.push('buscar cafe');
   steps.push(searchResultsFooter(true));
   steps.push('pedido 1x2');
   steps.push('mi pedido');

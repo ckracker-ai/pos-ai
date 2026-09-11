@@ -80,6 +80,24 @@ export function rubroPromptHint(rubro?: string | null, tenant?: TenantGlossary |
   return desc ? `${pack} El negocio se describe: ${desc.slice(0, 200)}.` : pack;
 }
 
+const SEARCH_TERM: Record<string, string> = {
+  FERRETERIA: 'tornillo',
+  MINIMARKET: 'bebida',
+  ROPA: 'polera',
+  MAYORISTA: 'caja',
+  GASTRONOMIA: 'cafe',
+};
+
+/** Ejemplo de búsqueda del catálogo (nunca un SKU de otro rubro). */
+export function catalogSearchTerm(rubro?: string | null): string {
+  if (!String(rubro ?? '').trim()) return 'producto';
+  return SEARCH_TERM[normalizeRubroKey(rubro)] ?? 'producto';
+}
+
+export function buscarExample(rubro?: string | null): string {
+  return `buscar ${catalogSearchTerm(rubro)}`;
+}
+
 export function parseTenantGlossary(raw: unknown): TenantGlossary | null {
   if (raw == null || raw === '') return null;
   if (typeof raw === 'string') {

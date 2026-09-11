@@ -7,6 +7,11 @@ import { platformFetch, usePlatformAuthStore } from '@/core/context/platform-aut
 import { PlatformPageHeader } from '@/components/molecules/PlatformPageHeader';
 import { WspMarkdownText } from '@/components/molecules/WspMarkdownText';
 import { unwrapApiEnvelope } from '@/core/api/normalizers';
+import {
+  buildAssistantDemoScenario,
+  buildAssistantHelpCommands,
+  buscarExample,
+} from '@/core/assistant/helpCommands';
 
 type ChatMessage = {
   id: string;
@@ -21,6 +26,7 @@ type AssistantBindingRow = {
   id: string;
   empresaId: string;
   empresaNombre?: string;
+  rubroNegocio?: string | null;
   channel: string;
   externalId: string;
   defaultBranchId: string | null;
@@ -28,27 +34,6 @@ type AssistantBindingRow = {
 };
 
 type BranchRow = { id: string; name: string };
-
-const QUICK_COMMANDS = [
-  'ayuda',
-  'sucursales',
-  'buscar empanada',
-  'pedido 1x2',
-  'mi pedido',
-  'confirmar',
-  'categorias',
-  'cancelar pedido',
-] as const;
-
-/** Flujo guiado demo Costa Azul (WSP P2). */
-const DEMO_SCENARIO = [
-  'sucursales',
-  '1',
-  'buscar empanada',
-  'pedido 1x2',
-  'mi pedido',
-  'confirmar',
-] as const;
 
 const CUSTOM_PHONE = '__custom__';
 const DEMO_WSP_PHONE = '56900000001';
@@ -92,6 +77,11 @@ export default function PlatformWhatsappSimPage() {
     () => wspBindings.find((b) => normalizePhoneDigits(b.externalId) === normalizePhoneDigits(phone)),
     [phone, wspBindings]
   );
+  const helpCommands = useMemo(
+    () => buildAssistantHelpCommands(activeBinding?.rubroNegocio),
+    [activeBinding?.rubroNegocio]
+  );
+  const searchHint = buscarExample(activeBinding?.rubroNegocio);
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/platform/login');
@@ -296,14 +286,14 @@ export default function PlatformWhatsappSimPage() {
     setScenarioRunning(true);
     setError(null);
     try {
-      for (const cmd of DEMO_SCENARIO) {
+      for (const cmd of buildAssistantDemoScenario(activeBinding?.rubroNegocio)) {
         await sendText(cmd);
         await new Promise((r) => setTimeout(r, 900));
       }
     } finally {
       setScenarioRunning(false);
     }
-  }, [bindingId, scenarioRunning, sendText, sending]);
+  }, [activeBinding?.rubroNegocio, bindingId, scenarioRunning, sendText, sending]);
 
   const clearChat = () => {
     setMessages([]);
@@ -450,7 +440,7 @@ export default function PlatformWhatsappSimPage() {
             <div className="mx-auto max-w-sm rounded-xl border border-brand-linen/70 bg-white/90 px-4 py-5 text-center shadow-sm">
               <p className="text-sm font-semibold text-brand-ink">Simulador POS-AI</p>
               <p className="mt-2 text-xs leading-relaxed text-brand-ink-muted">
-                Flujo demo: <strong>sucursales</strong> → <strong>buscar empanada</strong> →{' '}
+                Flujo: <strong>sucursales</strong> → <strong>{searchHint}</strong> →{' '}
                 <strong>pedido 1x2</strong> → <strong>confirmar</strong> → envía comprobante 📷
               </p>
               <p className="mt-3 text-[11px] text-brand-ink-muted">
@@ -500,7 +490,7 @@ export default function PlatformWhatsappSimPage() {
 
         <div className="border-t border-brand-linen/50 bg-white/90 px-3 py-2">
           <div className="mb-2 flex flex-wrap gap-1.5">
-            {QUICK_COMMANDS.map((cmd) => (
+            {helpCommands.map((cmd) => (
               <button
                 key={cmd}
                 type="button"

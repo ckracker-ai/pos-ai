@@ -14,6 +14,8 @@ import { isRubroModuleEnabled } from '@/core/config/rubro-packs';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
 import { AppPageHeader } from '@/components/molecules/AppPageHeader';
+import { BusinessAskPanel } from '@/components/molecules/BusinessAskPanel';
+import { coerceBusinessInsights, type BusinessInsights } from '@/core/pos/businessAgent';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -38,6 +40,18 @@ type OpsMetrics = {
   lowStockCount: number;
   pendingProofs: number;
   pendingShrinkages: number;
+};
+
+type ReorderDraft = {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  branchId: string;
+  branchName: string;
+  quantity: number;
+  minStock: number;
+  qtySold7d: number;
+  suggestedQty: number;
 };
 
 export function Dashboard() {
@@ -65,6 +79,8 @@ export function Dashboard() {
     pendingProofs: 0,
     pendingShrinkages: 0,
   });
+  const [reorderDrafts, setReorderDrafts] = useState<ReorderDraft[]>([]);
+  const [insights, setInsights] = useState<BusinessInsights | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -93,22 +109,67 @@ export function Dashboard() {
               const dashboard = unwrapApiEnvelope(res.data) as {
                 summary?: { todayRevenue?: number; todaySales?: number };
                 lowStockAlerts?: unknown[];
+                reorderDrafts?: ReorderDraft[];
+                businessInsights?: unknown;
               };
               next.todayRevenue = Number(dashboard.summary?.todayRevenue ?? 0);
               next.todaySales = Number(dashboard.summary?.todaySales ?? 0);
               next.lowStockCount = Array.isArray(dashboard.lowStockAlerts)
                 ? dashboard.lowStockAlerts.length
                 : 0;
+              if (!cancelled) {
+                const fromApi = Array.isArray(dashboard.reorderDrafts) ? dashboard.reorderDrafts : [];
+                const fromAlerts = (Array.isArray(dashboard.lowStockAlerts) ? dashboard.lowStockAlerts : [])
+                  .map((row) => {
+                    const alert = row as {
+                      productId?: string;
+                      productName?: string;
+                      branchId?: string;
+                      branchName?: string;
+                      quantity?: number;
+                      minStock?: number;
+                    };
+                    const quantity = Number(alert.quantity ?? 0);
+                    const minStock = Number(alert.minStock ?? 0);
+                    const suggestedQty = minStock > 0 ? Math.max(1, minStock + 1 - quantity) : Math.max(1, 6 - quantity);
+                    return {
+                      productId: String(alert.productId ?? ''),
+                      productName: String(alert.productName ?? 'Producto'),
+                      sku: null,
+                      branchId: String(alert.branchId ?? ''),
+                      branchName: String(alert.branchName ?? 'Sucursal'),
+                      quantity,
+                      minStock,
+                      qtySold7d: 0,
+                      suggestedQty,
+                    };
+                  })
+                  .filter((row) => row.productId && row.suggestedQty > 0);
+                setReorderDrafts(fromApi.length > 0 ? fromApi : fromAlerts);
+                setInsights(
+                  coerceBusinessInsights(dashboard.businessInsights, {
+                    todaySales: next.todaySales,
+                    todayRevenue: next.todayRevenue,
+                  })
+                );
+              }
             })()
           );
+        } else if (!cancelled) {
+          setReorderDrafts([]);
+          setInsights(null);
         }
 
         if (canProofs && branchId) {
           jobs.push(
             (async () => {
-              const res = await api.getPaymentProofs('pending');
-              const data = unwrapApiEnvelope(res.data) as { proofs?: Record<string, unknown>[] };
-              next.pendingProofs = extractList<Record<string, unknown>>(data, ['proofs']).length;
+              try {
+                const res = await api.getPaymentProofs('pending');
+                const data = unwrapApiEnvelope(res.data) as { proofs?: Record<string, unknown>[] };
+                next.pendingProofs = extractList<Record<string, unknown>>(data, ['proofs']).length;
+              } catch {
+                next.pendingProofs = 0;
+              }
             })()
           );
         }
@@ -116,10 +177,14 @@ export function Dashboard() {
         if (profile.canApproveShrinkages) {
           jobs.push(
             (async () => {
-              const res = await api.getShrinkageByStatus('PENDING');
-              const envelopeData = unwrapApiEnvelope(res.data) as { shrinkages?: unknown[] };
-              const list = Array.isArray(envelopeData?.shrinkages) ? envelopeData.shrinkages : [];
-              next.pendingShrinkages = list.length;
+              try {
+                const res = await api.getShrinkageByStatus('PENDING');
+                const envelopeData = unwrapApiEnvelope(res.data) as { shrinkages?: unknown[] };
+                const list = Array.isArray(envelopeData?.shrinkages) ? envelopeData.shrinkages : [];
+                next.pendingShrinkages = list.length;
+              } catch {
+                next.pendingShrinkages = 0;
+              }
             })()
           );
         }
@@ -141,7 +206,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [branchId, canProofs, canReports, profile.canApproveShrinkages]);
+  }, [branchId, canProofs, canReports, profile.canApproveShrinkages, profile.canSwitchBranch]);
 
   const avgTicket =
     metrics.todaySales > 0 ? Math.round(metrics.todayRevenue / metrics.todaySales) : 0;
@@ -233,6 +298,59 @@ export function Dashboard() {
             </button>
           ))}
         </div>
+      ) : null}
+
+      {canReports && profile.canSwitchBranch ? (
+        <div className="app-card mt-6 rounded-2xl p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-brand-ink-muted">
+                Reorden (borrador)
+              </h2>
+              <p className="mt-1 text-sm text-brand-ink-muted">
+                Sugerencias por sucursal según venta de 7 días y stock mínimo. No genera pedido de compra.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="app-btn-secondary text-sm"
+              onClick={() => router.push('/reportes')}
+            >
+              Ver en reportes
+            </button>
+          </div>
+          {isLoading ? (
+            <p className="mt-4 text-sm text-brand-ink-muted">Cargando sugerencias…</p>
+          ) : reorderDrafts.length === 0 ? (
+            <p className="mt-4 text-sm text-brand-ink-muted">
+              Sin sugerencias: el stock cubre al menos una semana de venta.
+            </p>
+          ) : (
+            <ul className="mt-4 divide-y divide-brand-linen/80">
+              {reorderDrafts.slice(0, 6).map((row) => (
+                <li
+                  key={`${row.productId}-${row.branchId}`}
+                  className="flex items-center justify-between gap-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-brand-ink">{row.productName}</p>
+                    <p className="truncate text-xs text-brand-ink-muted">
+                      {row.branchName}
+                      {row.sku ? ` · ${row.sku}` : ''} · hay {row.quantity}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-brand-olive/10 px-2.5 py-1 text-xs font-semibold text-brand-olive">
+                    Pedir {row.suggestedQty}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
+      {canReports && profile.canSwitchBranch ? (
+        <BusinessAskPanel insights={insights} loading={isLoading} />
       ) : null}
 
       <div className="mt-8">

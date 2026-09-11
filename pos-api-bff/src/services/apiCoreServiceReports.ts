@@ -62,4 +62,33 @@ export class ApiCoreServiceReports extends ApiCoreBaseService {
     });
     return response.data;
   }
+
+  async getHotSkus(
+    token: string,
+    internalKey: string,
+    branchId: string,
+    options?: { hour?: number }
+  ) {
+    const response = await this.client.get('/reports/hot-skus', {
+      headers: this.authHeaders(token, internalKey, branchId),
+      params: options?.hour != null ? { hour: options.hour } : undefined,
+    });
+    return response.data;
+  }
+
+  async getReorderDraft(
+    token: string,
+    internalKey: string,
+    branchId: string,
+    options?: { global?: boolean; limit?: number }
+  ) {
+    const response = await this.client.get('/reports/reorder-draft', {
+      headers: this.authHeaders(token, internalKey, branchId),
+      params: {
+        global: options?.global ? 'true' : undefined,
+        limit: options?.limit ?? 20,
+      },
+    });
+    return response.data;
+  }
 }

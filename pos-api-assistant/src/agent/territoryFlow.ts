@@ -24,6 +24,7 @@ export function formatTerritoryResolveReply(options: {
   comunaNombre: string;
   branches: Array<{ name: string; address: string | null }>;
   empresaNombre: string;
+  rubroNegocio?: string | null;
 }): string {
   return wspTerritoryResolveReply(options);
 }

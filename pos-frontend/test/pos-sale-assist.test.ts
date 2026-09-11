@@ -126,6 +126,22 @@ test('buildPosQuickActions usa productos del tenant en sesion', () => {
   assert.match(posAiInputPlaceholder(fusionCatalog), /buscar Hamburguesa Italiana/);
 });
 
+test('buildPosQuickActions antepone SKU calientes con stock', () => {
+  const catalog = [
+    { id: 'hb', name: 'Hamburguesa Italiana', price: 3500, stock: 10, category: 'Hamburguesa Carne' },
+    { id: 'beb', name: 'Coca Cola 1L', price: 1700, stock: 0, category: 'Bebidas' },
+    { id: 'emp', name: 'Empanada de pino', price: 2800, stock: 8, category: 'Empanadas' },
+  ];
+  const actions = buildPosQuickActions(catalog, [
+    { productId: 'emp', name: 'Empanada de pino', qtySold: 12 },
+    { productId: 'beb', name: 'Coca Cola 1L', qtySold: 9 },
+  ]);
+  assert.equal(actions[0].kind, 'hot');
+  assert.equal(actions[0].productId, 'emp');
+  assert.ok(!actions.some((a) => a.productId === 'beb'));
+  assert.equal(actions.at(-1)?.label, 'Vaciar');
+});
+
 test('enrichPosAiResult completa categoria desde catalogo local', () => {
   const result = enrichPosAiResult(
     {

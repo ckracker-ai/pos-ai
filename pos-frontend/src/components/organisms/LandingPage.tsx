@@ -1,13 +1,14 @@
+import { Inter } from 'next/font/google';
 import Image from 'next/image';
 import Link from 'next/link';
+import { LANDING_STAT_ICONS } from '@/components/atoms/LandingStatIcons';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { LandingContactForm } from '@/components/molecules/LandingContactForm';
 import { LandingFeatureCarousel } from '@/components/molecules/LandingFeatureCarousel';
-import { LandingHeroVideo } from '@/components/molecules/LandingHeroVideo';
+import { LandingHeroMockup } from '@/components/molecules/LandingHeroMockup';
 import {
   LANDING_AI_PILLARS,
   LANDING_AI_STEPS,
-  LANDING_BRAND,
   LANDING_MEDIA,
   LANDING_STATS,
 } from '@/core/constants/landing-content';
@@ -18,40 +19,46 @@ type LandingPageProps = {
   plans: LandingPlan[];
 };
 
+const landingSans = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['400', '500', '600'],
+});
+
 function LandingNav() {
   return (
-    <header className="landing-header fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-brand-olive/75 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-[4.25rem] max-w-6xl items-center justify-between gap-4 px-4 py-2 sm:px-6 lg:px-8">
+    <header className="landing-header fixed inset-x-0 top-0 z-50 border-b border-brand-linen/80 bg-brand-surface/90 backdrop-blur-md">
+      <div className="mx-auto flex min-h-[4.75rem] max-w-6xl items-center justify-between gap-4 px-4 py-2 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center" aria-label="POS-AI inicio">
-          <PosAiLogo height={40} width={72} priority className="brightness-0 invert" />
+          <PosAiLogo height={56} priority />
         </Link>
-        <nav className="hidden items-center gap-7 text-sm font-medium text-white/85 md:flex">
-          <a href="#producto" className="transition hover:text-white">
+        <nav className="hidden items-center gap-7 text-[13px] font-medium text-brand-ink-muted md:flex">
+          <a href="#producto" className="transition hover:text-brand-olive">
             Producto
           </a>
-          <a href="#ia" className="transition hover:text-white">
+          <a href="#ia" className="transition hover:text-brand-olive">
             Inteligencia
           </a>
-          <a href="#servicios" className="transition hover:text-white">
+          <a href="#servicios" className="transition hover:text-brand-olive">
             Servicios
           </a>
-          <a href="#planes" className="transition hover:text-white">
+          <a href="#planes" className="transition hover:text-brand-olive">
             Planes
           </a>
-          <a href="#contacto" className="transition hover:text-white">
+          <a href="#contacto" className="transition hover:text-brand-olive">
             Contacto
           </a>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/registro"
-            className="hidden rounded-full border border-white/35 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 sm:inline-block"
+            className="hidden rounded-full border border-brand-linen px-4 py-2 text-[13px] font-medium text-brand-ink transition hover:border-brand-olive sm:inline-block"
           >
             Registrarse
           </Link>
           <Link
             href="/login"
-            className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-brand-olive shadow-sm transition hover:bg-brand-linen"
+            className="rounded-full bg-brand-olive px-4 py-2 text-[13px] font-medium text-white transition hover:bg-[#3d4532]"
           >
             Iniciar sesión
           </Link>
@@ -63,9 +70,7 @@ function LandingNav() {
 
 function LandingHeroImageFrame({ priority = false, className = '' }: { priority?: boolean; className?: string }) {
   return (
-    <div
-      className={`relative aspect-[3/2] w-full overflow-hidden rounded-2xl border border-white/15 shadow-[0_24px_64px_rgba(0,0,0,0.35)] ${className}`}
-    >
+    <div className={`relative aspect-[3/2] w-full overflow-hidden rounded-2xl border border-brand-linen shadow-md shadow-brand-olive/10 ${className}`}>
       <Image
         src={LANDING_MEDIA.heroSlide}
         alt="POS-AI — copiloto de negocio con IA en caja, WhatsApp y ERP"
@@ -78,55 +83,62 @@ function LandingHeroImageFrame({ priority = false, className = '' }: { priority?
   );
 }
 
-function LandingHeroVideoFrame({ className = '' }: { className?: string }) {
-  return <LandingHeroVideo className={className} />;
-}
-
 function HeroSection() {
   return (
-    <section className="landing-hero relative overflow-hidden pt-[4.25rem]">
-      <div className="landing-hero-base pointer-events-none absolute inset-0" aria-hidden />
-      <div className="landing-hero-mesh pointer-events-none absolute inset-0" aria-hidden />
-      <div className="landing-hero-orb landing-hero-orb--1" aria-hidden />
-      <div className="landing-hero-orb landing-hero-orb--2" aria-hidden />
-      <div className="landing-hero-grid pointer-events-none absolute inset-0 opacity-60" aria-hidden />
-
-      <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-12">
+    <section className="landing-hero relative overflow-hidden pt-[4.75rem]">
+      <div className="landing-hero-photo pointer-events-none absolute inset-0" aria-hidden>
+        <Image
+          src={LANDING_MEDIA.heroBackground}
+          alt=""
+          fill
+          priority
+          className="object-cover object-center"
+          sizes="100vw"
+        />
+      </div>
+      <div className="relative mx-auto max-w-6xl px-4 pb-8 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24">
+        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16">
           <div className="max-w-xl">
-            <p className="landing-badge mb-6 inline-flex items-center gap-2 rounded-full border border-brand-linen/35 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-linen backdrop-blur-sm">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-linen" aria-hidden />
-              ERP con IA nativa · Chile
+            <p className="mb-5 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-linen">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-linen" aria-hidden />
+              ERP con IA · Chile
             </p>
-            <h1 className="font-serif text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.15rem]">
+            <h1 className="text-[1.85rem] font-semibold leading-[1.2] tracking-tight text-white sm:text-[2.2rem] lg:text-[2.45rem]">
               Punto de venta inteligente para la próxima generación de PYMEs
             </h1>
-            <p className="mt-6 text-lg leading-relaxed text-white/85">
+            <p className="mt-5 text-base leading-relaxed text-white/85 sm:text-lg">
               Caja, inventario, comandas y asistente WhatsApp con stock real por sucursal. Un solo ERP en la nube
               para operar y crecer con orden.
             </p>
-          </div>
-
-          <div className="landing-hero-visual mx-auto flex w-full max-w-xl flex-col gap-6 lg:max-w-none lg:justify-self-end">
-            <LandingHeroVideoFrame />
             <Link
               href="/registro"
-              className="inline-flex w-full items-center justify-center rounded-full bg-brand-linen px-8 py-3.5 text-base font-semibold text-brand-olive shadow-lg transition hover:bg-white sm:w-auto sm:self-start"
+              className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-semibold text-brand-olive shadow-sm transition hover:bg-brand-linen"
             >
               Crear mi negocio
             </Link>
           </div>
+
+          <div className="landing-hero-visual w-full">
+            <LandingHeroMockup />
+          </div>
         </div>
       </div>
 
-      <div className="relative border-t border-white/10 bg-[#252a1f]/90">
-        <ul className="landing-stats mx-auto grid max-w-6xl grid-cols-2 gap-3 px-4 py-8 sm:grid-cols-4 sm:gap-4 sm:px-6 lg:px-8">
-          {LANDING_STATS.map((s) => (
-            <li key={s.label} className="landing-stat-card rounded-2xl px-4 py-3.5 sm:py-4">
-              <p className="landing-stat-value font-serif text-2xl font-semibold sm:text-3xl">{s.value}</p>
-              <p className="landing-stat-label mt-1.5 text-xs leading-snug">{s.label}</p>
-            </li>
-          ))}
+      <div className="relative border-t border-white/15 bg-[#3d4532]/35 backdrop-blur-[6px]">
+        <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-3 px-4 py-8 sm:grid-cols-4 sm:gap-4 sm:px-6 lg:px-8">
+          {LANDING_STATS.map((s) => {
+            const Icon = LANDING_STAT_ICONS[s.value as keyof typeof LANDING_STAT_ICONS];
+            return (
+              <li
+                key={s.label}
+                className="rounded-2xl border border-brand-linen bg-white px-4 py-5 shadow-sm"
+              >
+                <span className="text-brand-olive">{Icon ? <Icon /> : null}</span>
+                <p className="mt-3 text-lg font-semibold tracking-tight text-brand-ink">{s.value}</p>
+                <p className="mt-1 text-xs leading-snug text-brand-ink-muted">{s.label}</p>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </section>
@@ -135,19 +147,17 @@ function HeroSection() {
 
 function ProductImageSection() {
   return (
-    <section id="producto" className="border-t border-brand-linen/60 bg-brand-surface px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+    <section id="producto" className="border-t border-brand-linen/70 bg-white px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-6xl text-center">
-        <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
-          Vista del producto
-        </p>
-        <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-olive">Vista del producto</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-brand-ink sm:text-3xl">
           El POS que piensa, aprende y hace crecer tu negocio
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-brand-ink-muted">
           IA en el core, WhatsApp, telefonía y ERP completo — diseñado para PYMEs chilenas.
         </p>
-        <div className="mx-auto mt-10 max-w-4xl">
-          <LandingHeroImageFrame className="border-brand-linen/80 shadow-xl shadow-brand-olive/10" />
+        <div className="mx-auto mt-12 max-w-4xl">
+          <LandingHeroImageFrame />
         </div>
       </div>
     </section>
@@ -156,13 +166,11 @@ function ProductImageSection() {
 
 function FeatureSlidesSection() {
   return (
-    <section id="servicios" className="border-t border-brand-linen/60 bg-white px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+    <section id="servicios" className="border-t border-brand-linen/70 bg-brand-surface px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
-            Capacidades
-          </p>
-          <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-olive">Capacidades</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-brand-ink sm:text-3xl">
             IA en el core, WhatsApp y voz
           </h2>
           <p className="mt-4 text-brand-ink-muted">
@@ -180,14 +188,11 @@ function FeatureSlidesSection() {
 
 function AiSection() {
   return (
-    <section id="ia" className="relative border-t border-brand-linen/50 bg-brand-surface px-4 py-24 sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-brand-olive/5 blur-3xl" />
+    <section id="ia" className="relative border-t border-brand-linen/70 bg-white px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
-            Vanguardia operativa
-          </p>
-          <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-olive">Vanguardia operativa</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-brand-ink sm:text-3xl">
             IA que no improvisa: conoce tu stock, tu plan y tus datos de pago
           </h2>
           <p className="mt-4 text-brand-ink-muted">
@@ -196,16 +201,13 @@ function AiSection() {
           </p>
         </div>
 
-        <ul className="mt-14 grid gap-6 lg:grid-cols-3">
+        <ul className="mt-14 grid gap-4 lg:grid-cols-3">
           {LANDING_AI_PILLARS.map((p) => (
-            <li key={p.title} className="landing-glass-card group p-8">
-              <span
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-olive/10 font-serif text-lg text-brand-olive transition group-hover:bg-brand-olive group-hover:text-white"
-                aria-hidden
-              >
+            <li key={p.title} className="rounded-2xl border border-brand-linen bg-brand-surface p-7">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-olive/10 text-sm text-brand-olive" aria-hidden>
                 {p.icon}
               </span>
-              <h3 className="mt-5 text-lg font-semibold text-brand-ink">{p.title}</h3>
+              <h3 className="mt-5 text-base font-semibold text-brand-ink">{p.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-brand-ink-muted">{p.desc}</p>
             </li>
           ))}
@@ -213,8 +215,8 @@ function AiSection() {
 
         <ol className="mt-16 grid gap-8 md:grid-cols-3">
           {LANDING_AI_STEPS.map((s) => (
-            <li key={s.step} className="relative border-l-2 border-brand-olive/25 pl-6">
-              <span className="font-mono text-xs font-bold text-brand-olive">{s.step}</span>
+            <li key={s.step} className="border-l-2 border-brand-olive/25 pl-5">
+              <span className="text-xs font-semibold text-brand-olive">{s.step}</span>
               <h3 className="mt-2 font-semibold text-brand-ink">{s.title}</h3>
               <p className="mt-2 text-sm text-brand-ink-muted">{s.desc}</p>
             </li>
@@ -227,45 +229,33 @@ function AiSection() {
 
 function ModulesSection() {
   return (
-    <section className="landing-services relative overflow-hidden border-t border-brand-linen/60 px-4 py-24 sm:px-6 lg:px-8">
-      <Image
-        src={LANDING_BRAND.heroAccent}
-        alt=""
-        fill
-        className="object-cover object-center"
-        sizes="100vw"
-      />
-      <div className="landing-services-overlay pointer-events-none absolute inset-0" aria-hidden />
-      <div className="landing-hero-grid pointer-events-none absolute inset-0 opacity-25" aria-hidden />
-
-      <div className="relative mx-auto max-w-6xl">
+    <section className="border-t border-brand-linen/70 bg-brand-surface px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
+      <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <p className="landing-section-eyebrow text-xs font-semibold uppercase text-brand-olive">
-              Módulos operativos
-            </p>
-            <h2 className="mt-3 font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-olive">Módulos operativos</p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-brand-ink sm:text-3xl">
               Todo lo que tu local necesita
             </h2>
             <p className="mt-4 text-brand-ink-muted">
-              Diez módulos operativos en un solo SaaS — sin piezas sueltas. Diseñado para empanaderías,
-              cafeterías y retail chico que quieren crecer con orden.
+              Diez módulos operativos en un solo SaaS — sin piezas sueltas. Diseñado para PYMEs que quieren crecer
+              con orden.
             </p>
           </div>
           <Link
             href="/registro"
-            className="inline-flex shrink-0 items-center justify-center rounded-full border border-brand-olive bg-white/90 px-6 py-3 text-sm font-semibold text-brand-olive shadow-sm backdrop-blur-sm transition hover:bg-brand-olive hover:text-white"
+            className="inline-flex shrink-0 items-center justify-center rounded-full border border-brand-olive bg-white px-5 py-2.5 text-sm font-semibold text-brand-olive transition hover:bg-brand-olive hover:text-white"
           >
             Probar gratis el onboarding
           </Link>
         </div>
-        <ul className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {LANDING_MODULES.map((m) => (
-            <li key={m.title} className="landing-module-card landing-module-card--on-image p-6">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-olive text-sm font-bold text-white">
+            <li key={m.title} className="rounded-2xl border border-brand-linen bg-white p-6">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-olive text-sm font-bold text-white">
                 {m.title.charAt(0)}
               </span>
-              <h3 className="mt-4 text-lg font-semibold text-brand-ink">{m.title}</h3>
+              <h3 className="mt-4 text-base font-semibold text-brand-ink">{m.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-brand-ink-muted">{m.desc}</p>
             </li>
           ))}
@@ -277,10 +267,10 @@ function ModulesSection() {
 
 function PlansSection({ plans }: { plans: LandingPlan[] }) {
   return (
-    <section id="planes" className="landing-plans px-4 py-24 sm:px-6 lg:px-8">
+    <section id="planes" className="border-t border-brand-linen/70 bg-white px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
-          <h2 className="font-serif text-3xl font-semibold text-brand-ink sm:text-4xl">
+          <h2 className="text-2xl font-semibold tracking-tight text-brand-ink sm:text-3xl">
             Planes claros, precio predecible
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-brand-ink-muted">
@@ -288,24 +278,22 @@ function PlansSection({ plans }: { plans: LandingPlan[] }) {
             canales — sin sorpresas.
           </p>
         </div>
-        <div className="mt-14 grid gap-8 lg:grid-cols-3">
+        <div className="mt-14 grid gap-6 lg:grid-cols-3">
           {plans.map((plan) => (
             <article
               key={plan.codigo}
-              className={`relative flex flex-col rounded-2xl border bg-white p-8 shadow-sm transition hover:shadow-xl ${
-                plan.destacado
-                  ? 'border-brand-olive ring-2 ring-brand-olive/25 lg:-translate-y-1'
-                  : 'border-brand-linen'
+              className={`relative flex flex-col rounded-2xl border bg-white p-8 ${
+                plan.destacado ? 'border-brand-olive shadow-md shadow-brand-olive/10' : 'border-brand-linen'
               }`}
             >
               {plan.destacado ? (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-olive px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-olive px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                   Con IA WhatsApp
                 </span>
               ) : null}
-              <h3 className="text-xl font-semibold text-brand-ink">{plan.nombre}</h3>
+              <h3 className="text-lg font-semibold text-brand-ink">{plan.nombre}</h3>
               <p className="mt-2 text-sm text-brand-ink-muted">{plan.tagline}</p>
-              <p className="mt-6 font-serif text-3xl font-semibold text-brand-olive">{plan.valorLabel}</p>
+              <p className="mt-6 text-2xl font-semibold text-brand-olive">{plan.valorLabel}</p>
               <p className="mt-1 text-xs text-brand-ink-muted">
                 {plan.sucursales} · {plan.usuarios}
               </p>
@@ -322,10 +310,10 @@ function PlansSection({ plans }: { plans: LandingPlan[] }) {
               </ul>
               <Link
                 href={`/registro?plan=${plan.codigo}`}
-                className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition ${
+                className={`mt-8 block rounded-full py-2.5 text-center text-sm font-semibold transition ${
                   plan.destacado
                     ? 'bg-brand-olive text-white hover:bg-[#3d4532]'
-                    : 'border border-brand-linen text-brand-ink hover:border-brand-olive hover:bg-brand-surface'
+                    : 'border border-brand-linen text-brand-ink hover:border-brand-olive'
                 }`}
               >
                 Comenzar
@@ -344,27 +332,27 @@ function PlansSection({ plans }: { plans: LandingPlan[] }) {
 function ContactSection({ plans }: { plans: LandingPlan[] }) {
   const planOptions = plans.map((p) => ({ codigo: p.codigo, nombre: p.nombre }));
   return (
-    <section id="contacto" className="border-t border-brand-linen/60 bg-white px-4 py-24 sm:px-6 lg:px-8">
+    <section id="contacto" className="border-t border-brand-linen/70 bg-brand-surface px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-3xl">
         <div className="text-center">
-          <h2 className="font-serif text-3xl font-semibold text-brand-ink">¿Listo para ordenar tu operación?</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-brand-ink">¿Listo para ordenar tu operación?</h2>
           <p className="mt-4 text-brand-ink-muted">
             Regístrate en minutos o escríbenos si buscas piloto, integración o precio especial para tu cadena.
           </p>
         </div>
-        <div className="landing-glass-card mt-10 p-6 sm:p-8">
+        <div className="mt-10 rounded-2xl border border-brand-linen bg-white p-6 sm:p-8">
           <LandingContactForm planOptions={planOptions} />
         </div>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href="/login"
-            className="inline-flex rounded-full border border-brand-linen px-8 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-olive hover:bg-brand-surface"
+            className="inline-flex rounded-full border border-brand-linen px-6 py-2.5 text-sm font-semibold text-brand-ink transition hover:border-brand-olive"
           >
             Ya tengo cuenta — iniciar sesión
           </Link>
           <Link
             href="/registro"
-            className="inline-flex rounded-full bg-brand-olive px-8 py-3 text-sm font-semibold text-white transition hover:bg-[#3d4532]"
+            className="inline-flex rounded-full bg-brand-olive px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#3d4532]"
           >
             Crear cuenta ahora
           </Link>
@@ -376,12 +364,12 @@ function ContactSection({ plans }: { plans: LandingPlan[] }) {
 
 function LandingFooter() {
   return (
-    <footer className="border-t border-brand-linen bg-brand-olive px-4 py-12 text-white sm:px-6 lg:px-8">
+    <footer className="border-t border-brand-olive bg-brand-olive px-4 py-10 text-white sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
-          <PosAiLogo width={88} className="brightness-0 invert" />
-          <span className="text-center text-sm text-white/75 sm:text-left">
-            © {new Date().getFullYear()} POS-AI · Punto de venta Inteligente
+          <PosAiLogo height={52} withBackground />
+          <span className="text-center text-sm text-white/80 sm:text-left">
+            © {new Date().getFullYear()} POS-AI · Punto de venta inteligente
           </span>
         </div>
         <div className="flex flex-wrap justify-center gap-4 text-sm sm:gap-6">
@@ -408,7 +396,7 @@ function LandingFooter() {
 
 export function LandingPage({ plans }: LandingPageProps) {
   return (
-    <div className="landing-page min-h-screen">
+    <div className={`${landingSans.className} landing-page min-h-screen text-brand-ink`}>
       <LandingNav />
       <main>
         <HeroSection />

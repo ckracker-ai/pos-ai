@@ -558,8 +558,8 @@ async function replyVirtualMenuLink(session: Session, branchId: string): Promise
 
 function helpForChannel(session: Session): string {
   return isVoiceChannel(session.context.channel)
-    ? voiceHelp(session.context.empresaNombre)
-    : wspHelp(session.context.empresaNombre);
+    ? voiceHelp(session.context.empresaNombre, session.context.rubroNegocio)
+    : wspHelp(session.context.empresaNombre, session.context.rubroNegocio);
 }
 
 function finalizeReply(session: Session, reply: AgentReply): AgentReply {
@@ -682,6 +682,7 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
               comunaNombre: pickedComuna.nombre,
               branches: [{ name: b.name, address: b.address }],
               empresaNombre: context.empresaNombre,
+              rubroNegocio: context.rubroNegocio,
             }),
           };
         }
@@ -691,6 +692,7 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
             comunaNombre: pickedComuna.nombre,
             branches: resolved.branches.map((b) => ({ name: b.name, address: b.address })),
             empresaNombre: context.empresaNombre,
+            rubroNegocio: context.rubroNegocio,
           }),
         };
       }
@@ -705,7 +707,7 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
         session.branchId = branchId;
         session.lastBranches = [];
         session.lastComunas = [];
-        return { text: branchSelectedSearchPrompt(picked.name) };
+        return { text: branchSelectedSearchPrompt(picked.name, context.rubroNegocio) };
       }
     }
 
@@ -735,7 +737,7 @@ async function runAgentCore(session: Session, userText: string): Promise<AgentRe
 
         session.lastBranches = [];
 
-        return { text: branchSelectedSearchPrompt(list[idx].name) };
+        return { text: branchSelectedSearchPrompt(list[idx].name, context.rubroNegocio) };
 
       }
 

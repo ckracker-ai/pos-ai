@@ -17,6 +17,7 @@ import {
   normalizePosVoiceCommand,
   posAiInputPlaceholder,
   type PosAssistProduct,
+  type PosHotSku,
 } from '@/core/pos/posSaleAssist';
 import { parsePositiveInt, sanitizeDigitsOnly } from '@/core/utils/numeric-input';
 import type { PosAiResult } from '@/core/pos/posAiTypes';
@@ -30,13 +31,15 @@ type Props = {
   loading?: boolean;
   lastResult?: PosAiResult | null;
   products: PosAssistProduct[];
+  hotSkus?: PosHotSku[];
+  hotHour?: number | null;
   onSubmit: (text: string) => void | Promise<void>;
   onQuickAdd: (productId: string, quantity: number) => void;
 };
 
 export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
   function PosAiCommandPanel(
-    { disabled, loading, lastResult, products, onSubmit, onQuickAdd },
+    { disabled, loading, lastResult, products, hotSkus, hotHour, onSubmit, onQuickAdd },
     ref
   ) {
     const [text, setText] = useState('');
@@ -47,7 +50,10 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
     const pendingQuantity = lastResult?.pending_quantity ?? 1;
     const showProductPicker = productOptions.length > 0;
 
-    const quickActions = useMemo(() => buildPosQuickActions(products), [products]);
+    const quickActions = useMemo(
+      () => buildPosQuickActions(products, hotSkus ?? []),
+      [products, hotSkus]
+    );
     const inputPlaceholder = useMemo(() => posAiInputPlaceholder(products), [products]);
 
     useImperativeHandle(ref, () => ({
@@ -198,14 +204,21 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
           </div>
           <p className="mt-2 text-xs text-brand-ink-muted">
             Enter envía el comando · F2 enfoca el campo
+            {hotHour != null
+              ? ` · Chips oliva: más vendidos a las ${String(hotHour).padStart(2, '0')} h`
+              : ''}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {quickActions.map((action) => (
               <button
-                key={action.label}
+                key={`${action.kind ?? 'tool'}-${action.productId ?? action.label}`}
                 type="button"
                 disabled={disabled || loading}
                 onClick={() => {
+                  if (action.productId) {
+                    onQuickAdd(action.productId, 1);
+                    return;
+                  }
                   if (action.runImmediately) {
                     void onSubmit(action.command);
                     setText('');
@@ -218,7 +231,9 @@ export const PosAiCommandPanel = forwardRef<PosAiCommandPanelHandle, Props>(
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
                   action.command === 'vaciar carrito'
                     ? 'border-rose-200 bg-white text-rose-800 hover:bg-rose-50'
-                    : 'border-brand-linen bg-white text-brand-ink hover:border-brand-olive'
+                    : action.kind === 'hot'
+                      ? 'border-brand-olive/40 bg-brand-olive text-white hover:bg-[#3d4532]'
+                      : 'border-brand-linen bg-white text-brand-ink hover:border-brand-olive'
                 }`}
               >
                 {action.label}

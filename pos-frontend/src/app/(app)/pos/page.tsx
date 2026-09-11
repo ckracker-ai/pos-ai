@@ -145,6 +145,8 @@ export default function PosPage() {
   const [isInformalTicket, setIsInformalTicket] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [sellAsPack, setSellAsPack] = useState(false);
+  const [hotSkus, setHotSkus] = useState<Array<{ productId: string; name: string }>>([]);
+  const [hotHour, setHotHour] = useState<number | null>(null);
   const posAiPanelRef = useRef<PosAiCommandPanelHandle>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -227,6 +229,41 @@ export default function PosPage() {
 
     loadProducts();
   }, [branchId, showPosFeedback]);
+
+  useEffect(() => {
+    if (!branchId) {
+      setHotSkus([]);
+      setHotHour(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.getReportsDashboard({ params: { days: 14 } });
+        const data = unwrapApiEnvelope(res.data) as {
+          hotSkus?: { hour?: number; items?: Array<{ productId?: string; name?: string }> };
+        };
+        if (cancelled) return;
+        const hot = data.hotSkus;
+        setHotHour(Number.isFinite(Number(hot?.hour)) ? Number(hot?.hour) : null);
+        setHotSkus(
+          Array.isArray(hot?.items)
+            ? hot.items
+                .filter((row) => row.productId && row.name)
+                .map((row) => ({ productId: String(row.productId), name: String(row.name) }))
+            : []
+        );
+      } catch {
+        if (!cancelled) {
+          setHotSkus([]);
+          setHotHour(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId]);
 
 
 
@@ -820,6 +857,8 @@ export default function PosPage() {
                 disabled={!branchId || products.length === 0}
                 loading={aiLoading}
                 lastResult={lastAiResult}
+                hotSkus={hotSkus}
+                hotHour={hotHour}
                 products={posAiProducts.map((p) => ({
                   id: p.id,
                   name: p.name,
