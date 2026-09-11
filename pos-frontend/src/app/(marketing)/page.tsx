@@ -10,18 +10,18 @@ import {
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: 'POS-AI — Punto de venta inteligente para PYMEs',
+  title: LANDING_BRAND.tagline,
   description: LANDING_BRAND.shortPitch,
   openGraph: {
-    title: 'POS-AI — Punto de venta inteligente',
+    title: LANDING_BRAND.tagline,
     description: LANDING_BRAND.shortPitch,
     type: 'website',
     locale: 'es_CL',
-    images: [{ url: LANDING_BRAND.ogImage, alt: 'POS-AI logo' }],
+    images: [{ url: LANDING_BRAND.ogImage, alt: LANDING_BRAND.tagline }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'POS-AI — Punto de venta inteligente',
+    title: LANDING_BRAND.tagline,
     description: LANDING_BRAND.shortPitch,
     images: [LANDING_BRAND.ogImage],
   },

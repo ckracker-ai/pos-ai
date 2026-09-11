@@ -9,6 +9,7 @@ import { LandingHeroMockup } from '@/components/molecules/LandingHeroMockup';
 import {
   LANDING_AI_PILLARS,
   LANDING_AI_STEPS,
+  LANDING_BRAND,
   LANDING_MEDIA,
   LANDING_STATS,
 } from '@/core/constants/landing-content';
@@ -104,7 +105,7 @@ function HeroSection() {
               ERP con IA · Chile
             </p>
             <h1 className="text-[1.85rem] font-semibold leading-[1.2] tracking-tight text-white sm:text-[2.2rem] lg:text-[2.45rem]">
-              Punto de venta inteligente para la próxima generación de PYMEs
+              {LANDING_BRAND.tagline}
             </h1>
             <p className="mt-5 text-base leading-relaxed text-white/85 sm:text-lg">
               Caja, inventario, comandas y asistente WhatsApp con stock real por sucursal. Un solo ERP en la nube
@@ -369,7 +370,7 @@ function LandingFooter() {
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
           <PosAiLogo height={52} withBackground />
           <span className="text-center text-sm text-white/80 sm:text-left">
-            © {new Date().getFullYear()} POS-AI · Punto de venta inteligente
+            © {new Date().getFullYear()} {LANDING_BRAND.tagline}
           </span>
         </div>
         <div className="flex flex-wrap justify-center gap-4 text-sm sm:gap-6">

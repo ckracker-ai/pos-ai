@@ -1,8 +1,7 @@
 /** Paleta y copy reutilizable en IG / LinkedIn / OG (misma jerarquía que la landing). */
 export const LANDING_BRAND = {
-  tagline: 'Punto de venta inteligente para PYMEs',
-  shortPitch:
-    'Caja, inventario, comandas y asistente IA por WhatsApp — un solo ERP en la nube para Chile.',
+  tagline: 'POS-AI: el POS con inteligencia artificial',
+  shortPitch: 'POS-AI: el POS con inteligencia artificial',
   ogImage: '/images/og-pos-ai.png',
   heroAccent: '/images/landing-hero-abstract.png',
 } as const;
@@ -34,7 +33,7 @@ export const LANDING_MEDIA = {
 
 /** Titulares por sección → un slide o post por bloque al replicar en redes. */
 export const LANDING_SOCIAL_BLOCKS = [
-  { id: 'hero', headline: 'POS inteligente para la próxima generación de PYMEs', cta: 'Crear mi negocio' },
+  { id: 'hero', headline: 'POS-AI: el POS con inteligencia artificial', cta: 'Crear mi negocio' },
   { id: 'ia', headline: 'IA que conoce tu stock, tu plan y tus datos de pago', cta: 'Ver cómo funciona' },
   { id: 'servicios', headline: '10 módulos en un solo SaaS', cta: 'Probar onboarding' },
   { id: 'planes', headline: 'Planes claros, precio predecible en CLP', cta: 'Elegir plan' },

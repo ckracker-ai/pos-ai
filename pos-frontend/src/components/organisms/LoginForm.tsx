@@ -76,7 +76,7 @@ export function LoginForm() {
         <div className="mb-8 flex flex-col items-center text-center">
           <PosAiLogo width={220} priority className="mb-4" />
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-olive">Tu negocio</p>
-          <p className="mt-2 text-sm text-brand-ink-muted">Punto de venta inteligente</p>
+          <p className="mt-2 text-sm text-brand-ink-muted">POS-AI: el POS con inteligencia artificial</p>
           <p className="mt-1 text-xs text-brand-ink-muted/80">Ingresa a tu cuenta</p>
         </div>
 
