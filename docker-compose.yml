@@ -8,10 +8,9 @@ services:
     build:
       context: ./pos-frontend
       args:
-        NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ''
         BFF_INTERNAL_URL: http://pos-api-bff:2020
-        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-2.0.2026-09-10}
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
     container_name: pos-ai-frontend
     restart: unless-stopped
     ports:
@@ -19,7 +18,7 @@ services:
     environment:
       BFF_INTERNAL_URL: http://pos-api-bff:2020
       AUTH_URL: http://pos-api-bff:2020
-      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-2.0.2026-09-10}
+      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
     networks:
       - public_gateway
     depends_on:
@@ -49,16 +48,21 @@ services:
       - API_PREFIX=/pos/proxy
       - CORE_API_BASE_URL=http://pos-api-core:1010
       - ASSISTANT_API_BASE_URL=http://pos-api-assistant:3030
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
-      - SUBSCRIPTION_WEBHOOK_SECRET=${SUBSCRIPTION_WEBHOOK_SECRET:-supersecretkey}
-      - PAYMENT_GATEWAY_WEBHOOK_SECRET=${PAYMENT_GATEWAY_WEBHOOK_SECRET:-supersecretkey}
-      - PAYMENT_WEBHOOK_HMAC_SECRET=${PAYMENT_WEBHOOK_HMAC_SECRET:-supersecretkey}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-pos_ai_internal_dev_only_key_32bxx}
+      - SUBSCRIPTION_WEBHOOK_SECRET=${SUBSCRIPTION_WEBHOOK_SECRET:-pos_ai_sub_webhook_dev_only_32xxx}
+      - PAYMENT_GATEWAY_WEBHOOK_SECRET=${PAYMENT_GATEWAY_WEBHOOK_SECRET:-pos_ai_pay_gateway_dev_only_32xx}
+      - PAYMENT_WEBHOOK_HMAC_SECRET=${PAYMENT_WEBHOOK_HMAC_SECRET:-pos_ai_pay_hmac_dev_only_32chars}
       - FRONTEND_PUBLIC_URL=${FRONTEND_PUBLIC_URL:-http://localhost:8010}
       - PLATFORM_ADMIN_EMAIL=${PLATFORM_ADMIN_EMAIL:-platform@pos-ai.local}
       - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
-      - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
+      - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026_dev_only_32}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-pos_ai_jwt_refresh_secret_2026}
-      - APP_VERSION=${APP_VERSION:-2.0.2026-09-10}
+      - APP_VERSION=${APP_VERSION:-2.0.2026-09-15}
+      - REDIS_URL=${REDIS_URL:-redis://:pos_ai_redis_dev_only_pass_32xx@pos-ai-redis:6379}
+      - SESSION_TTL_SEC=${SESSION_TTL_SEC:-28800}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8010,http://127.0.0.1:8010,https://pos-ai.cl,https://www.pos-ai.cl}
+      - RATE_LIMIT_GLOBAL_MAX=${RATE_LIMIT_GLOBAL_MAX:-100}
+      - RATE_LIMIT_LOGIN_MAX=${RATE_LIMIT_LOGIN_MAX:-5}
     volumes:
       - ./pos-api-bff:/usr/src/app
       - /usr/src/app/node_modules
@@ -70,12 +74,14 @@ services:
         condition: service_healthy
       pos-api-assistant:
         condition: service_healthy
+      pos-ai-redis:
+        condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2020/pos/proxy/health']
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 120s
 
   # ==========================================
   # POS-AI v1.7 — Assistant WhatsApp (plan Estándar, puerto 3030)
@@ -90,7 +96,7 @@ services:
       - NODE_ENV=development
       - PORT=3030
       - CORE_API_BASE_URL=http://pos-api-core:1010
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-pos_ai_internal_dev_only_key_32bxx}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-pos-ai-dev-verify}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
@@ -98,7 +104,7 @@ services:
       - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
       - META_APP_SECRET=${META_APP_SECRET:-}
       - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-}
-      - REDIS_URL=${REDIS_URL:-redis://pos-ai-redis:6379}
+      - REDIS_URL=${REDIS_URL:-redis://:pos_ai_redis_dev_only_pass_32xx@pos-ai-redis:6379}
     networks:
       - internal_backend
       - public_gateway
@@ -129,8 +135,10 @@ services:
       - DB_SEED_ROLES=true
       - PORT=1010
       - CORE_PORT=1010
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-supersecretkey}
-      - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-pos_ai_internal_dev_only_key_32bxx}
+      - RATE_LIMIT_GLOBAL_MAX=${RATE_LIMIT_GLOBAL_MAX:-100}
+      - RATE_LIMIT_LOGIN_MAX=${RATE_LIMIT_LOGIN_MAX:-5}
+      - JWT_SECRET=${JWT_SECRET:-pos_ai_jwt_secret_key_2026_dev_only_32}
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-pos_ai_field_encryption_key_2026_32bytes_min}
       - BOOTSTRAP_ADMIN_ENABLED=${BOOTSTRAP_ADMIN_ENABLED:-true}
       - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-admin@empanadascostaazul.cl}
@@ -152,23 +160,23 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-POS-AI <noreply@pos-ai.local>}
-      - APP_VERSION=${APP_VERSION:-2.0.2026-09-10}
-      - REDIS_URL=${REDIS_URL:-redis://pos-ai-redis:6379}
+      - APP_VERSION=${APP_VERSION:-2.0.2026-09-15}
+      - REDIS_URL=${REDIS_URL:-redis://:pos_ai_redis_dev_only_pass_32xx@pos-ai-redis:6379}
       - AUTH_USER_CACHE_TTL_SEC=${AUTH_USER_CACHE_TTL_SEC:-600}
       - PAYMENT_LINK_BASE_URL=${PAYMENT_LINK_BASE_URL:-https://pay.pos-ai.local/p}
-      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-WEBPAY}
-      - WEBPAY_MODE=${WEBPAY_MODE:-integration}
-      - WEBPAY_COMMERCE_CODE=${WEBPAY_COMMERCE_CODE:-597010000500}
-      - WEBPAY_API_SECRET=${WEBPAY_API_SECRET:-5729914e0d440847db17ef8755dcb4b14187bbc23e206514b7e256b755c0459a}
+      - PAYMENT_PROVIDER=${PAYMENT_PROVIDER:-SANDBOX}
+      - WEBPAY_MODE=${WEBPAY_MODE:-simulate}
+      - WEBPAY_COMMERCE_CODE=${WEBPAY_COMMERCE_CODE:-}
+      - WEBPAY_API_SECRET=${WEBPAY_API_SECRET:-}
       - PAYMENT_SANDBOX_RETURN_BASE_URL=${PAYMENT_SANDBOX_RETURN_BASE_URL:-http://localhost:8010}
       - WEBPAY_API_BASE_URL=${WEBPAY_API_BASE_URL:-https://webpay3gint.transbank.cl}
-      - PAYMENT_CHECKOUT_TOKEN_SECRET=${PAYMENT_CHECKOUT_TOKEN_SECRET:-supersecretkey}
-      - PAYMENT_WEBHOOK_HMAC_SECRET=${PAYMENT_WEBHOOK_HMAC_SECRET:-supersecretkey}
+      - PAYMENT_CHECKOUT_TOKEN_SECRET=${PAYMENT_CHECKOUT_TOKEN_SECRET:-pos_ai_pay_checkout_dev_only_32x}
+      - PAYMENT_WEBHOOK_HMAC_SECRET=${PAYMENT_WEBHOOK_HMAC_SECRET:-pos_ai_pay_hmac_dev_only_32chars}
       - DB_HOST=pos-ai-db-mysql
       - DB_PORT=3306
       - DB_NAME=${DB_NAME:-pos-ai-db}
-      - DB_USER=${DB_USER:-usr_pos_ai}
-      - DB_PASSWORD=${DB_PASSWORD:-Usr@12345}
+      - DB_USER=${DB_USER:-usr_pos_core}
+      - DB_PASSWORD=${DB_PASSWORD:-pos_ai_mysql_core_dev_only_32x}
     volumes:
       - ./pos-api-core:/usr/src/app
       - /usr/src/app/node_modules
@@ -197,7 +205,9 @@ services:
     image: redis:7-alpine
     container_name: pos-ai-redis
     restart: unless-stopped
-    command: redis-server --save "" --appendonly no
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD:-pos_ai_redis_dev_only_pass_32xx}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:-pos_ai_redis_dev_only_pass_32xx}
     networks:
       - internal_backend
     healthcheck:
@@ -217,10 +227,12 @@ services:
     ports:
       - '${MYSQL_HOST_PORT:-3308}:3306'
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pos_ai_mysql_root_dev_only_32x}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-pos-ai-db}
-      MYSQL_USER: ${MYSQL_USER:-usr_pos_ai}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}
+      MYSQL_USER: ${MYSQL_USER:-usr_pos_core}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pos_ai_mysql_core_dev_only_32x}
+      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:-usr_pos_readonly}
+      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:-pos_ai_mysql_ro_dev_only_32xx}
     volumes:
       - pos_ai_mysql_data:/var/lib/mysql
       - ./db-init:/docker-entrypoint-initdb.d

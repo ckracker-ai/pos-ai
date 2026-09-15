@@ -3,21 +3,28 @@ import authDelegate from '../delegates/AuthDelegate';
 import { sendOk, sendFail } from '../../../middleware/globalErrorHandler';
 import { AuthenticatedRequest } from '../../../middleware/auth.middleware';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
+import type { LoginInput, RegisterInput } from '../delegates/AuthDelegate';
 
 class AuthController {
   register = async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
-    const empresaId = req.user ? getEffectiveEmpresaId(req) : req.body?.empresaId;
-    const result = await authDelegate.register({ ...req.body, empresaId });
+    if (!req.user) {
+      return sendFail(res, 'UNAUTHENTICATED', 401);
+    }
+    const empresaId = getEffectiveEmpresaId(req);
+    const body = req.body as RegisterInput;
+    const result = await authDelegate.register({ ...body, empresaId });
     if (result.success) return sendOk(res, result.value, 201);
     return sendFail(res, result.error, 400);
   };
 
   login = async (req: Request, res: Response): Promise<Response | void> => {
-    const body = req.body ?? {};
+    const body = req.body as LoginInput;
     const result = await authDelegate.login({
-      ...body,
+      email: body.email,
+      password: body.password,
+      legalAcceptance: body.legalAcceptance,
       ipAddress: req.ip,
-      userAgent: String(req.headers['user-agent'] ?? ''),
+      userAgent: String(req.headers['user-agent'] ?? '').slice(0, 512),
     });
     if (result.success) return sendOk(res, result.value);
     const err = result.error;

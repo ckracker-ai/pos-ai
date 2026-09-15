@@ -13,8 +13,14 @@ export function PlatformGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    hydrate();
-    setReady(true);
+    let cancelled = false;
+    void (async () => {
+      await hydrate();
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [hydrate]);
 
   useEffect(() => {

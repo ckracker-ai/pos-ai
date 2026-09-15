@@ -49,18 +49,22 @@ services:
     build:
       context: ./pos-frontend
       args:
-        NEXT_PUBLIC_INTERNAL_KEY: ${INTERNAL_API_KEY:-supersecretkey}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         BFF_INTERNAL_URL: http://pos-api-bff:2020
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
 
   pos-api-bff:
     ports: !reset
     environment:
       NODE_ENV: production
+      COOKIE_SECURE: 'true'
+      APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
     volumes: !reset
 
   pos-api-core:
     volumes: !reset
+    environment:
+      APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
 
   certbot:
     profiles: [certbot]
@@ -74,10 +78,17 @@ services:
   pos-api-assistant:
     ports: !reset
 
+  pos-ai-redis:
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env.prod}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env.prod}
+
   pos-ai-db-mysql:
     ports: !reset
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-S3d4f5g6_}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required in .env.prod}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-pos-ai-db}
-      MYSQL_USER: ${MYSQL_USER:-usr_pos_ai}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Usr@12345}
+      MYSQL_USER: ${MYSQL_USER:-usr_pos_core}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required in .env.prod}
+      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:-usr_pos_readonly}
+      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?MYSQL_READONLY_PASSWORD is required in .env.prod}

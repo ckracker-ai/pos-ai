@@ -3,7 +3,7 @@ const env = process.env;
 export default {
   port: Number(env.PORT ?? 3030),
   coreBaseUrl: env.CORE_API_BASE_URL ?? 'http://pos-api-core:1010',
-  internalApiKey: env.INTERNAL_API_KEY ?? 'supersecretkey',
+  internalApiKey: env.INTERNAL_API_KEY ?? '',
   openAiApiKey: env.OPENAI_API_KEY ?? '',
   openAiModel: env.OPENAI_MODEL ?? 'gpt-4o-mini',
   whatsappVerifyToken: env.WHATSAPP_VERIFY_TOKEN ?? 'pos-ai-dev-verify',
@@ -11,8 +11,7 @@ export default {
   whatsappPhoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID ?? '',
   whatsappApiVersion: env.WHATSAPP_API_VERSION ?? 'v21.0',
   metaAppSecret: env.META_APP_SECRET ?? '',
-  paymentWebhookSecret:
-    env.PAYMENT_WEBHOOK_SECRET?.trim() || env.INTERNAL_API_KEY?.trim() || 'supersecretkey',
+  paymentWebhookSecret: env.PAYMENT_WEBHOOK_SECRET?.trim() || env.INTERNAL_API_KEY?.trim() || '',
   twilioAuthToken: env.TWILIO_AUTH_TOKEN ?? '',
   twilioAccountSid: env.TWILIO_ACCOUNT_SID ?? '',
   publicBaseUrl: env.ASSISTANT_PUBLIC_BASE_URL ?? '',

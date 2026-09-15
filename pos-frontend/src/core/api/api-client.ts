@@ -60,6 +60,7 @@ const getFriendlyHttpMessage = (status?: number, networkCode?: string) => {
   if (status === 404) return 'No encontramos el recurso solicitado. Revisa la ruta y los parametros enviados.';
   if (status === 409) return 'El registro ya existe o hay un conflicto con datos relacionados.';
   if (status === 422) return 'Los datos enviados no son validos. Revisa el formulario.';
+  if (status === 429) return 'Demasiadas solicitudes. Espera un minuto e intentalo de nuevo.';
   if (status >= 500) return 'El servicio no pudo procesar la solicitud. Intentalo nuevamente.';
   return 'No se pudo completar la solicitud. Revisa los datos e intentalo otra vez.';
 };
@@ -86,6 +87,7 @@ export function initializeApiClient() {
   isHandlingUnauthorized401 = false;
   apiClient = axios.create({
     baseURL: getApiBaseUrl(),
+    withCredentials: true,
     headers: {
       'Content-Type': 'application/json',
     },
@@ -94,21 +96,9 @@ export function initializeApiClient() {
   // Add interceptor to include branch ID and auth token in all requests
   apiClient.interceptors.request.use((config) => {
     const branchId = useBranchStore.getState().selectedBranchId;
-    const token = useAuthStore.getState().token;
-    const internalKey = process.env.NEXT_PUBLIC_INTERNAL_KEY || 'supersecretkey';
-
-    // Aseguramos que existan los headers para que nunca se omitan
-    // `x-branch-id` y `x-internal-key` (requeridos por api-bff/api-core).
     config.headers = config.headers ?? {};
-
-    config.headers['x-branch-id'] = branchId;
-
-    // Internal key required by BFF (except login, which uses a proxy route)
-    config.headers['x-internal-key'] = internalKey;
-
-    // Include auth token if available
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (branchId) {
+      config.headers['x-branch-id'] = branchId;
     }
     return config;
   });
@@ -135,8 +125,7 @@ export function initializeApiClient() {
         const requestUrl = String(error.config?.url ?? '');
 
         // Solo cerrar sesión cuando el 401 indica problema de autenticación real.
-        // Errores de configuración (p. ej. UNAUTHORIZED por x-internal-key en BFF→core)
-        // no deben expulsar al usuario al login.
+        // Errores de configuración no deben expulsar al usuario al login.
         const shouldForceLogout =
           /\/auth\//i.test(requestUrl) ||
           /token|sesion|session|expired|expir|ACCESS_TOKEN|UNAUTHENTICATED/i.test(apiError);

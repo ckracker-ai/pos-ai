@@ -17,6 +17,11 @@ function matchesPublicRules(normalized: string, prefix: string): boolean {
     normalized === `${prefix}/health` ||
     normalized.startsWith(`${prefix}/auth`) ||
     normalized === `${prefix}/platform/auth/login` ||
+    normalized === `${prefix}/platform/auth/session` ||
+    normalized === `${prefix}/platform/auth/logout` ||
+    normalized === '/platform/auth/login' ||
+    normalized === '/platform/auth/session' ||
+    normalized === '/platform/auth/logout' ||
     normalized === `${prefix}/public/planes` ||
     normalized === `${prefix}/public/registro` ||
     normalized.startsWith(`${prefix}/public/legal`) ||

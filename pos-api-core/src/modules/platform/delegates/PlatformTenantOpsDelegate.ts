@@ -13,6 +13,7 @@ import { assertCanAddActiveBranch } from '../../saas/utils/planLimits';
 import { readModelString } from '../../../utils/modelAttributes';
 import { Result, ok, fail } from '../../../types/result';
 import { invalidateAuthUserCache } from '../../../lib/authUserCache';
+import { readJwtSecret } from '../../../config/secrets';
 
 const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
   type: argon2.argon2id,
@@ -356,7 +357,7 @@ class PlatformTenantOpsDelegate {
     };
 
     const expiresIn = '2h';
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET ?? 'default_secret', {
+    const token = jwt.sign(tokenPayload, readJwtSecret(), {
       expiresIn,
     });
 

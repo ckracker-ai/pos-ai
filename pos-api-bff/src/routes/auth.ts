@@ -4,13 +4,19 @@ import { z } from 'zod';
 
 import { requireCoreRequestContext } from '../utils/coreRequestContext.js';
 import { sendFail, sendOk } from '../utils/response.js';
+import config from '../config/index.js';
+import { establishSession, clearSession, ttlFromJwt } from '../lib/sessionCookie.js';
+import { omitTokenFromPayload, takeLoginSecrets } from '../utils/authPayload.js';
+import { publicSessionView } from '../middlewares/sessionAuth.js';
+import { loginRateLimitRoute } from '../lib/rateLimit.js';
+import { requireSeller } from '../middlewares/requireSeller.js';
 
 const registerSchema = z.object({
-  fullName: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(1),
-  roleId: z.string().min(1),
-  branchId: z.string().min(1),
+  fullName: z.string().min(1).max(120),
+  email: z.string().email().max(254),
+  password: z.string().min(8).max(128),
+  roleId: z.string().uuid(),
+  branchId: z.string().uuid(),
   whatsappPhone: z.string().max(32).optional().nullable(),
 });
 
@@ -46,7 +52,7 @@ const authRoutes = async (app: FastifyInstance) => {
 
 
 
-  app.post('/login', async (request, reply) => {
+  app.post('/login', loginRateLimitRoute, async (request, reply) => {
     const body = loginSchema.parse(request.body);
     try {
       const data = await authCore.login({
@@ -54,7 +60,25 @@ const authRoutes = async (app: FastifyInstance) => {
         password: body.password,
         legalAcceptance: body.legalAcceptance,
       });
-      return sendOk(reply, data);
+      const secrets = takeLoginSecrets(data);
+      if (secrets) {
+        const branchId = String(secrets.user.branchId ?? '');
+        const ttl = ttlFromJwt(secrets.token, config.sessionTtlSec);
+        const okSession = await establishSession(
+          reply,
+          {
+            kind: 'tenant',
+            accessToken: secrets.token,
+            user: secrets.user,
+            branchId: branchId || undefined,
+          },
+          ttl
+        );
+        if (!okSession) {
+          return sendFail(reply, 'SESSION_STORE_UNAVAILABLE', 503);
+        }
+      }
+      return sendOk(reply, omitTokenFromPayload(data));
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { error?: string; data?: unknown } } };
       const statusCode = err?.response?.status ?? 401;
@@ -72,18 +96,37 @@ const authRoutes = async (app: FastifyInstance) => {
     }
   });
 
-  app.post('/register', async (request, reply) => {
+  app.get('/session', async (request, reply) => {
+    if (!request.authSession || request.authSession.kind !== 'tenant') {
+      return sendFail(reply, 'UNAUTHENTICATED', 401);
+    }
+    return sendOk(reply, publicSessionView(request.authSession));
+  });
+
+  app.post('/logout', async (request, reply) => {
+    await clearSession(request, reply, 'tenant');
+    return sendOk(reply, { loggedOut: true });
+  });
+
+  app.post('/register', { preHandler: [requireSeller] }, async (request, reply) => {
     const body = registerSchema.parse(request.body);
+    const ctx = requireCoreRequestContext(reply, request);
+    if (!ctx) return;
 
     try {
-      const data = await authCore.register({
-        fullName: body.fullName,
-        email: body.email,
-        password: body.password,
-        roleId: body.roleId,
-        branchId: body.branchId,
-        whatsappPhone: body.whatsappPhone,
-      });
+      const data = await authCore.register(
+        {
+          fullName: body.fullName,
+          email: body.email,
+          password: body.password,
+          roleId: body.roleId,
+          branchId: body.branchId,
+          whatsappPhone: body.whatsappPhone,
+        },
+        ctx.token,
+        ctx.internalKey,
+        ctx.branchId
+      );
       return sendOk(reply, data, 201);
 
     } catch (e: any) {

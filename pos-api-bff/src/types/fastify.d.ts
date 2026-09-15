@@ -1,4 +1,6 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply } from 'fastify';
+
+import type { StoredSession } from '../lib/sessionStore.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -10,6 +12,8 @@ declare module 'fastify' {
       roles: string[];
       branchId?: string;
     };
+    authSession?: StoredSession;
+    authSessionId?: string;
   }
 
   interface FastifyReply {

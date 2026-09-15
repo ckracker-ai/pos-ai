@@ -13,6 +13,7 @@ import legalDelegate from '../../legal/delegates/LegalDelegate';
 import { assertCanAddActiveUser } from '../../saas/utils/planLimits';
 import { normalizePhoneE164 } from '../../assistant/delegates/AssistantDelegate';
 import { invalidateAuthUserCache } from '../../../lib/authUserCache';
+import { readJwtSecret } from '../../../config/secrets';
 
 export interface RegisterInput {
   fullName: string;
@@ -242,7 +243,7 @@ class AuthDelegate {
       isActive: accountIsActive,
     };
 
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET ?? 'default_secret', {
+    const token = jwt.sign(tokenPayload, readJwtSecret(), {
       expiresIn: '24h',
     });
 

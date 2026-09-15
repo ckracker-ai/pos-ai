@@ -7,6 +7,15 @@ import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import User from '../models/User.model';
 import Role from '../models/Role.model';
 import { invalidateAuthUserCache } from '../../../lib/authUserCache';
+import { loginRateLimiter } from '../../../middleware/rateLimit';
+import { validate } from '../../../middleware/validate';
+import {
+  idParamSchema,
+  loginBodySchema,
+  passwordBodySchema,
+  registerBodySchema,
+  userUpdateBodySchema,
+} from '../schemas/auth.schemas';
 
 const router = Router();
 
@@ -18,13 +27,36 @@ const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
 };
 
 
-router.post('/register', AuthController.register);
-router.post('/login', AuthController.login);
+router.post(
+  '/register',
+  authenticateToken,
+  requireAdmin,
+  validate(registerBodySchema, 'body'),
+  AuthController.register
+);
+router.post('/login', loginRateLimiter, validate(loginBodySchema, 'body'), AuthController.login);
 
 // Protected routes
-router.get('/users/:id', authenticateToken, AuthController.findById);
-router.patch('/users/:id/deactivate', authenticateToken, requireAdmin, AuthController.deactivate);
-router.patch('/users/:id/restore', authenticateToken, requireAdmin, AuthController.restore);
+router.get(
+  '/users/:id',
+  authenticateToken,
+  validate(idParamSchema, 'params'),
+  AuthController.findById
+);
+router.patch(
+  '/users/:id/deactivate',
+  authenticateToken,
+  requireAdmin,
+  validate(idParamSchema, 'params'),
+  AuthController.deactivate
+);
+router.patch(
+  '/users/:id/restore',
+  authenticateToken,
+  requireAdmin,
+  validate(idParamSchema, 'params'),
+  AuthController.restore
+);
 
 // Admin only: CRUD users
 router.get('/roles', authenticateToken, requireAuditor, async (_req, res) => {
@@ -44,8 +76,20 @@ router.get('/users', authenticateToken, requireAuditor, async (req: Authenticate
 
 
 
-router.post('/users', authenticateToken, requireAdmin, AuthController.register);
-router.put('/users/:id', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.post(
+  '/users',
+  authenticateToken,
+  requireAdmin,
+  validate(registerBodySchema, 'body'),
+  AuthController.register
+);
+router.put(
+  '/users/:id',
+  authenticateToken,
+  requireAdmin,
+  validate(idParamSchema, 'params'),
+  validate(userUpdateBodySchema, 'body'),
+  async (req: AuthenticatedRequest, res) => {
   try {
     const empresaId = getEffectiveEmpresaId(req);
     const user = await User.findOne({ where: { id: req.params.id, empresaId } });
@@ -78,24 +122,19 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req: Authentica
   }
 });
 
-router.patch('/users/:id/password', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.patch(
+  '/users/:id/password',
+  authenticateToken,
+  requireAdmin,
+  validate(idParamSchema, 'params'),
+  validate(passwordBodySchema, 'body'),
+  async (req: AuthenticatedRequest, res) => {
   try {
     const empresaId = getEffectiveEmpresaId(req);
     const user = await User.findOne({ where: { id: req.params.id, empresaId } });
     if (!user) return res.status(404).json({ success: false, data: null, error: 'USER_NOT_FOUND', code: 404 });
 
-    const newPasswordRaw = typeof req.body?.password === 'string' ? req.body.password : '';
-    const newPassword = newPasswordRaw.trim();
-    if (newPassword.length < 8) {
-      return res.status(422).json({
-        success: false,
-        data: null,
-        error: 'VALIDATION_ERROR: password must be at least 8 characters',
-        code: 422,
-      });
-    }
-
-    const passwordHash = await argon2.hash(newPassword, ARGON2_OPTIONS);
+    const passwordHash = await argon2.hash(req.body.password, ARGON2_OPTIONS);
     await user.update({ password: passwordHash, isActive: true });
     await invalidateAuthUserCache(String(user.id));
     return sendOk(res, { updated: true });
@@ -104,6 +143,12 @@ router.patch('/users/:id/password', authenticateToken, requireAdmin, async (req:
   }
 });
 
-router.delete('/users/:id', authenticateToken, requireAdmin, AuthController.deactivate);
+router.delete(
+  '/users/:id',
+  authenticateToken,
+  requireAdmin,
+  validate(idParamSchema, 'params'),
+  AuthController.deactivate
+);
 
 export default router;

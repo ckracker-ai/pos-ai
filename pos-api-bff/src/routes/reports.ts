@@ -1,27 +1,44 @@
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { requireSeller } from '../middlewares/requireSeller.js';
 import { requireCoreRequestContext } from '../utils/coreRequestContext.js';
 import { sendFail, sendOk } from '../utils/response.js';
 import { ApiCoreServiceReports } from '../services/apiCoreServiceReports.js';
 
+const reportsQuerySchema = z.object({
+  global: z.string().max(8).optional(),
+  days: z.preprocess(
+    (val) => (val === undefined || val === '' ? undefined : Number(val)),
+    z.number().int().min(7).max(90).optional()
+  ),
+  limit: z.preprocess(
+    (val) => (val === undefined || val === '' ? undefined : Number(val)),
+    z.number().int().min(1).max(500).optional()
+  ),
+  status: z.string().max(32).optional(),
+  hour: z.preprocess(
+    (val) => (val === undefined || val === '' ? undefined : Number(val)),
+    z.number().int().min(0).max(23).optional()
+  ),
+});
+
 const reportsRoutes = async (app: FastifyInstance) => {
   const reportsCore = new ApiCoreServiceReports();
 
-  // Fastify tipa request.query como unknown; aquí lo tratamos dinámicamente.
-  const parseGlobal = (request: any) =>
-    String(request?.query?.global ?? '').toLowerCase() === 'true';
+  const parseReportsQuery = (request: { query?: unknown }) =>
+    reportsQuerySchema.parse(request.query ?? {});
+
+  const parseGlobal = (query: { global?: string }) =>
+    String(query.global ?? '').toLowerCase() === 'true';
 
   app.get('/dashboard', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
-
-    const global = parseGlobal(request);
-    const days = Number((request.query as { days?: string }).days ?? 30);
-
+    const query = parseReportsQuery(request);
     try {
       const data = await reportsCore.getDashboard(ctx.token, ctx.internalKey, ctx.branchId, {
-        global,
-        days,
+        global: parseGlobal(query),
+        days: query.days ?? 30,
       });
       return sendOk(reply, data);
     } catch (e: unknown) {
@@ -33,11 +50,11 @@ const reportsRoutes = async (app: FastifyInstance) => {
   app.get('/sales', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
-
+    const query = parseReportsQuery(request);
     try {
       const data = await reportsCore.getSalesReport(ctx.token, ctx.internalKey, ctx.branchId, {
-        global: parseGlobal(request),
-        limit: Number((request.query as { limit?: string }).limit ?? 200),
+        global: parseGlobal(query),
+        limit: query.limit ?? 200,
       });
       return sendOk(reply, data);
     } catch (e: unknown) {
@@ -49,10 +66,10 @@ const reportsRoutes = async (app: FastifyInstance) => {
   app.get('/inventory', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
-
+    const query = parseReportsQuery(request);
     try {
       const data = await reportsCore.getInventoryReport(ctx.token, ctx.internalKey, ctx.branchId, {
-        global: parseGlobal(request),
+        global: parseGlobal(query),
       });
       return sendOk(reply, data);
     } catch (e: unknown) {
@@ -64,14 +81,12 @@ const reportsRoutes = async (app: FastifyInstance) => {
   app.get('/shrinkage', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
-
-    const query = request.query as { status?: string; limit?: string };
-
+    const query = parseReportsQuery(request);
     try {
       const data = await reportsCore.getShrinkageReport(ctx.token, ctx.internalKey, ctx.branchId, {
-        global: parseGlobal(request),
+        global: parseGlobal(query),
         status: query.status ?? 'ALL',
-        limit: Number(query.limit ?? 300),
+        limit: query.limit ?? 300,
       });
       return sendOk(reply, data);
     } catch (e: unknown) {
@@ -83,10 +98,10 @@ const reportsRoutes = async (app: FastifyInstance) => {
   app.get('/hot-skus', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
-    const hourRaw = Number((request.query as { hour?: string }).hour);
+    const query = parseReportsQuery(request);
     try {
       const data = await reportsCore.getHotSkus(ctx.token, ctx.internalKey, ctx.branchId, {
-        hour: Number.isFinite(hourRaw) ? hourRaw : undefined,
+        hour: query.hour,
       });
       return sendOk(reply, data);
     } catch (e: unknown) {
@@ -98,10 +113,11 @@ const reportsRoutes = async (app: FastifyInstance) => {
   app.get('/reorder-draft', { preHandler: [requireSeller] }, async (request, reply) => {
     const ctx = requireCoreRequestContext(reply, request);
     if (!ctx) return;
+    const query = parseReportsQuery(request);
     try {
       const data = await reportsCore.getReorderDraft(ctx.token, ctx.internalKey, ctx.branchId, {
-        global: parseGlobal(request),
-        limit: Number((request.query as { limit?: string }).limit ?? 20),
+        global: parseGlobal(query),
+        limit: query.limit ?? 20,
       });
       return sendOk(reply, data);
     } catch (e: unknown) {

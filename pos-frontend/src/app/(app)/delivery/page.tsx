@@ -47,7 +47,7 @@ function formatClp(n: number): string {
 }
 
 export default function DeliveryPage() {
-  const token = useAuthStore((s) => s.token);
+  const { isAuthenticated } = useAuthStore();
   const branchId = useAuthStore((s) => s.user?.branchId);
   const userRole = useAuthStore((s) => s.user?.role);
   const isDispatcher = useMemo(
@@ -65,19 +65,20 @@ export default function DeliveryPage() {
   const headers = useCallback(() => {
     const h: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token ?? ''}`,
-      'x-internal-key': process.env.NEXT_PUBLIC_INTERNAL_KEY ?? 'supersecretkey',
     };
     if (branchId) h['x-branch-id'] = branchId;
     return h;
-  }, [token, branchId]);
+  }, [branchId]);
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     setLoading(true);
     setError('');
     try {
-      const pendingRes = await fetch(posProxyPath('sales/deliveries/pending'), { headers: headers() });
+      const pendingRes = await fetch(posProxyPath('sales/deliveries/pending'), {
+        headers: headers(),
+        credentials: 'include',
+      });
       const pendingJson = await pendingRes.json();
       if (!pendingRes.ok || !pendingJson.success) {
         setError(String(pendingJson.error ?? 'No se pudo cargar envíos'));
@@ -88,7 +89,10 @@ export default function DeliveryPage() {
       setRows(Array.isArray(list) ? list : []);
 
       if (isDispatcher) {
-        const driversRes = await fetch(posProxyPath('sales/deliveries/drivers'), { headers: headers() });
+        const driversRes = await fetch(posProxyPath('sales/deliveries/drivers'), {
+          headers: headers(),
+          credentials: 'include',
+        });
         const driversJson = await driversRes.json();
         const driverList = (driversJson.data?.drivers ?? []) as DriverOption[];
         setDrivers(Array.isArray(driverList) ? driverList : []);
@@ -98,7 +102,7 @@ export default function DeliveryPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, headers, isDispatcher]);
+  }, [isAuthenticated, headers, isDispatcher]);
 
   useEffect(() => {
     load();
@@ -113,6 +117,7 @@ export default function DeliveryPage() {
       const res = await fetch(posProxyPath(`sales/sales/${saleId}/delivery-status`), {
         method: 'PATCH',
         headers: headers(),
+        credentials: 'include',
         body: JSON.stringify(body),
       });
       const json = await res.json();

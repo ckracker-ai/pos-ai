@@ -8,6 +8,9 @@ import { posInterpretRoutes } from './routes/posInterpret.js';
 import { voiceRoutes } from './webhooks/voice.js';
 import { twilioVoiceRoutes } from './webhooks/twilioVoice.js';
 import { getRedis, isRedisConfigured } from './lib/redis.js';
+import { assertInternalApiKey } from './lib/secrets.js';
+
+assertInternalApiKey();
 
 const app = Fastify({ logger: true, bodyLimit: 6 * 1024 * 1024 });
 
@@ -17,7 +20,7 @@ if (isRedisConfigured()) {
   app.log.info('REDIS_URL not set — assistant sessions use in-memory fallback');
 }
 
-await app.register(cors, { origin: true });
+await app.register(cors, { origin: false });
 
 app.get('/health', async () => ({
   status: 'ok',

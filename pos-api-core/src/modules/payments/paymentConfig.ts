@@ -1,14 +1,12 @@
 const paymentConfig = {
   defaultProvider: (process.env.PAYMENT_PROVIDER ?? 'SANDBOX').trim().toUpperCase(),
   checkoutTokenSecret:
-    process.env.PAYMENT_CHECKOUT_TOKEN_SECRET ??
-    process.env.INTERNAL_API_KEY ??
-    'supersecretkey',
+    process.env.PAYMENT_CHECKOUT_TOKEN_SECRET ?? process.env.INTERNAL_API_KEY ?? '',
   webhookHmacSecret:
     process.env.PAYMENT_WEBHOOK_HMAC_SECRET ??
     process.env.SUBSCRIPTION_WEBHOOK_SECRET ??
     process.env.INTERNAL_API_KEY ??
-    'supersecretkey',
+    '',
   sandboxReturnBaseUrl:
     process.env.PAYMENT_SANDBOX_RETURN_BASE_URL ??
     process.env.FRONTEND_PUBLIC_URL ??

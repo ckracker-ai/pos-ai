@@ -1,12 +1,14 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { sessionOrBearerToken } from './sessionAuth.js';
 
 export const requirePlatformAuth = async (request: FastifyRequest, reply: FastifyReply) => {
   try {
-    const authorization = request.headers.authorization;
-    if (!authorization) {
-      return reply.status(401).send({ error: 'Missing Authorization header' });
+    const token = sessionOrBearerToken(request);
+    if (!token) {
+      return reply.status(401).send({ error: 'Missing session' });
     }
 
+    request.headers.authorization = `Bearer ${token}`;
     const payload = await request.jwtVerify<{ userId: string; roles?: string[] }>();
     const roles = payload.roles ?? [];
     if (!roles.includes('PLATFORM_ADMIN')) {

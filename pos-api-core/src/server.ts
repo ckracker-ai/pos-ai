@@ -33,6 +33,8 @@ import wholesaleRoutes from './modules/wholesale/routes/wholesale.routes';
 import virtualMenuRoutes from './modules/wsp/routes/virtualMenu.routes';
 import { startTenantDeletionJob } from './jobs/tenantDeletionJob';
 import { getRedis, isRedisConfigured } from './lib/redis';
+import { globalRateLimiter } from './middleware/rateLimit';
+import { assertInternalApiKey, assertJwtSecret } from './config/secrets';
 
 
 const internalKeyGuard = (req: Request, res: Response, next: express.NextFunction) => {
@@ -52,20 +54,14 @@ const internalKeyGuard = (req: Request, res: Response, next: express.NextFunctio
 };
 
 function warnInsecureSecrets(): void {
-  const jwt = process.env.JWT_SECRET ?? 'default_secret';
-  if (jwt === 'default_secret' || jwt.length < 32) {
-    console.warn('⚠️  JWT_SECRET is missing, default, or shorter than 32 chars — use a strong secret in production.');
-  }
-  const ik = process.env.INTERNAL_API_KEY ?? '';
-  if (!ik || ik === 'supersecretkey' || ik.length < 24) {
-    console.warn('⚠️  INTERNAL_API_KEY is missing, default, or weak — rotate before production.');
-  }
   if (!process.env.FIELD_ENCRYPTION_KEY?.trim() && !process.env.FIELD_ENCRYPTION_KEY_B64?.trim()) {
     console.warn('⚠️  FIELD_ENCRYPTION_KEY missing — transfer fields cannot be encrypted/decrypted.');
   }
 }
 
 async function bootstrap(): Promise<void> {
+  assertJwtSecret();
+  assertInternalApiKey();
   warnInsecureSecrets();
   defineAssociations();
 
@@ -99,12 +95,14 @@ async function bootstrap(): Promise<void> {
   }
 
   const app = express();
+  app.set('trust proxy', 1);
 
   app.use(helmet());
   app.use(cors({ origin: false }));
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(globalRateLimiter);
 
   app.get('/health', (_req, res) =>
     sendOk(res, { status: 'ok', service: APP_NAME, version: APP_VERSION, ts: new Date().toISOString() })

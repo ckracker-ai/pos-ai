@@ -1,5 +1,9 @@
 import createApp from './app.js';
 import config from './config/index.js';
+import { assertInternalApiKey, assertJwtSecret } from './lib/secrets.js';
+
+assertJwtSecret();
+assertInternalApiKey();
 
 const app = createApp();
 

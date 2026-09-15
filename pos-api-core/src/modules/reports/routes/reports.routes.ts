@@ -8,10 +8,13 @@ import {
 import { getEffectiveBranchId } from '../../../utils/branchContext';
 import { getEffectiveEmpresaId } from '../../../utils/tenantScope';
 import reportsDelegate from '../delegates/ReportsDelegate';
+import { validate } from '../../../middleware/validate';
+import { reportsQuerySchema } from '../schemas/reports.schemas';
 
 const router = Router();
 
 router.use(authenticateToken);
+router.use(validate(reportsQuerySchema, 'query'));
 
 function resolveReportBranchId(req: AuthenticatedRequest): string | null {
   const global =

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { LoginLegalReauthBundle, LoginRequest, User, UserRole } from '@/core/interfaces';
 import { getFriendlyApiError } from '@/core/api/api-error-messages';
 import { getRoleProfile } from '@/core/config/role-access';
@@ -13,20 +12,26 @@ interface RegisterRequest extends LoginRequest {
   branchId?: string;
 }
 
+export type SupportSessionInfo = {
+  active: boolean;
+  email?: string;
+  expiresAt?: Date;
+};
+
 interface AuthStore {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-
+  supportSession: SupportSessionInfo;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (payload: RegisterRequest) => Promise<void>;
   logout: () => void;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   clearError: () => void;
-  hydrate: () => void;
+  hydrate: () => Promise<void>;
 }
 
 const getBffBaseUrl = () =>
@@ -61,219 +66,205 @@ const parseJsonResponse = async (response: Response) => {
   return text ? JSON.parse(text) : {};
 };
 
-type AuthTokenPayload = {
-  branchId?: string;
-  email?: string;
-  supportSession?: boolean;
-  exp?: number;
-};
+const credentialsInit = (init: RequestInit = {}): RequestInit => ({
+  ...init,
+  credentials: 'include',
+});
 
-const readTokenPayload = (token: string): AuthTokenPayload | null => {
-  try {
-    const segment = token.split('.')[1];
-    if (!segment) return null;
-    return JSON.parse(atob(segment)) as AuthTokenPayload;
-  } catch {
-    return null;
+const applySessionUser = (normalizedUser: User) => {
+  const canSwitchBranch = getRoleProfile(normalizedUser.role).canSwitchBranch;
+  if (normalizedUser.branchId && !canSwitchBranch) {
+    useBranchStore.getState().setSelectedBranchId(normalizedUser.branchId);
   }
 };
 
-const readBranchIdFromToken = (token: string): string | undefined => {
-  const payload = readTokenPayload(token);
-  return payload?.branchId?.trim() || undefined;
-};
-
-export type SupportSessionInfo = {
-  active: boolean;
-  email?: string;
-  expiresAt?: Date;
-};
-
-export const readSupportSessionFromToken = (token: string | null): SupportSessionInfo => {
-  if (!token) return { active: false };
-  const payload = readTokenPayload(token);
-  if (!payload?.supportSession) return { active: false };
+const supportFromPayload = (payload: Record<string, unknown>, user?: User | null): SupportSessionInfo => {
+  if (!payload.supportSession) return { active: false };
+  const expiresAtRaw = payload.supportExpiresAt;
   return {
     active: true,
-    email: payload.email?.trim() || undefined,
-    expiresAt: payload.exp ? new Date(payload.exp * 1000) : undefined,
+    email: user?.email,
+    expiresAt: typeof expiresAtRaw === 'string' ? new Date(expiresAtRaw) : undefined,
   };
 };
 
-export const useAuthStore = create<AuthStore>()(
-  persist(
-    (set, get) => ({
+const clearLegacyAuthStorage = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('auth-store');
+};
+
+export const readSupportSessionFromToken = (_token: string | null): SupportSessionInfo => {
+  return useAuthStore.getState().supportSession;
+};
+
+export const useAuthStore = create<AuthStore>()((set) => ({
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isLoading: false,
+  error: null,
+  supportSession: { active: false },
+
+  login: async (credentials: LoginRequest) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(
+        `${getBffBaseUrl()}${posProxyPath('auth/login')}`,
+        credentialsInit({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentials),
+        })
+      );
+
+      const payload = await parseJsonResponse(response);
+
+      if (!response.ok || payload.success === false) {
+        const apiErr = String(payload.error || payload.message || 'INVALID_CREDENTIALS');
+        if (
+          credentials.email.trim().toLowerCase() === 'platform@pos-ai.local' ||
+          credentials.email.trim().toLowerCase().includes('platform@')
+        ) {
+          throw new Error(
+            'Estas credenciales son de super-admin plataforma. Usa http://localhost:8010/platform/login'
+          );
+        }
+        if (apiErr === 'LEGAL_REAUTH_REQUIRED' && payload.data) {
+          const legalErr = new Error('LEGAL_REAUTH_REQUIRED') as Error & {
+            code: 'LEGAL_REAUTH_REQUIRED';
+            legal: LoginLegalReauthBundle;
+          };
+          legalErr.code = 'LEGAL_REAUTH_REQUIRED';
+          legalErr.legal = payload.data as LoginLegalReauthBundle;
+          throw legalErr;
+        }
+        throw new Error(apiErr);
+      }
+
+      const authData = payload.data ?? {};
+      if (!authData.user) {
+        throw new Error('La respuesta de autenticacion no incluyo usuario.');
+      }
+
+      const normalizedUser = normalizeAuthUser(authData.user, credentials.email);
+      applySessionUser(normalizedUser);
+      clearLegacyAuthStorage();
+      set({
+        user: normalizedUser,
+        token: null,
+        isAuthenticated: true,
+        isLoading: false,
+        supportSession: supportFromPayload(authData, normalizedUser),
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error as Error & { code?: string }).code === 'LEGAL_REAUTH_REQUIRED'
+      ) {
+        set({ isLoading: false, isAuthenticated: false });
+        throw error;
+      }
+      const errorMessage = getFriendlyApiError(error, 'auth.login').message;
+      set({
+        error: errorMessage,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+      throw new Error(errorMessage);
+    }
+  },
+
+  register: async (payload: RegisterRequest) => {
+    set({ isLoading: true, error: null });
+    try {
+      const branchId = payload.branchId || process.env.NEXT_PUBLIC_DEFAULT_BRANCH_ID || '1';
+      const response = await fetch(
+        `${getBffBaseUrl()}${posProxyPath('auth/register')}`,
+        credentialsInit({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Branch-ID': branchId,
+          },
+          body: JSON.stringify(payload),
+        })
+      );
+
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || data.error || 'No se pudo registrar el usuario.');
+      }
+
+      set({ isLoading: false });
+    } catch (error) {
+      const errorMessage =
+        (error instanceof Error && error.message) || 'Error al registrar usuario.';
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
+    }
+  },
+
+  logout: () => {
+    void fetch(`${getBffBaseUrl()}${posProxyPath('auth/logout')}`, credentialsInit({ method: 'POST' }));
+    set({
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: false,
       error: null,
+      supportSession: { active: false },
+    });
+    clearLegacyAuthStorage();
+  },
 
-      login: async (credentials: LoginRequest) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch(`${getBffBaseUrl()}${posProxyPath('auth/login')}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(credentials),
-          });
+  setUser: (user: User | null) => {
+    set({ user, isAuthenticated: user !== null });
+  },
 
-          const payload = await parseJsonResponse(response);
-          console.info('Login response:', payload);
+  setToken: (_token: string | null) => {
+    set({ token: null });
+  },
 
-          if (!response.ok || payload.success === false) {
-            const apiErr = String(payload.error || payload.message || 'INVALID_CREDENTIALS');
-            if (
-              credentials.email.trim().toLowerCase() === 'platform@pos-ai.local' ||
-              credentials.email.trim().toLowerCase().includes('platform@')
-            ) {
-              throw new Error(
-                'Estas credenciales son de super-admin plataforma. Usa http://localhost:8010/platform/login'
-              );
-            }
-            if (apiErr === 'LEGAL_REAUTH_REQUIRED' && payload.data) {
-              const legalErr = new Error('LEGAL_REAUTH_REQUIRED') as Error & {
-                code: 'LEGAL_REAUTH_REQUIRED';
-                legal: LoginLegalReauthBundle;
-              };
-              legalErr.code = 'LEGAL_REAUTH_REQUIRED';
-              legalErr.legal = payload.data as LoginLegalReauthBundle;
-              throw legalErr;
-            }
-            throw new Error(apiErr);
-          }
+  clearError: () => {
+    set({ error: null });
+  },
 
-          const authData = payload.data;
-          if (!authData.user || !authData.token) {
-            throw new Error('La respuesta de autenticacion no incluyo usuario o token.');
-          }
-
-          const tokenBranchId = readBranchIdFromToken(String(authData.token ?? ''));
-          const normalizedUser = normalizeAuthUser(authData.user, credentials.email);
-          if (!normalizedUser.branchId && tokenBranchId) {
-            normalizedUser.branchId = tokenBranchId;
-          }
-          set({
-            user: normalizedUser,
-            token: authData.token,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-          const canSwitchBranch = getRoleProfile(normalizedUser.role).canSwitchBranch;
-          const effectiveBranchId = normalizedUser.branchId ?? tokenBranchId;
-          if (effectiveBranchId && !canSwitchBranch) {
-            useBranchStore.getState().setSelectedBranchId(effectiveBranchId);
-          }
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            (error as Error & { code?: string }).code === 'LEGAL_REAUTH_REQUIRED'
-          ) {
-            set({ isLoading: false, isAuthenticated: false });
-            throw error;
-          }
-          console.error('Login error:', error);
-          const errorMessage = getFriendlyApiError(error, 'auth.login').message;
-          set({
-            error: errorMessage,
-            isLoading: false,
-            isAuthenticated: false,
-          });
-          throw new Error(errorMessage);
-        }
-      },
-
-      register: async (payload: RegisterRequest) => {
-        set({ isLoading: true, error: null });
-        try {
-          const branchId = payload.branchId || process.env.NEXT_PUBLIC_DEFAULT_BRANCH_ID || '1';
-          const response = await fetch(`${getBffBaseUrl()}${posProxyPath('auth/register')}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Branch-ID': branchId,
-            },
-            body: JSON.stringify(payload),
-          });
-
-          const data = await parseJsonResponse(response);
-          console.info('Register response:', data);
-
-          if (!response.ok || data.success === false) {
-            throw new Error(data.message || data.error || 'No se pudo registrar el usuario.');
-          }
-
-          set({ isLoading: false });
-        } catch (error) {
-          console.error('Register error:', error);
-          const errorMessage =
-            (error instanceof Error && error.message) ||
-            'Error al registrar usuario.';
-          set({ error: errorMessage, isLoading: false });
-          throw new Error(errorMessage);
-        }
-      },
-
-      logout: () => {
+  hydrate: async () => {
+    clearLegacyAuthStorage();
+    try {
+      const response = await fetch(
+        `${getBffBaseUrl()}${posProxyPath('auth/session')}`,
+        credentialsInit({ method: 'GET' })
+      );
+      const payload = await parseJsonResponse(response);
+      if (!response.ok || payload.success === false || !payload.data?.user) {
         set({
           user: null,
           token: null,
           isAuthenticated: false,
-          error: null,
+          supportSession: { active: false },
         });
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('auth-store');
-        }
-      },
-
-      setUser: (user: User | null) => {
-        set({ user, isAuthenticated: user !== null });
-      },
-
-      setToken: (token: string | null) => {
-        set({ token });
-      },
-
-      clearError: () => {
-        set({ error: null });
-      },
-
-      hydrate: () => {
-        const { token, user } = get();
-
-        // Si no hay token o no hay usuario, no estamos autenticados.
-        if (!token || !user) {
-          set({ token: token ?? null, user: user ?? null, isAuthenticated: false });
-          return;
-        }
-
-        // Si existe token pero el usuario no cuadra (inconsistencia típica al expirar), limpiamos.
-        // Nota: aquí no validamos firma/exp por simplicidad; el backend validará en requests.
-        // Lo importante es evitar quedarnos en isAuthenticated=true con state incompleto.
-        const tokenBranchId = readBranchIdFromToken(token);
-        const branchId = user.branchId ?? tokenBranchId;
-        const userWithBranch =
-          branchId && !user.branchId ? { ...user, branchId } : user;
-
-        const canSwitchBranch = getRoleProfile(userWithBranch.role).canSwitchBranch;
-        if (branchId && !canSwitchBranch) {
-          useBranchStore.getState().setSelectedBranchId(branchId);
-        }
-        set({
-          user: userWithBranch,
-          isAuthenticated: true,
-        });
-      },
-    }),
-    {
-      name: 'auth-store',
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
-      }),
+        return;
+      }
+      const session = payload.data as Record<string, unknown>;
+      const normalizedUser = normalizeAuthUser(
+        session.user as Record<string, unknown>,
+        String((session.user as Record<string, unknown>)?.email ?? '')
+      );
+      applySessionUser(normalizedUser);
+      set({
+        user: normalizedUser,
+        token: null,
+        isAuthenticated: true,
+        supportSession: supportFromPayload(session, normalizedUser),
+      });
+    } catch {
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        supportSession: { active: false },
+      });
     }
-  )
-);
+  },
+}));

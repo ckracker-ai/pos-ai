@@ -1,9 +1,29 @@
 import { Sequelize } from 'sequelize';
 
+const FORBIDDEN_DB_USERS = new Set(['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'debian-sys-maint']);
+
+function resolveDbUser(): string {
+  const user = String(process.env.DB_USER ?? '').trim();
+  if (!user || FORBIDDEN_DB_USERS.has(user.toLowerCase())) {
+    throw new Error(
+      'DB_USER must be a dedicated least-privilege account (not root or a MySQL system user).'
+    );
+  }
+  return user;
+}
+
+function resolveDbPassword(): string {
+  const password = process.env.DB_PASSWORD ?? '';
+  if (!password) {
+    throw new Error('DB_PASSWORD is required for the application database user.');
+  }
+  return password;
+}
+
 const sequelize = new Sequelize(
   process.env.DB_NAME ?? 'pos-ai-db',
-  process.env.DB_USER ?? 'root',
-  process.env.DB_PASSWORD ?? '',
+  resolveDbUser(),
+  resolveDbPassword(),
   {
     host: process.env.DB_HOST ?? '127.0.0.1',
     port: Number(process.env.DB_PORT ?? 3306),

@@ -28,13 +28,18 @@ export class UsersService {
     _requestBranchId: string
   ) {
     try {
-      const data = await this.authCore.register({
-        fullName,
-        email,
-        password,
-        roleId,
-        branchId,
-      });
+      const data = await this.authCore.register(
+        {
+          fullName,
+          email,
+          password,
+          roleId,
+          branchId,
+        },
+        _token,
+        _internalKey,
+        _requestBranchId
+      );
       return ok({ data });
     } catch (error: any) {
       const statusCode = error?.response?.status ?? 502;

@@ -2,7 +2,7 @@ import { useAuthStore } from '@/store/auth';
 import { UserRole } from '@/core/interfaces';
 
 export function useAuthCheck() {
-  const { user, isAuthenticated, token } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
 
   const hasRole = (role: UserRole | UserRole[]) => {
     if (!isAuthenticated || !user) return false;
@@ -26,7 +26,7 @@ export function useAuthCheck() {
   return {
     user,
     isAuthenticated,
-    token,
+    token: null as string | null,
     hasRole,
     isAdmin,
     isAuditor,

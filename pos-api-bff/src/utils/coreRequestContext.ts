@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import config from '../config/index.js';
 import { sendFail } from './response.js';
+import { sessionOrBearerToken } from '../middlewares/sessionAuth.js';
 
 export type CoreRequestContext = {
   token: string;
@@ -13,13 +14,13 @@ export type RequireCoreContextOptions = {
   requireBranchId?: boolean;
 };
 
-/** Extrae token, x-internal-key y branchId del request (middleware + header). */
 export function getCoreRequestContext(request: FastifyRequest): CoreRequestContext {
-  const token = (request.headers.authorization ?? '').toString().replace(/^Bearer\s+/i, '');
-  const internalKey = request.headers['x-internal-key']?.toString();
+  const token = sessionOrBearerToken(request);
+  const internalKey = config.internalApiKey;
   const branchId =
     request.branchContext?.branchId ??
     request.headers[config.branchHeader]?.toString() ??
+    request.authSession?.branchId ??
     '';
 
   return {
@@ -29,10 +30,6 @@ export function getCoreRequestContext(request: FastifyRequest): CoreRequestConte
   };
 }
 
-/**
- * Valida el contexto requerido por api-core y responde con sendFail si falta algo.
- * Devuelve null si ya se envió la respuesta de error.
- */
 export function requireCoreRequestContext(
   reply: FastifyReply,
   request: FastifyRequest,
@@ -41,8 +38,13 @@ export function requireCoreRequestContext(
   const { requireInternalKey = true, requireBranchId = true } = options;
   const ctx = getCoreRequestContext(request);
 
+  if (!ctx.token) {
+    sendFail(reply, 'Missing session', 401);
+    return null;
+  }
+
   if (requireInternalKey && !ctx.internalKey) {
-    sendFail(reply, 'Missing x-internal-key header', 401);
+    sendFail(reply, 'Missing INTERNAL_API_KEY', 401);
     return null;
   }
 

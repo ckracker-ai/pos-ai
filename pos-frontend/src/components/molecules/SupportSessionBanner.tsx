@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { readSupportSessionFromToken } from '@/core/context/auth';
 import { useAuthStore } from '@/store/auth';
 
 function formatExpiry(date: Date): string {
@@ -26,12 +25,12 @@ function formatRemaining(ms: number): string {
 
 export function SupportSessionBanner() {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
+  const supportSession = useAuthStore((s) => s.supportSession);
   const logout = useAuthStore((s) => s.logout);
   const userEmail = useAuthStore((s) => s.user?.email);
   const [now, setNow] = useState(() => Date.now());
 
-  const session = useMemo(() => readSupportSessionFromToken(token), [token]);
+  const session = supportSession;
 
   useEffect(() => {
     if (!session.active) return;

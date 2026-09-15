@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePlatformAuthStore } from '@/core/context/platform-auth';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
@@ -9,11 +9,21 @@ import { LoginShell } from '@/components/organisms/LoginShell';
 export default function PlatformLoginPage() {
   const router = useRouter();
   const login = usePlatformAuthStore((s) => s.login);
+  const hydrate = usePlatformAuthStore((s) => s.hydrate);
+  const isAuthenticated = usePlatformAuthStore((s) => s.isAuthenticated);
   const isLoading = usePlatformAuthStore((s) => s.isLoading);
   const error = usePlatformAuthStore((s) => s.error);
 
   const [email, setEmail] = useState('platform@pos-ai.local');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  useEffect(() => {
+    if (isAuthenticated) router.replace('/platform/dashboard');
+  }, [isAuthenticated, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

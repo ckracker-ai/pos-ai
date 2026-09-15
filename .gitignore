@@ -18,6 +18,10 @@ pos-api-bff/src/**/*.js
 .env.*
 **/.env
 **/.env.*
+!.env.example
+!.env.prod.example
+!**/.env.example
+!**/.env.prod.example
 
 # Operación local (no forma parte del producto versionado)
 /deploy/

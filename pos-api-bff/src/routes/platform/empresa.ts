@@ -4,6 +4,8 @@ import { requirePlatformAuth } from '../../middlewares/requirePlatformAuth.js';
 import { extractCoreError } from '../../utils/extractCoreError.js';
 import { sendFail, sendOk } from '../../utils/response.js';
 import { registerPlatformAssistantEmpresaRoutes } from './assistantHandlers.js';
+import { takeLoginSecrets, omitTokenFromPayload } from '../../utils/authPayload.js';
+import { establishSession, ttlFromJwt, decodeJwtPayload } from '../../lib/sessionCookie.js';
 
 const createEmpresaSchema = z.object({
   rut: z.string().min(1),
@@ -410,7 +412,29 @@ const platformEmpresaRoutes = async (app: FastifyInstance) => {
     const { empresaId } = request.params as { empresaId: string };
     try {
       const data = await core.createSupportAccess(empresaId);
-      return sendOk(reply, data);
+      const secrets = takeLoginSecrets(data);
+      if (secrets) {
+        const payload = decodeJwtPayload(secrets.token);
+        const supportExpiresAt =
+          typeof payload?.exp === 'number' ? new Date(payload.exp * 1000).toISOString() : undefined;
+        const ttl = ttlFromJwt(secrets.token, 7200);
+        const okSession = await establishSession(
+          reply,
+          {
+            kind: 'tenant',
+            accessToken: secrets.token,
+            user: secrets.user,
+            branchId: String(secrets.user.branchId ?? '') || undefined,
+            supportSession: true,
+            supportExpiresAt,
+          },
+          ttl
+        );
+        if (!okSession) {
+          return sendFail(reply, 'SESSION_STORE_UNAVAILABLE', 503);
+        }
+      }
+      return sendOk(reply, omitTokenFromPayload(data));
     } catch (e: unknown) {
       const err = e as { response?: { status?: number } };
       return sendFail(

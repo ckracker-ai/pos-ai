@@ -36,7 +36,11 @@ function LoginRegisteredBanner() {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, hydrate } = useAuthStore();
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

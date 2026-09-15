@@ -429,7 +429,6 @@ export default function PlatformEmpresaDetailPage() {
 
     const {
       openSupportPlaceholderTab,
-      stashSupportHandoff,
       navigateSupportTab,
       closeSupportTab,
     } = await import('@/core/context/support-handoff');
@@ -446,32 +445,16 @@ export default function PlatformEmpresaDetailPage() {
     setSupportLoading(true);
     try {
       const res = await platformFetch<
-        ApiEnvelope<{ token: string; user: PlatformTenantUser; expiresIn: string }>
+        ApiEnvelope<{ user: PlatformTenantUser; expiresIn: string; session?: boolean }>
       >(`platform/empresas/${empresaId}/support-access`, { method: 'POST', body: '{}' });
       const data = unwrapApiEnvelope(res) as {
-        token?: string;
         user?: PlatformTenantUser;
       };
-      if (!data.token || !data.user) {
+      if (!data.user) {
         throw new Error('Respuesta de soporte incompleta');
       }
 
-      const handoffId = stashSupportHandoff({
-        token: data.token,
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.fullName,
-          role: 'admin',
-          branchId: data.user.branchId,
-          isActive: data.user.isActive,
-          createdAt: data.user.createdAt,
-          updatedAt: data.user.updatedAt,
-        },
-        branchId: data.user.branchId,
-      });
-
-      navigateSupportTab(supportTab, handoffId);
+      navigateSupportTab(supportTab);
       flashOk(`Sesión de soporte como ${data.user.email} (2 h).`);
     } catch (err) {
       closeSupportTab(supportTab);

@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
     if (contentType) {
       responseHeaders.set('Content-Type', contentType);
     }
+    const cookies =
+      typeof backendResponse.headers.getSetCookie === 'function'
+        ? backendResponse.headers.getSetCookie()
+        : [];
+    for (const cookie of cookies) {
+      responseHeaders.append('set-cookie', cookie);
+    }
 
     return new NextResponse(responseText, {
       status: backendResponse.status,

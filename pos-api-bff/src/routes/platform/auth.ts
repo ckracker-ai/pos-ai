@@ -2,6 +2,10 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { sendFail, sendOk } from '../../utils/response.js';
 import { ApiCoreServicePlatformAuth } from '../../services/apiCoreServicePlatformAuth.js';
+import config from '../../config/index.js';
+import { clearSession, establishSession, ttlFromJwt } from '../../lib/sessionCookie.js';
+import { publicSessionView } from '../../middlewares/sessionAuth.js';
+import { loginRateLimitRoute } from '../../lib/rateLimit.js';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -11,7 +15,7 @@ const loginSchema = z.object({
 const platformAuthRoutes = async (app: FastifyInstance) => {
   const coreAuth = new ApiCoreServicePlatformAuth();
 
-  app.post('/login', async (request, reply) => {
+  app.post('/login', loginRateLimitRoute, async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
     let user = null as {
@@ -36,15 +40,43 @@ const platformAuthRoutes = async (app: FastifyInstance) => {
       roles: ['PLATFORM_ADMIN'],
     });
 
-    return sendOk(reply, {
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        roleName: 'PLATFORM_ADMIN',
+    const userPayload = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      roleName: 'PLATFORM_ADMIN',
+    };
+
+    const ttl = ttlFromJwt(token, config.sessionTtlSec);
+    const okSession = await establishSession(
+      reply,
+      {
+        kind: 'platform',
+        accessToken: token,
+        user: userPayload,
       },
+      ttl
+    );
+    if (!okSession) {
+      return sendFail(reply, 'SESSION_STORE_UNAVAILABLE', 503);
+    }
+
+    return sendOk(reply, {
+      session: true,
+      user: userPayload,
     });
+  });
+
+  app.get('/session', async (request, reply) => {
+    if (!request.authSession || request.authSession.kind !== 'platform') {
+      return sendFail(reply, 'UNAUTHENTICATED', 401);
+    }
+    return sendOk(reply, publicSessionView(request.authSession));
+  });
+
+  app.post('/logout', async (request, reply) => {
+    await clearSession(request, reply, 'platform');
+    return sendOk(reply, { loggedOut: true });
   });
 };
 

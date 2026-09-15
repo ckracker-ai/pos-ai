@@ -1,9 +1,4 @@
 /** @type {import('next').NextConfig} */
-const bffInternalUrl = (process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:2020').replace(
-  /\/$/,
-  ''
-);
-
 const proxyPrefix = '/pos/proxy';
 
 const nextConfig = {
@@ -16,15 +11,8 @@ const nextConfig = {
     domains: ['localhost', 'api.example.com'],
   },
 
-  // Browser → mismo origen (:8010) → rewrite → BFF (:2020) /pos/proxy/*
-  async rewrites() {
-    return [
-      {
-        source: `${proxyPrefix}/:path*`,
-        destination: `${bffInternalUrl}${proxyPrefix}/:path*`,
-      },
-    ];
-  },
+  // Browser → mismo origen (:8010) → App Router proxy → BFF (:2020) /pos/proxy/*
+  // (route.ts reenvía Set-Cookie HttpOnly; no usar rewrite que puede perder cookies)
 
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? '',
@@ -41,7 +29,7 @@ const nextConfig = {
           {
             key: 'Access-Control-Allow-Headers',
             value:
-              'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-internal-key, x-branch-id',
+              'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-branch-id',
           },
         ],
       },

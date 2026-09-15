@@ -2,56 +2,22 @@ import type { User } from '@/core/interfaces';
 import { useAuthStore } from '@/core/context/auth';
 import { useBranchStore } from '@/store/branch';
 
-const HANDOFF_PREFIX = 'pos-support-handoff:';
-const HANDOFF_TTL_MS = 2 * 60 * 1000;
-
-/** HTTP (sin HTTPS) no expone crypto.randomUUID — fallback para EC2 por IP. */
-function createHandoffId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `h-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-}
-
 export type SupportHandoffPayload = {
-  token: string;
   user: User;
   branchId?: string;
-  exp: number;
 };
 
-export function stashSupportHandoff(payload: Omit<SupportHandoffPayload, 'exp'>): string {
-  const id = createHandoffId();
-  const record: SupportHandoffPayload = { ...payload, exp: Date.now() + HANDOFF_TTL_MS };
-  localStorage.setItem(`${HANDOFF_PREFIX}${id}`, JSON.stringify(record));
-  return id;
+export function applySupportHandoff(payload: SupportHandoffPayload): void {
+  useAuthStore.getState().setUser(payload.user);
+  if (payload.branchId) {
+    useBranchStore.getState().setSelectedBranchId(payload.branchId);
+  } else if (payload.user.branchId) {
+    useBranchStore.getState().setSelectedBranchId(payload.user.branchId);
+  }
 }
 
-export function consumeSupportHandoff(handoffId: string): boolean {
-  const key = `${HANDOFF_PREFIX}${handoffId}`;
-  const raw = localStorage.getItem(key);
-  localStorage.removeItem(key);
-  if (!raw) return false;
-
-  let record: SupportHandoffPayload;
-  try {
-    record = JSON.parse(raw) as SupportHandoffPayload;
-  } catch {
-    return false;
-  }
-
-  if (!record.token || !record.user || record.exp < Date.now()) {
-    return false;
-  }
-
-  useAuthStore.getState().setToken(record.token);
-  useAuthStore.getState().setUser(record.user);
-  if (record.branchId) {
-    useBranchStore.getState().setSelectedBranchId(record.branchId);
-  } else if (record.user.branchId) {
-    useBranchStore.getState().setSelectedBranchId(record.user.branchId);
-  }
-  return true;
+export function consumeSupportHandoff(_handoffId: string): boolean {
+  return false;
 }
 
 export function openSupportPlaceholderTab(): Window | null {
@@ -67,8 +33,8 @@ export function openSupportPlaceholderTab(): Window | null {
   return tab;
 }
 
-export function navigateSupportTab(tab: Window, handoffId: string): void {
-  tab.location.href = `/dashboard?support=${encodeURIComponent(handoffId)}`;
+export function navigateSupportTab(tab: Window): void {
+  tab.location.href = '/dashboard';
 }
 
 export function closeSupportTab(tab: Window | null): void {

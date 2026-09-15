@@ -15,7 +15,6 @@ import { isPlanModuleEnabled } from '@/core/config/plan-access';
 import { resolveRubroCapabilities } from '@/core/config/rubro-packs';
 import { useActiveBranch } from '@/core/hooks/useActiveBranch';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
-import { useAuthStore } from '@/store/auth';
 import { AppPageContent } from '@/components/molecules/AppPageContent';
 import { AppPageHeader } from '@/components/molecules/AppPageHeader';
 import { DashboardLayout } from '@/components/molecules/DashboardLayout';
@@ -64,7 +63,6 @@ function formatWhen(iso: string) {
 
 export default function PedidosPage() {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
   const { branchId } = useActiveBranch();
   const { empresa } = useTenantEmpresa();
   const plan = empresa?.plan ?? null;
@@ -109,12 +107,12 @@ export default function PedidosPage() {
     if (caps.delivery) {
       jobs.push(
         (async () => {
-          const headers: Record<string, string> = {
-            Authorization: `Bearer ${token ?? ''}`,
-            'x-internal-key': process.env.NEXT_PUBLIC_INTERNAL_KEY ?? 'supersecretkey',
-          };
+          const headers: Record<string, string> = {};
           if (branchId) headers['x-branch-id'] = branchId;
-          const pendingRes = await fetch(posProxyPath('sales/deliveries/pending'), { headers });
+          const pendingRes = await fetch(posProxyPath('sales/deliveries/pending'), {
+            headers,
+            credentials: 'include',
+          });
           const pendingJson = await pendingRes.json();
           const list = (pendingJson.data?.deliveries ?? pendingJson.data ?? []) as DeliveryRow[];
           for (const row of Array.isArray(list) ? list : []) {
@@ -163,7 +161,7 @@ export default function PedidosPage() {
       setErrorMessage('Algunas colas no se pudieron cargar. Revisa pagos, envíos o comandas.');
     }
     setLoading(false);
-  }, [branchId, canProofs, caps.delivery, caps.kitchen, token]);
+  }, [branchId, canProofs, caps.delivery, caps.kitchen]);
 
   useEffect(() => {
     void load();

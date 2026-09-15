@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 import * as jwt from 'jsonwebtoken';
+import { readJwtSecret } from '../config/secrets';
 
 
 
@@ -178,7 +179,7 @@ export const authenticateToken = (
 
 
 
-  jwt.verify(token, process.env.JWT_SECRET ?? 'default_secret', async (err, decoded) => {
+  jwt.verify(token, readJwtSecret(), async (err, decoded) => {
 
     if (err) {
 
