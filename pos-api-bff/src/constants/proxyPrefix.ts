@@ -24,6 +24,8 @@ function matchesPublicRules(normalized: string, prefix: string): boolean {
     normalized === '/platform/auth/logout' ||
     normalized === `${prefix}/public/planes` ||
     normalized === `${prefix}/public/registro` ||
+    normalized.startsWith(`${prefix}/public/otp`) ||
+    normalized === `${prefix}/public/password/reset` ||
     normalized.startsWith(`${prefix}/public/legal`) ||
     normalized.startsWith(`${prefix}/public/menu`) ||
     normalized.startsWith(`${prefix}/public/checkout`) ||
@@ -31,6 +33,8 @@ function matchesPublicRules(normalized: string, prefix: string): boolean {
     normalized === `${prefix}/public/webhooks/payment-gateway` ||
     normalized === '/public/planes' ||
     normalized === '/public/registro' ||
+    normalized.startsWith('/public/otp') ||
+    normalized === '/public/password/reset' ||
     normalized.startsWith('/public/legal') ||
     normalized.startsWith('/public/menu') ||
     normalized.startsWith('/public/checkout')

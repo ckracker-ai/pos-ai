@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import publicOtpRoutes from './otp.js';
 import publicPlanesRoutes from './planes.js';
 import publicRegistroRoutes from './registro.js';
 import publicCheckoutRoutes from './checkout.js';
@@ -7,6 +8,7 @@ import publicVirtualMenuRoutes from './virtualMenu.js';
 import paymentGatewayRoutes from './paymentGateway.js';
 
 const publicRoutes = async (app: FastifyInstance) => {
+  app.register(publicOtpRoutes);
   app.register(publicPlanesRoutes);
   app.register(publicRegistroRoutes);
   app.register(publicCheckoutRoutes);

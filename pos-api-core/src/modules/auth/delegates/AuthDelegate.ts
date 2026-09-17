@@ -14,6 +14,15 @@ import { assertCanAddActiveUser } from '../../saas/utils/planLimits';
 import { normalizePhoneE164 } from '../../assistant/delegates/AssistantDelegate';
 import { invalidateAuthUserCache } from '../../../lib/authUserCache';
 import { readJwtSecret } from '../../../config/secrets';
+import {
+  consumeEmailOtp,
+  discardEmailOtp,
+  issueEmailOtp,
+  verifyEmailOtp,
+  type EmailOtpPurpose,
+} from '../../../lib/emailOtp';
+import emailService from '../../../services/emailService';
+import { buildEmailOtpMessage } from '../../../services/emailOtpMessage';
 
 export interface RegisterInput {
   fullName: string;
@@ -339,6 +348,72 @@ class AuthDelegate {
       (user as { role?: { name?: string } }).role?.name ?? 'UNKNOWN'
     );
     return ok(this.toPayload(user, roleName));
+  }
+
+  async requestEmailOtp(
+    purpose: EmailOtpPurpose,
+    email: string
+  ): Promise<Result<{ sent: true }>> {
+    const normalized = email.trim().toLowerCase();
+    let greetingName = 'hola';
+
+    if (purpose === 'password_reset') {
+      const user = await User.findOne({
+        where: { email: normalized, isActive: true },
+        order: [['updatedAt', 'DESC']],
+      });
+      if (!user) return ok({ sent: true });
+      greetingName = String(user.fullName ?? 'hola').split(' ')[0] || 'hola';
+    }
+
+    const issued = await issueEmailOtp(purpose, normalized);
+    if (!issued.success) return issued;
+
+    const message = buildEmailOtpMessage({
+      greetingName,
+      code: issued.value.code,
+      ttlMinutes: Math.round(issued.value.ttlSec / 60),
+    });
+    const sent = await emailService.send({
+      to: normalized,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+    });
+    if (!sent.success) {
+      await discardEmailOtp(purpose, normalized);
+      return fail(sent.error);
+    }
+    return ok({ sent: true });
+  }
+
+  async verifyRegistroOtp(email: string, code: string): Promise<Result<{ consumed: boolean }>> {
+    return verifyEmailOtp('registro', email.trim().toLowerCase(), code);
+  }
+
+  async consumeRegistroOtp(email: string, code: string): Promise<Result<{ consumed: true }>> {
+    return consumeEmailOtp('registro', email.trim().toLowerCase(), code);
+  }
+
+  async resetPasswordWithOtp(
+    email: string,
+    code: string,
+    password: string
+  ): Promise<Result<{ updated: true }>> {
+    const normalized = email.trim().toLowerCase();
+    const consumed = await consumeEmailOtp('password_reset', normalized, code);
+    if (!consumed.success) return consumed;
+
+    const user = await User.scope('withPassword').findOne({
+      where: { email: normalized, isActive: true },
+      order: [['updatedAt', 'DESC']],
+    });
+    if (!user) return fail('EMAIL_OTP_INVALID');
+
+    const passwordHash = await argon2.hash(password, ARGON2_OPTIONS);
+    await user.update({ password: passwordHash });
+    await invalidateAuthUserCache(String(user.id));
+    return ok({ updated: true });
   }
 
   private toPayload(user: User, roleName: string): UserPayload {

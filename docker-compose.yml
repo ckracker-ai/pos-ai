@@ -154,8 +154,8 @@ services:
       - PLATFORM_ADMIN_EMAIL=${PLATFORM_ADMIN_EMAIL:-platform@pos-ai.local}
       - PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-PlatformAdmin2026!}
       - FRONTEND_PUBLIC_URL=${FRONTEND_PUBLIC_URL:-http://localhost:8010}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_HOST=${SMTP_HOST:-pos-ai-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
       - SMTP_SECURE=${SMTP_SECURE:-false}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
@@ -172,11 +172,13 @@ services:
       - WEBPAY_API_BASE_URL=${WEBPAY_API_BASE_URL:-https://webpay3gint.transbank.cl}
       - PAYMENT_CHECKOUT_TOKEN_SECRET=${PAYMENT_CHECKOUT_TOKEN_SECRET:-pos_ai_pay_checkout_dev_only_32x}
       - PAYMENT_WEBHOOK_HMAC_SECRET=${PAYMENT_WEBHOOK_HMAC_SECRET:-pos_ai_pay_hmac_dev_only_32chars}
-      - DB_HOST=pos-ai-db-mysql
-      - DB_PORT=3306
+      - DB_HOST=${DB_HOST:-pos-ai-db-mysql}
+      - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME:-pos-ai-db}
       - DB_USER=${DB_USER:-usr_pos_core}
       - DB_PASSWORD=${DB_PASSWORD:-pos_ai_mysql_core_dev_only_32x}
+      - DB_SSL=${DB_SSL:-false}
+      - DB_SSL_REJECT_UNAUTHORIZED=${DB_SSL_REJECT_UNAUTHORIZED:-true}
     volumes:
       - ./pos-api-core:/usr/src/app
       - /usr/src/app/node_modules
@@ -189,8 +191,12 @@ services:
     depends_on:
       pos-ai-db-mysql:
         condition: service_healthy
+        required: false
       pos-ai-redis:
         condition: service_healthy
+      pos-ai-mailpit:
+        condition: service_healthy
+        required: false
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:1010/health']
       interval: 15s
@@ -217,7 +223,33 @@ services:
       retries: 5
 
   # ==========================================
-  # MySQL — pos-ai-db (3306 interno; host 3308 por defecto)
+  # Mailpit — SMTP de desarrollo hasta Amazon SES
+  # UI: http://localhost:8025  |  SMTP interno: pos-ai-mailpit:1025
+  # No entrega correo real; captura OTP y transaccionales.
+  # ==========================================
+  pos-ai-mailpit:
+    image: axllent/mailpit:v1.21.8
+    container_name: pos-ai-mailpit
+    restart: unless-stopped
+    ports:
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+    environment:
+      MP_MAX_MESSAGES: ${MAILPIT_MAX_MESSAGES:-500}
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks:
+      - internal_backend
+      - public_gateway
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8025/readyz']
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 8s
+
+  # ==========================================
+  # MySQL local — pos-ai-db (3306 interno; host 3308)
+  # En RDS: overlay docker-compose.rds.yml (este servicio no arranca).
   # ==========================================
   pos-ai-db-mysql:
     image: mysql:8.0

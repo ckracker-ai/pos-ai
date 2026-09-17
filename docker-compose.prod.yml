@@ -61,10 +61,20 @@ services:
       APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
     volumes: !reset
 
+  pos-ai-mailpit:
+    profiles: [local-mail]
+    ports: !reset
+
   pos-api-core:
     volumes: !reset
     environment:
       APP_VERSION: ${APP_VERSION:-2.0.2026-09-15}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-POS-AI <noreply@pos-ai.cl>}
 
   certbot:
     profiles: [certbot]

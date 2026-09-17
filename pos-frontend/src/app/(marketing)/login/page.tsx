@@ -10,13 +10,18 @@ function LoginRegisteredBanner() {
   const searchParams = useSearchParams();
   const paid = searchParams.get('paid') === '1';
   const registered = searchParams.get('registered') === '1';
-  if (!paid && !registered) return null;
+  const reset = searchParams.get('reset') === '1';
+  if (!paid && !registered && !reset) return null;
   const email = searchParams.get('email');
   return (
     <div className="mx-auto mb-4 max-w-md rounded-xl border border-brand-olive/30 bg-brand-olive/10 px-4 py-3 text-center text-sm text-brand-ink">
       {paid ? (
         <>
           <strong>Pago confirmado.</strong> Tu suscripción está activa — inicia sesión.
+        </>
+      ) : reset ? (
+        <>
+          <strong>Contraseña actualizada.</strong> Inicia sesión con tu nueva clave.
         </>
       ) : (
         <>

@@ -1,5 +1,5 @@
 /** Rutas accesibles sin sesión tenant (marketing + auth). */
-export const PUBLIC_APP_EXACT = ['/', '/login', '/registro', '/checkout'] as const;
+export const PUBLIC_APP_EXACT = ['/', '/login', '/registro', '/checkout', '/recuperar-contrasena'] as const;
 
 export const PUBLIC_APP_PREFIXES = ['/platform', '/checkout'] as const;
 

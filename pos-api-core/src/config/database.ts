@@ -1,4 +1,5 @@
 import { Sequelize } from 'sequelize';
+import { resolveDbSsl } from './dbSsl';
 
 const FORBIDDEN_DB_USERS = new Set(['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'debian-sys-maint']);
 
@@ -19,6 +20,8 @@ function resolveDbPassword(): string {
   }
   return password;
 }
+
+const dbSsl = resolveDbSsl();
 
 const sequelize = new Sequelize(
   process.env.DB_NAME ?? 'pos-ai-db',
@@ -43,6 +46,7 @@ const sequelize = new Sequelize(
     dialectOptions: {
       decimalNumbers: true,
       charset: 'utf8mb4',
+      ...(dbSsl ? { ssl: dbSsl } : {}),
     },
   }
 );

@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 import { ApiCoreServicePlatformEmpresa } from '../../services/apiCoreServicePlatformEmpresa.js';
 
+import { ApiCoreServiceAuth } from '../../services/apiCoreServiceAuth.js';
+
 import { ApiCoreServiceLegal } from '../../services/apiCoreServiceLegal.js';
 
 import { extractCoreError } from '../../utils/extractCoreError.js';
@@ -52,6 +54,8 @@ const registroFormalSchema = z.object({
 
   legalAcceptance: legalAcceptanceSchema,
 
+  emailOtp: z.string().regex(/^\d{6}$/),
+
 });
 
 
@@ -78,6 +82,8 @@ const registroInformalSchema = z.object({
 
   legalAcceptance: legalAcceptanceSchema,
 
+  emailOtp: z.string().regex(/^\d{6}$/),
+
 });
 
 
@@ -92,6 +98,8 @@ const publicRegistroRoutes = async (app: FastifyInstance) => {
 
   const core = new ApiCoreServicePlatformEmpresa();
 
+  const authCore = new ApiCoreServiceAuth();
+
   const legalCore = new ApiCoreServiceLegal();
 
 
@@ -103,6 +111,20 @@ const publicRegistroRoutes = async (app: FastifyInstance) => {
 
 
     try {
+
+      try {
+        await authCore.verifyRegistroOtp({
+          email: body.adminEmail,
+          code: body.emailOtp,
+        });
+      } catch (otpErr: unknown) {
+        const err = otpErr as { response?: { status?: number } };
+        return sendFail(
+          reply,
+          extractCoreError(otpErr, 'EMAIL_OTP_INVALID'),
+          err.response?.status ?? 400
+        );
+      }
 
       const isInformal = body.modoRegistro === 'INFORMAL';
 
@@ -193,6 +215,15 @@ const publicRegistroRoutes = async (app: FastifyInstance) => {
 
         );
 
+      }
+
+      try {
+        await authCore.consumeRegistroOtp({
+          email: body.adminEmail,
+          code: body.emailOtp,
+        });
+      } catch {
+        // Alta ya creada: el OTP se invalida en el siguiente intento o al caducar.
       }
 
 

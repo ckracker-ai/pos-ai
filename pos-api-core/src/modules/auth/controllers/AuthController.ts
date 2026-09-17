@@ -48,6 +48,46 @@ class AuthController {
     return sendFail(res, err, 401);
   };
 
+  requestEmailOtp = async (req: Request, res: Response): Promise<Response | void> => {
+    const body = req.body as { email: string; purpose: 'registro' | 'password_reset' };
+    const result = await authDelegate.requestEmailOtp(body.purpose, body.email);
+    if (!result.success) {
+      const status = result.error === 'OTP_COOLDOWN' ? 429 : result.error === 'OTP_STORE_UNAVAILABLE' ? 503 : 400;
+      return sendFail(res, result.error, status);
+    }
+    return sendOk(res, result.value);
+  };
+
+  verifyRegistroOtp = async (req: Request, res: Response): Promise<Response | void> => {
+    const body = req.body as { email: string; code: string };
+    const result = await authDelegate.verifyRegistroOtp(body.email, body.code);
+    if (!result.success) {
+      const status = result.error === 'OTP_STORE_UNAVAILABLE' ? 503 : 400;
+      return sendFail(res, result.error, status);
+    }
+    return sendOk(res, result.value);
+  };
+
+  consumeRegistroOtp = async (req: Request, res: Response): Promise<Response | void> => {
+    const body = req.body as { email: string; code: string };
+    const result = await authDelegate.consumeRegistroOtp(body.email, body.code);
+    if (!result.success) {
+      const status = result.error === 'OTP_STORE_UNAVAILABLE' ? 503 : 400;
+      return sendFail(res, result.error, status);
+    }
+    return sendOk(res, result.value);
+  };
+
+  resetPasswordWithOtp = async (req: Request, res: Response): Promise<Response | void> => {
+    const body = req.body as { email: string; code: string; password: string };
+    const result = await authDelegate.resetPasswordWithOtp(body.email, body.code, body.password);
+    if (!result.success) {
+      const status = result.error === 'OTP_STORE_UNAVAILABLE' ? 503 : 400;
+      return sendFail(res, result.error, status);
+    }
+    return sendOk(res, result.value);
+  };
+
   findById = async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     const result = await authDelegate.findById(req.params.id, getEffectiveEmpresaId(req));
     if (result.success) return sendOk(res, result.value);

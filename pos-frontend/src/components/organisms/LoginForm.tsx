@@ -125,6 +125,12 @@ export function LoginForm() {
             />
           </div>
 
+          <p className="text-right text-sm">
+            <a href="/recuperar-contrasena" className="font-medium text-brand-olive hover:underline">
+              ¿Olvidaste tu contraseña?
+            </a>
+          </p>
+
           {legalReauth ? (
             <LegalAcceptanceField
               initialLegal={null}

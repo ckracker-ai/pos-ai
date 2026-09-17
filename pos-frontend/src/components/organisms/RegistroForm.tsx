@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PosAiLogo } from '@/components/atoms/PosAiLogo';
 import { LegalAcceptanceField } from '@/components/molecules/LegalAcceptanceField';
+import { EmailVerificationCode } from '@/components/molecules/EmailVerificationCode';
 import { posProxyPath } from '@/core/constants/api-path';
 import type { SaasPlanCodigo } from '@/core/interfaces';
 import { formatRutInput, parseRut } from '@/core/utils/rutChile';
@@ -36,7 +37,10 @@ function mapApiError(error: string): string {
   if (error.includes('RUT_ALREADY_REGISTERED')) {
     return 'Ese RUT ya está registrado. Si ya tienes cuenta, inicia sesión.';
   }
-  if (error.includes('EMAIL_TAKEN')) {
+  if (error.includes('EMAIL_OTP') || error.includes('OTP_')) {
+    return 'El código de verificación no es válido o expiró. Solicita uno nuevo.';
+  }
+  if (error.includes('EMAIL_TAKEN') || error.includes('EMAIL_ALREADY')) {
     return 'Ese correo ya está en uso. Prueba con otro o inicia sesión.';
   }
   if (error.includes('invalid RUT')) {
@@ -135,6 +139,7 @@ export function RegistroForm({ plans, legal: initialLegal }: RegistroFormProps) 
   const [telefonoNegocio, setTelefonoNegocio] = useState('');
   const [adminFullName, setAdminFullName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
   const [planCodigo, setPlanCodigo] = useState<SaasPlanCodigo>(initialPlan);
@@ -172,6 +177,9 @@ export function RegistroForm({ plans, legal: initialLegal }: RegistroFormProps) 
       if (!adminFullName.trim()) return 'Ingresa tu nombre como administrador.';
       if (!adminEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())) {
         return 'Ingresa un correo válido.';
+      }
+      if (!/^\d{6}$/.test(emailOtp)) {
+        return 'Verifica tu correo con el código de 6 dígitos.';
       }
       if (adminPassword.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
       if (adminPassword !== adminPasswordConfirm) return 'Las contraseñas no coinciden.';
@@ -251,6 +259,7 @@ export function RegistroForm({ plans, legal: initialLegal }: RegistroFormProps) 
       rubroNegocio: rubroNegocio.trim() || undefined,
       telefonoNegocio: telefonoNegocio.trim() || undefined,
       adminEmail: adminEmail.trim().toLowerCase(),
+      emailOtp,
       adminPassword,
       adminFullName: adminFullName.trim(),
       branchName: branchName.trim() || 'Sucursal Central',
@@ -464,11 +473,22 @@ export function RegistroForm({ plans, legal: initialLegal }: RegistroFormProps) 
                   type="email"
                   className={inputClass}
                   value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
+                  onChange={(e) => {
+                    setAdminEmail(e.target.value);
+                    setEmailOtp('');
+                  }}
                   placeholder="tu@negocio.cl"
                   autoComplete="email"
                 />
               </div>
+
+              <EmailVerificationCode
+                email={adminEmail}
+                purpose="registro"
+                code={emailOtp}
+                onCodeChange={setEmailOtp}
+                disabled={loading}
+              />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>

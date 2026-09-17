@@ -15,6 +15,9 @@ import {
   passwordBodySchema,
   registerBodySchema,
   userUpdateBodySchema,
+  otpConsumeBodySchema,
+  otpRequestBodySchema,
+  passwordResetWithOtpBodySchema,
 } from '../schemas/auth.schemas';
 
 const router = Router();
@@ -35,6 +38,30 @@ router.post(
   AuthController.register
 );
 router.post('/login', loginRateLimiter, validate(loginBodySchema, 'body'), AuthController.login);
+router.post(
+  '/otp/request',
+  loginRateLimiter,
+  validate(otpRequestBodySchema, 'body'),
+  AuthController.requestEmailOtp
+);
+router.post(
+  '/otp/verify',
+  loginRateLimiter,
+  validate(otpConsumeBodySchema, 'body'),
+  AuthController.verifyRegistroOtp
+);
+router.post(
+  '/otp/consume',
+  loginRateLimiter,
+  validate(otpConsumeBodySchema, 'body'),
+  AuthController.consumeRegistroOtp
+);
+router.post(
+  '/password/reset',
+  loginRateLimiter,
+  validate(passwordResetWithOtpBodySchema, 'body'),
+  AuthController.resetPasswordWithOtp
+);
 
 // Protected routes
 router.get(

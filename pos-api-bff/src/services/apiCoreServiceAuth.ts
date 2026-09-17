@@ -16,6 +16,38 @@ export class ApiCoreServiceAuth extends ApiCoreBaseService {
     return response.data;
   }
 
+  async requestEmailOtp(input: { email: string; purpose: 'registro' | 'password_reset' }) {
+    const response = await this.client.post('/auth/otp/request', input, {
+      headers: this.publicHeaders(),
+    });
+    return response.data;
+  }
+
+  async verifyRegistroOtp(input: { email: string; code: string }) {
+    const response = await this.client.post(
+      '/auth/otp/verify',
+      { ...input, purpose: 'registro' },
+      { headers: this.publicHeaders() }
+    );
+    return response.data;
+  }
+
+  async consumeRegistroOtp(input: { email: string; code: string }) {
+    const response = await this.client.post(
+      '/auth/otp/consume',
+      { ...input, purpose: 'registro' },
+      { headers: this.publicHeaders() }
+    );
+    return response.data;
+  }
+
+  async resetPasswordWithOtp(input: { email: string; code: string; password: string }) {
+    const response = await this.client.post('/auth/password/reset', input, {
+      headers: this.publicHeaders(),
+    });
+    return response.data;
+  }
+
   async register(
     input: {
       fullName: string;

@@ -1,0 +1,32 @@
+# Overlay RDS — Core usa Amazon RDS y NO arranca el MySQL de Docker.
+#
+# Local (Mailpit sigue activo):
+#   docker compose -f docker-compose.yml -f docker-compose.rds.yml up -d
+#
+# Producción / EC2:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.rds.yml --env-file .env.prod up -d
+#
+# Requisitos en .env / .env.prod:
+#   DB_HOST=xxxx.region.rds.amazonaws.com
+#   DB_PORT=3306
+#   DB_NAME=pos-ai-db
+#   DB_USER=usr_pos_core
+#   DB_PASSWORD=...
+#   DB_SSL=true
+#
+# RDS: mismo charset utf8mb4, security group abierto al EC2 (no 0.0.0.0/0),
+# usuario con host '%', TLS requerido. Migrar datos con mysqldump del volumen local.
+
+services:
+  pos-ai-db-mysql:
+    profiles: [local-mysql]
+
+  pos-api-core:
+    environment:
+      DB_HOST: ${DB_HOST:?DB_HOST (endpoint RDS) is required}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-pos-ai-db}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_SSL: ${DB_SSL:-true}
+      DB_SSL_REJECT_UNAUTHORIZED: ${DB_SSL_REJECT_UNAUTHORIZED:-true}
