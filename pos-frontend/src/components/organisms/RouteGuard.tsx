@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { canAccessPath } from '@/core/config/role-access';
 import { useTenantEmpresa } from '@/core/hooks/useTenantEmpresa';
+import { SupportWidget } from '@/components/organisms/SupportWidget';
 
 /** Solo envuelve rutas en `app/(app)/*` — marketing y platform tienen layout propio. */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
@@ -52,5 +53,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <SupportWidget />
+    </>
+  );
 }

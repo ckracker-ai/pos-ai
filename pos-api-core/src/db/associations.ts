@@ -22,6 +22,8 @@ import LegalAcceptance from '../modules/legal/models/LegalAcceptance.model';
 import VirtualMenu from '../modules/wsp/models/VirtualMenu.model';
 import VirtualMenuCategory from '../modules/wsp/models/VirtualMenuCategory.model';
 import VirtualMenuProduct from '../modules/wsp/models/VirtualMenuProduct.model';
+import SupportCase from '../modules/support/models/SupportCase.model';
+import SupportMessage from '../modules/support/models/SupportMessage.model';
 
 export function defineAssociations(): void {
   LegalDocument.hasMany(LegalAcceptance, { foreignKey: 'documentId', as: 'acceptances' });
@@ -47,6 +49,11 @@ export function defineAssociations(): void {
 
   Empresa.hasMany(User, { foreignKey: 'empresaId', as: 'users' });
   User.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
+  Empresa.hasMany(SupportCase, { foreignKey: 'empresaId', as: 'supportCases' });
+  SupportCase.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+  SupportCase.hasMany(SupportMessage, { foreignKey: 'casoId', as: 'messages' });
+  SupportMessage.belongsTo(SupportCase, { foreignKey: 'casoId', as: 'caso' });
 
   Empresa.hasMany(Category, { foreignKey: 'empresaId', as: 'categories' });
   Category.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });

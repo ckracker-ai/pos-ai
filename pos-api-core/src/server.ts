@@ -22,6 +22,7 @@ import reportsRoutes from './modules/reports/routes/reports.routes';
 import empresaRoutes from './modules/tenant/routes/empresa.routes';
 import assistantRoutes from './modules/assistant/routes/assistant.routes';
 import paymentProofRoutes from './modules/assistant/routes/paymentProof.routes';
+import supportRoutes from './modules/support/routes/support.routes';
 import platformAuthRoutes from './modules/platform/routes/platformAuth.routes';
 import { seedBootstrapPlatformAdmin } from './db/seedBootstrapPlatformAdmin';
 import { seedCutChile } from './db/seedCutChile';
@@ -130,6 +131,7 @@ async function bootstrap(): Promise<void> {
   app.use('/assistant', assistantRoutes);
   app.use('/payments', paymentRoutes);
   app.use('/payment-proofs', paymentProofRoutes);
+  app.use('/support', supportRoutes);
 
   app.use(globalErrorHandler);
 

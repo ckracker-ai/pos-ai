@@ -630,6 +630,12 @@ export default function PlatformEmpresaDetailPage() {
               >
                 Ver usuarios
               </button>
+              <Link
+                href={`/platform/soporte?empresaId=${empresaId}`}
+                className="app-btn-secondary text-xs"
+              >
+                Casos de soporte
+              </Link>
               <button
                 type="button"
                 disabled={supportLoading}

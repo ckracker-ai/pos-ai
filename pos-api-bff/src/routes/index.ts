@@ -15,6 +15,7 @@ import publicRoutes from './public/index.js';
 import posRoutes from './pos.js';
 import wspRoutes from './wsp.js';
 import wholesaleRoutes from './wholesale.js';
+import tenantSupportRoutes from './support.js';
 
 const apiRoutes = async (app: FastifyInstance) => {
   app.register(healthRoutes, { prefix: '/health' });
@@ -33,6 +34,7 @@ const apiRoutes = async (app: FastifyInstance) => {
   app.register(posRoutes, { prefix: '/pos' });
   app.register(wspRoutes, { prefix: '/wsp' });
   app.register(wholesaleRoutes, { prefix: '/wholesale' });
+  app.register(tenantSupportRoutes, { prefix: '/support' });
 };
 
 export default apiRoutes;

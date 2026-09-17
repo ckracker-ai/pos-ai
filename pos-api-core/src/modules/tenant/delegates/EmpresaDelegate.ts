@@ -32,6 +32,7 @@ import type { SaasPlanCodigo } from '../../saas/constants/planCodes';
 import { getPlanDescription, getPlanDisplayName } from '../../saas/utils/planDisplay';
 import * as argon2 from 'argon2';
 import activationNotificationDelegate from '../../notifications/delegates/ActivationNotificationDelegate';
+import supportDelegate from '../../support/delegates/SupportDelegate';
 
 export interface EmpresaPlanSummary {
   id: string;
@@ -638,6 +639,16 @@ class EmpresaDelegate {
     if (!row) return fail('EMPRESA_NOT_FOUND');
     await row.update({ estado: 'SUSPENDIDO' });
     await this.reloadWithPlan(row);
+    try {
+      await supportDelegate.ensureOpenSignal({
+        empresaId: id,
+        subject: 'Empresa suspendida',
+        body: 'Señal automática: el tenant quedó SUSPENDIDO. Revisar acceso y suscripción.',
+        severity: 'ALTA',
+      });
+    } catch {
+      /* no bloquear la suspensión si el inbox no está listo */
+    }
     const sub = await this.loadSuscripcion(id);
     return ok(this.toRecord(row, sub));
   }

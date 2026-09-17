@@ -8,6 +8,7 @@ import { usePlatformAuthStore } from '@/core/context/platform-auth';
 
 const NAV_ITEMS = [
   { href: '/platform/dashboard', label: 'Dashboard', icon: 'chart' },
+  { href: '/platform/soporte', label: 'Soporte', icon: 'help' },
   { href: '/platform/empresas', label: 'Empresas', icon: 'building' },
   { href: '/platform/whatsapp', label: 'Simular WSP', icon: 'chat' },
   { href: '/platform/voice', label: 'Simular voz', icon: 'register' },
