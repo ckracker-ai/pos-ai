@@ -16,6 +16,7 @@ pos-api-bff/src/**/*.js
 # Environment & secrets — NUNCA en Git (solo en VPS / máquina local)
 .env
 .env.*
+/claves.txt
 **/.env
 **/.env.*
 !.env.example

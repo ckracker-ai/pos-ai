@@ -14,7 +14,7 @@ export default function PlatformLoginPage() {
   const isLoading = usePlatformAuthStore((s) => s.isLoading);
   const error = usePlatformAuthStore((s) => s.error);
 
-  const [email, setEmail] = useState('platform@pos-ai.local');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   useEffect(() => {
@@ -48,13 +48,6 @@ export default function PlatformLoginPage() {
             <h1 className="mt-2 font-serif text-xl font-semibold text-brand-ink">Consola super-admin</h1>
             <p className="mt-1 text-sm text-brand-ink-muted">Gestión de empresas tenant</p>
           </div>
-
-          <p className="rounded-lg border border-brand-linen bg-brand-surface/80 px-3 py-2 text-xs text-brand-ink-muted">
-            Dev: <strong className="text-brand-ink">platform@pos-ai.local</strong> /{' '}
-            <strong className="text-brand-ink">PlatformAdmin2026!</strong>
-            <br />
-            (No uses este usuario en el login de sucursal /login)
-          </p>
 
           {error && (
             <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
